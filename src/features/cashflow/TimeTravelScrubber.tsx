@@ -248,12 +248,12 @@ export const TimeTravelScrubber: React.FC<TimeTravelScrubberProps> = ({
 
         {/* Day Ticks Label */}
         <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-2">
-          <span>Day 1 (วันนี้)</span>
-          <span>Day 5 (มัดจำ 20%)</span>
-          <span>Day 10 (ส่งมอบครบ)</span>
-          <span>Day 15 (ค่าเช่า)</span>
-          <span>Day 25 (รับ 80%)</span>
-          <span>Day 30</span>
+          <span>D1 <span className="hidden sm:inline">(วันนี้)</span></span>
+          <span>D5 <span className="hidden sm:inline">(มัดจำ 20%)</span></span>
+          <span>D10 <span className="hidden sm:inline">(ส่งมอบครบ)</span></span>
+          <span>D15 <span className="hidden sm:inline">(ค่าเช่า)</span></span>
+          <span>D25 <span className="hidden sm:inline">(รับ 80%)</span></span>
+          <span>D30</span>
         </div>
       </div>
 
