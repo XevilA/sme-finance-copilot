@@ -1,5 +1,8 @@
 # SME Finance Copilot — ห้องประกอบโอกาสธุรกิจ (Opportunity Studio)
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FXevilA%2Fsme-finance-copilot)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-XevilA%2Fsme--finance--copilot-181717?style=flat&logo=github)](https://github.com/XevilA/sme-finance-copilot)
+
 > **ระบบ Frontend เว็บไซต์ระดับสตูดิโอสำหรับการประกอบแผนธุรกิจ การเงินกระแสเงินสด และการรวมทีมรับงานขนาดใหญ่**
 > *พัฒนาขึ้นตามข้อกำหนด UX/UI + Frontend + Motion System (Part A – M)*
 
