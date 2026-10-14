@@ -9,7 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .models import FinancialRecord, SmeProfile, SwarmAllocation, SwarmProject
+from .models import FinancialRecord, Simulation, SmeProfile, SwarmAllocation, SwarmProject, UploadEvent
 
 
 def parse_uuid(value: str | None) -> uuid.UUID | None:
@@ -151,3 +151,56 @@ async def load_shop_capacities(session: AsyncSession | None, sme_ids: list[uuid.
         }
         for row in rows
     ]
+
+
+async def save_upload_event(
+    session: AsyncSession | None,
+    sme_id: uuid.UUID | None,
+    record_id: uuid.UUID | None,
+    filename: str,
+    byte_size: int,
+    content_sha256: str,
+    status: str,
+    reject_reason: str | None = None,
+) -> uuid.UUID | None:
+    """Records that a workbook was seen. The file bytes are never stored."""
+    if session is None:
+        return None
+    event = UploadEvent(
+        sme_id=sme_id,
+        record_id=record_id,
+        filename=filename[:255],
+        byte_size=byte_size,
+        content_sha256=content_sha256,
+        status=status,
+        reject_reason=None if reject_reason is None else reject_reason[:2000],
+    )
+    session.add(event)
+    await session.flush()
+    return event.id
+
+
+async def save_simulation(
+    session: AsyncSession | None,
+    sme_id: uuid.UUID | None,
+    scenario_key: str,
+    params: dict,
+    results: dict,
+    project_id: uuid.UUID | None = None,
+    base_record_id: uuid.UUID | None = None,
+) -> uuid.UUID | None:
+    if session is None:
+        return None
+    if sme_id is not None and await session.get(SmeProfile, sme_id) is None:
+        return None
+    simulation = Simulation(
+        sme_id=sme_id,
+        project_id=project_id,
+        base_record_id=base_record_id,
+        scenario_key=scenario_key,
+        params=params,
+        results=results,
+    )
+    session.add(simulation)
+    await session.flush()
+    return simulation.id

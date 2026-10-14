@@ -184,6 +184,58 @@ docker compose -f backend/docker-compose.yml up -d
 
 ถ้ามี PostgreSQL ติดตั้งอยู่แล้ว ใช้ `psql -d sme_swarm -f backend/db/schema.sql -f backend/db/seed.sql` ได้ผลเหมือนกัน
 
+### ตารางที่เพิ่มใน Module 8
+
+| ตาราง | เก็บอะไร |
+| --- | --- |
+| `users` | ผู้ใช้ + `role` (`sme_owner`, `investor`, `analyst`, `admin`) เป็นหลักยึดของ RBAC มี constraint บังคับว่า `sme_owner` ต้องผูก `sme_id` และ `investor` ต้องผูก `investor_id` |
+| `investor_profiles` | นักลงทุน/ผู้ให้ทุนที่ลงเงินกับโครงการโดยตรง (angel, VC, ภาครัฐ) แยกจาก `funding_products` ที่เป็นผลิตภัณฑ์สินเชื่อ |
+| `investor_matches` | ผลการจับคู่ SME กับนักลงทุนพร้อมคะแนนและเหตุผล |
+
+การบังคับสิทธิ์ (enforcement) ยังไม่ได้ผูกกับ route ใด เพราะจะทำให้ frontend ที่เรียก API อยู่ตอนนี้ถูกปฏิเสธทันที schema พร้อมแล้ว เหลือขั้นเพิ่ม dependency ตรวจ role ตอนที่ตกลงเรื่อง auth กันแล้ว
+
+`schema.sql` เป็น idempotent ทั้งไฟล์ (`IF NOT EXISTS` ทุกจุด) รันซ้ำบน DB ที่มีข้อมูลอยู่ได้เพื่อ apply ตารางใหม่
+
+```powershell
+docker exec -i sme_swarm_db psql -U postgres -d sme_swarm -v ON_ERROR_STOP=1 < backend/db/schema.sql
+```
+
+### Endpoint ที่เพิ่ม (Module 8 + Module 6)
+
+| Method | Endpoint | Input | หมายเหตุ |
+| --- | --- | --- | --- |
+| POST | `/api/upload` | multipart workbook + `sme_id?` | เรียก parser ของ Codex แล้วคืน metrics + unit economics + เกรด A-D บันทึก `financial_records` และ `upload_events` โดย**ไม่เก็บไฟล์** เก็บแค่ชื่อ ขนาด และ SHA-256 ไฟล์ที่ parse ไม่ผ่านก็ถูกบันทึกเป็น `rejected` พร้อมเหตุผล |
+| POST | `/api/simulate` | `{ input, scenario, swarm? }` | Module 6 เทียบ Plan A กับ Plan B |
+
+### `/api/simulate` — ตัวแปรที่ปรับได้
+
+ฝั่งรายได้: `revenue_change_pct`, `units_sold_change_pct`, `unit_price_change_pct`
+ฝั่งต้นทุน: `cost_change_pct` (เหมารวม) และตัวเจาะจง `cogs_change_pct`, `operating_expenses_change_pct`, `fixed_costs_change_pct`, `variable_cost_change_pct` — **ตัวเจาะจงชนะตัวเหมารวมในฟิลด์ของตัวเอง**
+กระแสเงินสดและเงินทุน: `collection_delay_days`, `extra_funding`
+หนี้: `loan` (แทนเงื่อนไขเดิม), `drop_loan`
+ทีมร้านค้า: `remove_shops`, `add_shops`
+
+สมมติฐานที่ engine ใช้จะถูกส่งกลับใน `assumptions` ทุกครั้ง ไม่มีการปรับค่าแบบเงียบ ๆ:
+- กำไรถูกคำนวณใหม่จากบรรทัด P&L ที่ถูก scale แล้ว `net_income` ขยับตามส่วนต่าง
+- ส่วนต่างกำไรถือเป็นเงินสดในงวดเดียวกัน จึงขยับ `operating_cash_flow`, `cash_available_for_debt_service` และ `cash_balance` ด้วย **ถ้าไม่ทำข้อนี้ DSCR จะไม่ขยับเลย และ DSCR คิดเป็น 35% ของเกรด ทำให้ simulator ไร้ประโยชน์**
+- `extra_funding` ถือเป็นการกู้ จึงเพิ่มทั้ง `assets` และ `liabilities` พร้อมกัน สมการบัญชีจึงยังสมดุล
+- ถ้า `cash_balance` ติดลบจะถูกตรึงที่ 0 และบันทึกไว้ใน `notes` ว่าขาดเท่าไร
+
+ผลลัพธ์มี `delta.summary.verdict` เป็น `better` / `worse` / `mixed` / `unchanged` พร้อมรายชื่อตัวชี้วัดใน `improved` และ `worsened` โดยตัวชี้วัดที่ "ยิ่งต่ำยิ่งดี" (`funding_gap`, `total_cost`, `cost_per_unit`, `breakeven_units`, `debt_ratio`, `pmt`) ถูกตีความกลับทางให้ถูกต้อง
+
+ถ้า scenario ดันงบออกนอกสัญญา input (เช่น เงินสดเกินสินทรัพย์หมุนเวียน) จะได้ 422 พร้อมชื่อฟิลด์ที่ผิด ไม่ส่งตัวเลขการเงินกลับไปใน error
+
+### เชื่อม Frontend แบบไม่แตะ UI
+
+`src/services/api.ts` เป็นไฟล์ใหม่ล้วน ไม่ import component ไม่แตะ CSS/Tailwind/layout และ **ไม่มีใคร import มัน** Vite จึง tree-shake ออกจาก bundle ทั้งหมด ยืนยันด้วยการ build: hash ของ `index-*.js` และ `index-*.css` เท่าเดิมทุกตัว และ module count เท่าเดิมที่ 1955
+
+ของเดิม `src/api/client.ts` (client ที่ใช้ mock) ไม่ถูกแก้แม้แต่บรรทัดเดียว หน้าไหนจะต่อ backend จริงก็เรียกฟังก์ชันหรือ hook จากไฟล์ใหม่แล้วส่งค่าเข้า state ของตัวเอง
+
+ฟังก์ชัน: `health`, `uploadStatement`, `calculate`, `analyze`, `buildSwarm`, `getSwarm`, `simulate`
+Hooks: `useBackend` (ยกเลิก request เก่าอัตโนมัติเมื่อ deps เปลี่ยนหรือ unmount), `useBackendHealth`, `useBackendAction` (สำหรับ POST ที่ผู้ใช้กดเอง)
+
+ตั้ง base URL ผ่าน `VITE_BACKEND_URL` ค่าเริ่มต้นคือ `http://127.0.0.1:8000`
+
 ### Connection pool
 
 asyncpg ผูก connection ไว้กับ event loop ที่เปิดมัน จึงนำ connection จาก pool ไปใช้ข้าม loop ไม่ได้ ซึ่งเป็นสิ่งที่ `TestClient` (สร้าง loop ใหม่ทุก request) และ serverless ทำ ค่าเริ่มต้นจึงเป็น `NullPool` คือเปิด connection ใหม่ต่อหนึ่ง session หากรันหลัง uvicorn ที่อยู่ยาว ให้ตั้ง `DB_POOL=queue` เพื่อใช้ pool จริง

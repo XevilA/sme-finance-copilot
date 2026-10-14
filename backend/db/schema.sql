@@ -158,6 +158,82 @@ CREATE TABLE IF NOT EXISTS ai_analyses (
     CONSTRAINT ai_analyses_cache_key UNIQUE (scope, input_sha256)
 );
 
+-- 9. Users and role-based access control -------------------------------------
+-- role is the RBAC anchor. An sme_owner row points at the SME it may act for;
+-- an investor row points at its investor profile. Enforcement lives in the API
+-- layer, so adding a role here never silently widens access.
+CREATE TABLE IF NOT EXISTS users (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           TEXT        NOT NULL UNIQUE,
+    full_name       TEXT        NOT NULL,
+    role            TEXT        NOT NULL
+                    CHECK (role IN ('sme_owner', 'investor', 'analyst', 'admin')),
+    sme_id          UUID        REFERENCES sme_profiles (id) ON DELETE SET NULL,
+    investor_id     UUID,
+    password_hash   TEXT,
+    active          BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- An sme_owner is meaningless without the SME it owns; likewise investors.
+    CONSTRAINT role_scope CHECK (
+        (role = 'sme_owner' AND sme_id IS NOT NULL)
+        OR (role = 'investor' AND investor_id IS NOT NULL)
+        OR role IN ('analyst', 'admin')
+    )
+);
+CREATE INDEX IF NOT EXISTS users_role_idx ON users (role);
+
+-- 10. Investor profiles and their scored matches -----------------------------
+-- funding_products covers lending products; this covers the counterparties who
+-- back a swarm project directly (angels, VCs, government programmes).
+CREATE TABLE IF NOT EXISTS investor_profiles (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                TEXT        NOT NULL,
+    type                TEXT        NOT NULL
+                        CHECK (type IN ('bank', 'vc', 'angel', 'government', 'fintech', 'corporate')),
+    province            TEXT,
+    ticket_min          NUMERIC(20,2) NOT NULL CHECK (ticket_min >= 0),
+    ticket_max          NUMERIC(20,2) NOT NULL CHECK (ticket_max >= 0),
+    target_sectors      JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    risk_appetite       TEXT        NOT NULL CHECK (risk_appetite IN ('low', 'medium', 'high')),
+    min_grade           CHAR(1)     CHECK (min_grade IN ('A', 'B', 'C', 'D')),
+    min_dscr            NUMERIC(12,4),
+    horizon_months      INTEGER     CHECK (horizon_months > 0),
+    contact_email       TEXT,
+    active              BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ticket_range CHECK (ticket_max >= ticket_min)
+);
+CREATE INDEX IF NOT EXISTS investor_profiles_sector_idx ON investor_profiles USING GIN (target_sectors);
+
+CREATE TABLE IF NOT EXISTS investor_matches (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    investor_id      UUID        NOT NULL REFERENCES investor_profiles (id) ON DELETE CASCADE,
+    sme_id           UUID        NOT NULL REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    project_id       UUID        REFERENCES swarm_projects (id) ON DELETE SET NULL,
+    requested_amount NUMERIC(20,2) NOT NULL CHECK (requested_amount >= 0),
+    sme_grade        CHAR(1)     CHECK (sme_grade IN ('A', 'B', 'C', 'D')),
+    match_score      SMALLINT    NOT NULL CHECK (match_score BETWEEN 0 AND 100),
+    match_reason     TEXT        NOT NULL,
+    status           TEXT        NOT NULL CHECK (status IN ('eligible', 'requires_info', 'not_eligible')),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT one_match_per_investor UNIQUE (investor_id, sme_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS investor_matches_sme_score_idx
+    ON investor_matches (sme_id, match_score DESC);
+
+-- users.investor_id is declared before investor_profiles exists, so the foreign
+-- key is attached here. Re-running this file must not fail on an existing one.
+DO $$
+BEGIN
+    ALTER TABLE users ADD CONSTRAINT users_investor_fk
+        FOREIGN KEY (investor_id) REFERENCES investor_profiles (id) ON DELETE SET NULL;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END;
+$$;
+
 -- updated_at triggers --------------------------------------------------------
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
 BEGIN
@@ -172,4 +248,12 @@ CREATE TRIGGER sme_profiles_touch BEFORE UPDATE ON sme_profiles
 
 DROP TRIGGER IF EXISTS swarm_projects_touch ON swarm_projects;
 CREATE TRIGGER swarm_projects_touch BEFORE UPDATE ON swarm_projects
+    FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+DROP TRIGGER IF EXISTS users_touch ON users;
+CREATE TRIGGER users_touch BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+DROP TRIGGER IF EXISTS investor_profiles_touch ON investor_profiles;
+CREATE TRIGGER investor_profiles_touch BEFORE UPDATE ON investor_profiles
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();

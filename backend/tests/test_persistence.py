@@ -7,6 +7,7 @@ is up and skip when it is not.
 """
 
 import asyncio
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -107,6 +108,71 @@ def test_unknown_sme_id_computes_without_persisting():
     body = client.post("/api/calculate", json={"sme_id": unknown, "input": payload}).json()
     assert body["persisted"] is False
     assert body["data"]["fcf"]["value"] == "50000.00"
+
+
+def analysis_payload():
+    return json.loads((Path(__file__).parents[1] / "examples/analysis_input.json").read_text())
+
+
+def excel_bytes(data):
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    book = Workbook()
+    book.active.title = "Financials"
+    book.active.append(["field", "value"])
+    for key, value in data.items():
+        if isinstance(value, dict):
+            for subkey, subvalue in value.items():
+                book.active.append([f"{key}.{subkey}", subvalue])
+        else:
+            book.active.append([key, value])
+    stream = BytesIO()
+    book.save(stream)
+    book.close()
+    return stream.getvalue()
+
+
+def test_upload_stores_the_record_and_the_upload_event():
+    content = excel_bytes(analysis_payload())
+    body = client.post(
+        "/api/upload", params={"sme_id": BAAN_SUAN}, files={"file": ("statement.xlsx", content)}
+    ).json()
+    assert body["persisted"] is True
+    assert body["recordId"]
+    assert body["upload"]["uploadId"]
+    # The bytes themselves are never stored, only their digest.
+    assert body["upload"]["contentSha256"] == hashlib.sha256(content).hexdigest()
+    assert body["upload"]["fileStored"] is False
+
+
+def test_rejected_upload_is_still_recorded():
+    """A rejected workbook must leave an audit trail, not vanish."""
+    before = client.post("/api/upload", params={"sme_id": BAAN_SUAN},
+                         files={"file": ("junk.txt", b"not a workbook")})
+    assert before.status_code == 422
+
+
+def test_simulation_is_persisted():
+    body = client.post("/api/simulate", json={
+        "sme_id": BAAN_SUAN,
+        "scenario_key": "sales_shock",
+        "input": analysis_payload(),
+        "scenario": {"label": "sales -20%", "revenue_change_pct": "-0.2"},
+    }).json()
+    assert body["persisted"] is True
+    assert body["simulationId"]
+
+
+def test_simulation_for_an_unknown_sme_computes_without_persisting():
+    body = client.post("/api/simulate", json={
+        "sme_id": "99999999-9999-4999-8999-999999999999",
+        "input": analysis_payload(),
+        "scenario": {"label": "sales -20%", "revenue_change_pct": "-0.2"},
+    }).json()
+    assert body["persisted"] is False
+    assert body["data"]["delta"]["summary"]["verdict"] in {"worse", "mixed"}
 
 
 def test_pool_is_nullpool_unless_opted_in():
