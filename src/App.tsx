@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/ui/AppSidebar";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { AIPanel } from "@/features/ai-panel/AIPanel";
 import { StoryModeModal } from "@/features/reports/StoryModeModal";
+import { MobileDrawer } from "@/components/ui/MobileDrawer";
 
 // Feature Pages
 import { OverviewPage } from "@/features/overview/OverviewPage";
@@ -147,6 +148,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* Global Modals & Side Panels */}
+      <MobileDrawer />
       <CommandPalette />
       <AIPanel />
       <StoryModeModal />
