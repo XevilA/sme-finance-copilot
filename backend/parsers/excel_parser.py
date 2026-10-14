@@ -106,6 +106,8 @@ def parse_excel(content: bytes, filename: str, *, sheet_name: str = "Financials"
         raise ExtractionError("Invalid or unreadable .xlsx workbook") from exc
     try:
         if sheet_name not in workbook.sheetnames:
+            if {"Statement of Financial Position", "งบไทย"} & set(workbook.sheetnames):
+                raise ExtractionError("Multi-statement workbook: use extract_statement_workbook or extract_statement_file; select a consistent business, period, and currency before grading")
             raise ExtractionError(f"Required sheet: {sheet_name}")
         sheet = workbook[sheet_name]
         if sheet.max_column is not None and sheet.max_column > 2:
@@ -157,3 +159,15 @@ def parse_excel_file(path: str | Path = DEFAULT_TEMPLATE_PATH, *, sheet_name: st
     with file_path.open("rb") as source:
         content = source.read(MAX_UPLOAD_BYTES + 1)
     return parse_excel(content, file_path.name, sheet_name=sheet_name)
+
+
+def extract_statement_workbook(content: bytes, filename: str) -> dict:
+    from .statement_parser import extract_statement_workbook as extract
+
+    return extract(content, filename)
+
+
+def extract_statement_file(path: str | Path = DEFAULT_TEMPLATE_PATH) -> dict:
+    from .statement_parser import extract_statement_file as extract
+
+    return extract(path)
