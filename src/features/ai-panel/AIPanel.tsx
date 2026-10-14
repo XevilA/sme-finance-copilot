@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { NavPage, useAppStore } from "@/store/useAppStore";
-import { useAnalysisStore } from "@/store/useAnalysisStore";
+import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { AIResponse } from "@/api/contracts/types";
 import {
@@ -29,62 +28,25 @@ export const AIPanel: React.FC = () => {
   const [aiData, setAIData] = useState<AIResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedRefId, setSelectedRefId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { result: financialAnalysis, inputJson, isStale, setResult } = useAnalysisStore();
 
   // Fetch AI explanation based on current active page
   useEffect(() => {
-    let active = true;
-    setError(null);
     if (isAIPanelOpen) {
-      setAIData(null);
-      setSelectedRefId(null);
-      setActiveEvidenceTarget(null);
-      if (currentPage === "health") {
-        setLoading(false);
-        if (financialAnalysis) setAIData(financialAnalysis.data.explanation);
-        else setError("Run a financial analysis on the health page first.");
-        return;
-      }
       setLoading(true);
       apiClient
         .getAIExplanation(currentPage)
         .then((res) => {
-          if (!active) return;
           setAIData(res.data);
           setLoading(false);
         })
-        .catch((cause) => {
-          if (!active) return;
-          setError(cause instanceof Error ? cause.message : "Cannot load the explanation.");
-          setLoading(false);
-        });
+        .catch(() => setLoading(false));
     } else {
       setActiveEvidenceTarget(null);
       setSelectedRefId(null);
     }
-    return () => { active = false; };
-  }, [isAIPanelOpen, currentPage, setActiveEvidenceTarget, financialAnalysis]);
+  }, [isAIPanelOpen, currentPage, setActiveEvidenceTarget]);
 
   if (!isAIPanelOpen) return null;
-
-  const refreshAnalysis = async () => {
-    if (currentPage !== "health") {
-      setCurrentPage("health");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const input = JSON.parse(inputJson);
-      if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Financial input must be a JSON object.");
-      setResult(await apiClient.analyzeFinancials(input, aiData?.mode === "openai"));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Analysis failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleHighlightEvidence = (item: { id: string; targetElementId: string }) => {
     if (selectedRefId === item.id) {
@@ -128,7 +90,7 @@ export const AIPanel: React.FC = () => {
             <h3 className="font-display font-bold text-ink text-sm flex items-center gap-1.5">
               <span>SME Copilot Intelligence</span>
               <span className="text-[10px] bg-brand/10 text-brand px-1.5 py-0.2 rounded font-normal">
-                {currentPage === "health" ? (aiData?.mode === "openai" ? "Model-assisted" : "Rules-based") : "Demo"}
+                AI วิเคราะห์
               </span>
             </h3>
             <p className="text-[11px] text-ink-muted">อธิบายบริบทหน้า: {currentPage}</p>
@@ -146,13 +108,11 @@ export const AIPanel: React.FC = () => {
       </div>
 
       {/* Stale Warning Bar if user made sandbox simulation changes */}
-      {(hasUnsavedChanges || (currentPage === "health" && isStale)) && (
+      {hasUnsavedChanges && (
         <div className="p-2.5 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
           <span>ข้อมูลในหน้าเปลี่ยนแล้ว! การวิเคราะห์นี้อิงจากข้อมูลเดิม</span>
           <button
             type="button"
-            disabled={loading}
-            onClick={() => void refreshAnalysis()}
             className="px-2 py-0.5 bg-brand text-white text-[10px] font-medium rounded hover:bg-brand-dark flex items-center gap-1"
           >
             <RefreshCw className="w-2.5 h-2.5" />
@@ -163,8 +123,6 @@ export const AIPanel: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs">
-        {error && <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800">{error}</div>}
-        {aiData?.warning && <div role="status" className="p-3 bg-amber-50 rounded-xl text-amber-900">{aiData.warning}</div>}
         {loading ? (
           <div className="space-y-4 animate-pulse pt-4">
             <div className="h-4 bg-slate-200 rounded w-3/4" />
@@ -244,12 +202,7 @@ export const AIPanel: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const target = typeof sug === "string" ? undefined : sug.targetPage;
-                          if (target && ["health", "cashflow", "funding", "import"].includes(target)) {
-                            setCurrentPage(target as NavPage);
-                            setAIPanelOpen(false);
-                          }
-                          else if (currentPage === "overview") setCurrentPage("cashflow");
+                          if (currentPage === "overview") setCurrentPage("cashflow");
                           else if (currentPage === "swarm") setCurrentPage("funding");
                           else setCurrentPage("simulator");
                         }}
@@ -281,7 +234,7 @@ export const AIPanel: React.FC = () => {
       </div>
 
       {/* Quick Prompt Questions */}
-      {currentPage !== "health" && <div className="p-3 bg-slate-50 border-t border-borderLine space-y-1.5">
+      <div className="p-3 bg-slate-50 border-t border-borderLine space-y-1.5">
         <span className="text-[10px] font-bold text-ink-muted uppercase block">คำถามลัด:</span>
         <div className="flex flex-wrap gap-1.5">
           {currentQuestions.map((q, idx) => (
@@ -297,7 +250,7 @@ export const AIPanel: React.FC = () => {
             </button>
           ))}
         </div>
-      </div>}
+      </div>
     </div>
   );
 };

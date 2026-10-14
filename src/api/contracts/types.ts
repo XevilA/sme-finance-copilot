@@ -476,7 +476,4 @@ export type AIResponse = {
   suggestions: (AISuggestion | string)[];
   unknowns: string[];
   staleWarning?: string;
-  mode?: "rules" | "openai";
-  policyVersion?: string;
-  warning?: string | null;
 };

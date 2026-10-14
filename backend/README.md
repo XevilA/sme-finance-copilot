@@ -206,25 +206,26 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/analyze -Conten
 
 ตัวอย่างได้เกรด **B / 75.00**, กำไรสุทธิ 50,000 บาท, จุดคุ้มทุน 1,154 หน่วย และ ROI 15% API ยังคืนเหตุผล จุดแข็ง จุดอ่อน ความเสี่ยง และหลักฐานที่อ้างอิงตัวเลขจริงจากข้อมูลที่ส่งมา
 
-## ซ้อมเดโมผ่านหน้าเว็บ
+## ซ้อมเดโม backend โดยคงดีไซน์ frontend เดิม
+
+Frontend ถูกคืนให้ตรงกับ commit ต้นฉบับ `73649fc` แล้ว รวมหน้า Health, AI Panel, API client และ Vite configuration ไม่มีช่อง JSON ปุ่มอัปโหลด หรือกล่องเกรดที่เพิ่มเข้าไปในหน้าเว็บอีกต่อไป
 
 1. เปิด backend ที่พอร์ต 8000 ด้วย `backend\run.cmd`
-2. เปิด PowerShell อีกหน้าต่างที่โฟลเดอร์โครงการ แล้วรัน `pnpm install --frozen-lockfile` และ `pnpm dev`
-3. เปิด `http://localhost:3000` ไปหน้า **สุขภาพการเงิน**
-4. กด **Load simulated example** แล้ว **Calculate and analyze** เพื่อตรวจเกรดและสูตร
-5. กด **ให้ AI อธิบายตัวชี้วัด** เพื่อตรวจเหตุผลและเลือกหลักฐานที่เชื่อมกับการ์ด
-6. กด **Download Excel template** แล้วอัปโหลดไฟล์นั้นผ่าน **Analyze Excel** ต้องได้ผลตรงกับ JSON
-7. ลองเปลี่ยน `equity` เป็น `"1"` ต้องเห็น error งบบัญชีไม่สมดุล พร้อมแจ้งว่าผลเดิมล้าสมัย
+2. เปิด `http://127.0.0.1:8000/docs`
+3. ใช้ `GET /api/analysis/example` อ่านข้อมูลตัวอย่างที่ระบุ `kind: simulated`
+4. ส่งข้อมูลตัวอย่างภายใน field `input` ไป `POST /api/analyze` โดยตั้ง `use_llm: false` ต้องได้เกรด **B / 75.00**
+5. ดาวน์โหลดแม่แบบจาก `GET /api/analysis/template.xlsx` แล้วอัปโหลดผ่าน `POST /api/analyze/excel` ต้องได้ผลตรงกับ JSON
+6. ลองเปลี่ยน `equity` เป็น `"1"` แล้วส่งใหม่ ต้องได้ HTTP 422 เพราะงบบัญชีไม่สมดุล
+
+ทดสอบหน้าเว็บดีไซน์เดิมได้โดยเปิด PowerShell อีกหน้าต่างแล้วรัน `pnpm dev` จากโฟลเดอร์โครงการ หน้าเว็บยังใช้พฤติกรรม mock/API adapter เดิมของทีม Frontend
 
 หาก backend เดิมรันอยู่ก่อนอัปเดตโค้ด ให้หยุดแล้วเริ่มใหม่ หรือใช้ `backend\run.cmd --reload --reload-dir backend/app`
 
-ตอนนี้เชื่อม backend จริงเฉพาะ flow วิเคราะห์ในหน้าสุขภาพการเงินและ AI Panel ของหน้านี้ ส่วน dashboard อื่นและหน้าฟอร์มเดิมยังใช้พฤติกรรมเดโมเดิม ผลวิเคราะห์ล่าสุดอยู่ในหน่วยความจำของ browser และหายเมื่อ reload หน้า
-
-Vite ตั้ง proxy `/api` ไปพอร์ต 8000 ให้แล้ว หาก backend อยู่ที่อื่น ให้ตั้ง `VITE_FINANCE_API_BASE_URL` เป็น URL ของ backend ที่ลงท้าย `/api/v1` สำหรับ Vercel ต้อง deploy backend แล้วตั้ง URL แบบ HTTPS และ rebuild frontend การ push โค้ด frontend ไม่ได้ deploy FastAPI ให้อัตโนมัติ
+สูตร การให้เกรด และ API วิเคราะห์ยังอยู่ครบใน `backend/app` การเชื่อม API ใหม่เข้าหน้าเว็บต้องผ่าน fetch hooks หรือ props ของทีม Frontend โดยคง tags, styling และ layout เดิม ส่วน POST สำหรับวิเคราะห์ยังไม่ได้ผูกกับ UI ต้นฉบับ การ push โค้ด frontend ไม่ได้ deploy FastAPI ให้อัตโนมัติ
 
 ## ทางเลือกใช้ AI Model
 
-โหมดเริ่มต้นเป็น **Rules-based** ใช้งานได้ทันทีโดยไม่ต้องมี API key หากต้องการให้โมเดลช่วยจัดลำดับประเด็น ให้เพิ่ม `OPENAI_API_KEY` และ `OPENAI_MODEL` ใน `backend/.env` แล้ว restart backend จากนั้นเลือก **Model-assisted priorities** ก่อนวิเคราะห์ ห้ามนำ API key ไปใส่ตัวแปรที่ขึ้นต้น `VITE_`
+โหมดเริ่มต้นเป็น **Rules-based** ใช้งานได้ทันทีโดยไม่ต้องมี API key หากต้องการให้โมเดลช่วยจัดลำดับประเด็น ให้เพิ่ม `OPENAI_API_KEY` และ `OPENAI_MODEL` ใน `backend/.env` แล้ว restart backend จากนั้นส่ง `use_llm: true` ไป API วิเคราะห์ ห้ามนำ API key ไปใส่ตัวแปรที่ขึ้นต้น `VITE_`
 
 โมเดลเลือกเฉพาะประเด็นที่ backend คำนวณและตรวจไว้แล้ว ไม่แก้สูตร ตัวเลข เกรด หรือหลักฐาน หากยังไม่มี key หรือโมเดลตอบผิด/timeout ระบบจะกลับมาใช้กฎพร้อมแจ้งสาเหตุ ไม่แสร้งว่าเรียกโมเดลสำเร็จ การเรียกโมเดลจริงยังต้องทดสอบด้วย key ที่ใช้งานได้
 

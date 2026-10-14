@@ -118,21 +118,27 @@ exercise the provider boundary with mocked responses.
 
 Source: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
 
-## Frontend integration and demo scope
+## Frontend boundary
 
-The health page exposes a JSON input, simulated example, Excel upload and
-downloadable template. Its real analysis POST calls are independent of the
-existing dashboard mock flag. The AI Panel uses the same returned analysis.
-Other dashboards and the original import screen retain their existing demo
-behavior; no other dashboard is claimed to be integrated in this milestone.
+All frontend files are restored to commit `73649fc`, the original design before
+backend development. There are no added JSON editors, upload controls, grade
+cards, mode badges, frontend analysis stores or Vite proxy changes. The original
+frontend mock and API adapter behavior is preserved exactly.
 
-Local Vite development proxies `/api` to `http://127.0.0.1:8000`. For an external
-backend, set `VITE_FINANCE_API_BASE_URL` to its `/api/v1` HTTPS URL and configure
-the frontend origin in backend CORS. On Vercel, set that variable and rebuild
-after deploying the backend. Pushing the frontend code does not deploy FastAPI.
+Backend calculations, grading, rules, optional model integration and all
+`/api/*` and `/api/v1/*` endpoints remain under `backend/app`. Analysis can be
+tested independently through `/docs` or API requests. The existing example and
+Excel template endpoints are retained. Removing UI controls does not remove
+these services.
 
-Verification: backend tests cover financial boundaries, known answers,
-cross-source equivalence, evidence references, invalid inputs, isolation and
-provider fallback. Frontend build and seed invariants pass. Browser testing
-checks JSON analysis, invalid balances/stale results, absent credentials and
-download-template-to-Excel-upload analysis. The checked example shows B / 75.00.
+Future integration must use the existing component tags, Tailwind classes,
+layout and page structure unchanged. Frontend owners may connect fetch hooks
+or props using this contract. Calculation and decision logic must remain in
+the backend. The analysis POST routes are not currently wired into the original
+UI. The existing adapter's `VITE_API_BASE_URL` is unchanged; simply disabling
+mock mode is insufficient because its dashboard GET endpoints are a separate
+contract. Deploying the frontend does not deploy FastAPI.
+
+Backend tests cover known financial answers, boundaries, source equivalence,
+evidence references, input isolation, validation and provider fallback. The
+synthetic example still has grade B / 75.00 through the API.

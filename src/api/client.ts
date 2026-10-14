@@ -36,27 +36,10 @@ import {
   mockProjectRecords,
   mockAIExplanations,
 } from "./mock/seedData";
-import type { AnalysisEnvelope, FinancialInput } from "./contracts/analysis";
 
 // Environment configuration
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-const FINANCE_BASE_URL = (import.meta.env.VITE_FINANCE_API_BASE_URL || BASE_URL).replace(/\/$/, "");
-
-async function financeRequest<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${FINANCE_BASE_URL}${path}`, options);
-  const payload = await response.json().catch(() => {
-    throw new Error(`Finance API returned an unreadable response (${response.status}). Check the backend URL.`);
-  });
-  if (!response.ok) {
-    const detail = payload.detail;
-    const message = typeof detail === "string" ? detail : Array.isArray(detail)
-      ? detail.map((item: { loc?: (string | number)[]; msg?: string }) => `${item.loc?.join(".") || "input"}: ${item.msg || "Invalid value"}`).join("; ")
-      : `Finance API request failed (${response.status}).`;
-    throw new Error(message);
-  }
-  return payload as T;
-}
 
 // Helper to wrap data into official API Envelope
 function wrapEnvelope<T>(
@@ -79,27 +62,6 @@ function wrapEnvelope<T>(
 
 // API Client implementation
 export const apiClient = {
-  getAnalysisTemplateUrl(): string {
-    return `${FINANCE_BASE_URL}/analysis/template.xlsx`;
-  },
-
-  async getAnalysisExample(signal?: AbortSignal): Promise<Envelope<FinancialInput>> {
-    return financeRequest("/analysis/example", { signal });
-  },
-
-  async analyzeFinancials(input: FinancialInput, useLlm = false, signal?: AbortSignal): Promise<AnalysisEnvelope> {
-    return financeRequest("/analyze", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input, use_llm: useLlm }), signal,
-    });
-  },
-
-  async analyzeExcel(file: File, useLlm = false, signal?: AbortSignal): Promise<AnalysisEnvelope> {
-    const body = new FormData();
-    body.append("file", file);
-    return financeRequest(`/analyze/excel?use_llm=${useLlm}`, { method: "POST", body, signal });
-  },
-
   async getOverview(): Promise<Envelope<BusinessOverview>> {
     if (USE_MOCK) {
       await simulateLatency();
@@ -204,13 +166,12 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(
         mockHealthIndicators,
-        "simulated",
+        "actual",
         "ok",
         ["มูลค่าสินค้าคงเหลือของสด (ส่งผลต่อ DIO)"]
       );
     }
     const res = await fetch(`${BASE_URL}/health/indicators`);
-    if (!res.ok) throw new Error(`Cannot load financial indicators (${res.status}). Use Calculate and analyze with the finance backend.`);
     return res.json();
   },
 

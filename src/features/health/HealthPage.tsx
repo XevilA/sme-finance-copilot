@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { HealthIndicator, Envelope } from "@/api/contracts/types";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
-import { useAnalysisStore } from "@/store/useAnalysisStore";
 import {
   HeartPulse,
   TrendingUp,
@@ -19,23 +18,12 @@ import {
 
 export const HealthPage: React.FC = () => {
   const { setAIPanelOpen, setCurrentPage } = useAppStore();
-  const { result, inputJson, isStale, setInputJson, setResult, markStale } = useAnalysisStore();
   const [indicatorsEnvelope, setIndicatorsEnvelope] = useState<Envelope<HealthIndicator[]> | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [inspectFormulaId, setInspectFormulaId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [useLlm, setUseLlm] = useState(false);
-  const requestRef = useRef<AbortController | null>(null);
-  const evidenceTarget = useAppStore((state) => state.activeEvidenceTargetId);
 
   const loadData = () => {
-    setError(null);
-    if (result) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     apiClient
       .getHealthIndicators()
@@ -43,58 +31,27 @@ export const HealthPage: React.FC = () => {
         setIndicatorsEnvelope(res);
         setLoading(false);
       })
-      .catch((cause) => {
-        setError(cause instanceof Error ? cause.message : "Cannot load financial indicators.");
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => {
     loadData();
-  }, [result]);
+  }, []);
 
-  useEffect(() => () => requestRef.current?.abort(), []);
+  if (loading || !indicatorsEnvelope) {
+    return (
+      <div className="p-8 max-w-7xl mx-auto space-y-6">
+        <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-48 bg-slate-200 rounded-card animate-pulse" />
+          <div className="h-48 bg-slate-200 rounded-card animate-pulse" />
+          <div className="h-48 bg-slate-200 rounded-card animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (evidenceTarget?.startsWith("health-")) setActiveCategory("all");
-  }, [evidenceTarget]);
-
-  useEffect(() => {
-    if (evidenceTarget?.startsWith("health-")) {
-      document.getElementById(evidenceTarget)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [evidenceTarget, activeCategory]);
-
-  const runAnalysis = async (file?: File, exampleOnly = false) => {
-    requestRef.current?.abort();
-    const controller = new AbortController();
-    requestRef.current = controller;
-    setAnalyzing(true);
-    setError(null);
-    markStale();
-    try {
-      if (exampleOnly) {
-        const example = await apiClient.getAnalysisExample(controller.signal);
-        setInputJson(JSON.stringify(example.data, null, 2));
-      } else if (file) {
-        if (!file.name.toLowerCase().endsWith(".xlsx") || file.size > 5 * 1024 * 1024) {
-          throw new Error("Upload a .xlsx workbook no larger than 5 MiB.");
-        }
-        setResult(await apiClient.analyzeExcel(file, useLlm, controller.signal));
-      } else {
-        const input = JSON.parse(inputJson);
-        if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Financial input must be a JSON object.");
-        setResult(await apiClient.analyzeFinancials(input, useLlm, controller.signal));
-      }
-    } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Analysis failed.");
-    } finally {
-      if (!controller.signal.aborted) setAnalyzing(false);
-    }
-  };
-
-  const indicators = result?.data.indicators ?? indicatorsEnvelope?.data ?? [];
-  const dataKind = result?.kind ?? indicatorsEnvelope?.kind ?? "simulated";
+  const indicators = indicatorsEnvelope.data;
   const filtered =
     activeCategory === "all"
       ? indicators
@@ -113,7 +70,7 @@ export const HealthPage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 สุขภาพการเงิน 5 มิติ (Financial Health Diagnostics)
               </h1>
-              <DataKindBadge kind={dataKind} size="md" />
+              <DataKindBadge kind="actual" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               ตรวจสภาพคล่อง ความสามารถทำกำไร ภาระหนี้ ประสิทธิภาพหมุนเวียน และการเติบโต
@@ -132,57 +89,6 @@ export const HealthPage: React.FC = () => {
           </div>
         </div>
 
-        <section aria-label="Financial analysis input" className="bg-white p-5 rounded-card border border-borderLine space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label htmlFor="financial-input-json" className="text-sm font-bold">Financial input (JSON or Excel)</label>
-            <button type="button" disabled={analyzing} onClick={() => void runAnalysis(undefined, true)}
-              className="text-xs font-bold text-brand disabled:opacity-50">Load simulated example</button>
-          </div>
-          <textarea id="financial-input-json" value={inputJson} onChange={(event) => setInputJson(event.target.value)}
-            disabled={analyzing} rows={8} spellCheck={false} placeholder="Paste FinancialInput JSON, or load the simulated example."
-            className="w-full p-3 border border-slate-200 rounded-xl text-xs font-mono" />
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <button type="button" disabled={analyzing || !inputJson.trim()} onClick={() => void runAnalysis()}
-              className="px-4 py-2 bg-brand text-white rounded-btn font-bold disabled:opacity-50">
-              {analyzing ? "Analyzing..." : "Calculate and analyze"}
-            </button>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={useLlm} disabled={analyzing} onChange={(event) => setUseLlm(event.target.checked)} />
-              Model-assisted priorities (optional)
-            </label>
-            <label className="flex flex-col gap-1">
-              <span>Analyze Excel (.xlsx, up to 5 MiB)</span>
-              <input aria-label="Analyze Excel" type="file" accept=".xlsx" disabled={analyzing} onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void runAnalysis(file);
-                event.target.value = "";
-              }} />
-            </label>
-            <a href={apiClient.getAnalysisTemplateUrl()} download className="text-brand font-bold">Download Excel template</a>
-          </div>
-          {!result && <p className="text-xs text-ink-muted">The preview below is simulated. Run analysis to use the backend with your supplied inputs.</p>}
-          {error && <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800">{error}</div>}
-          {isStale && <p role="status" className="text-xs text-amber-800">Inputs changed. Displayed results refer to the previous analysis; calculate again.</p>}
-          {result && <div id="health-grade" className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div className="flex flex-wrap items-center gap-3 text-sm font-bold">
-              <span>Grade: {result.data.grading.grade ?? "Unavailable"}</span>
-              <span>Score: {result.data.grading.score ?? "Unavailable"} / 100</span>
-              <span className="text-xs font-normal">{result.data.grading.policyVersion} · {result.data.aiMode === "openai" ? "Model-assisted" : "Rules-based"}</span>
-            </div>
-            <p className="text-xs text-ink-muted">{result.data.grading.notice}</p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-              {Object.entries(result.data.grading.components).map(([key, component]) => (
-                <div key={key}><strong>{key}</strong>: {component.score ?? "Unavailable"} · weight {component.weight}
-                  <p className="text-ink-muted">{component.reason || component.missingFields.join(", ")}</p>
-                </div>
-              ))}
-            </div>
-            {result.data.aiWarning && <p role="status" className="text-xs text-amber-800">{result.data.aiWarning}</p>}
-            {result.status === "insufficient_data" && <p className="text-xs text-amber-800">Some metrics are unavailable. See each card and the AI Panel for missing inputs and undefined calculations.</p>}
-          </div>}
-        </section>
-
-        {loading && !result && <p role="status" className="text-xs">Loading indicator preview...</p>}
         {/* Category Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
           {[
@@ -214,7 +120,6 @@ export const HealthPage: React.FC = () => {
 
             return (
               <div
-                id={item.id}
                 key={item.id}
                 className={`p-5 rounded-card border transition-all duration-200 flex flex-col justify-between space-y-3 ${
                   isInsufficient
@@ -308,7 +213,7 @@ export const HealthPage: React.FC = () => {
                     <span>{inspectFormulaId === item.id ? "ซ่อนสูตร" : "ดูสูตรที่ใช้"}</span>
                   </button>
 
-                  <DataKindBadge kind={dataKind} size="sm" />
+                  <DataKindBadge kind="actual" size="sm" />
                 </div>
 
                 {/* Formula Popover Dropdown */}
