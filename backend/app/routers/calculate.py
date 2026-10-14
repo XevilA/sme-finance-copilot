@@ -6,7 +6,8 @@ from starlette.concurrency import run_in_threadpool
 
 from ..db import DB_ENABLED, session_scope
 from ..extraction import ExtractionError, MAX_UPLOAD_BYTES, parse_excel
-from ..finance import calculate_financials
+from ..finance import calculate_business_metrics, calculate_financials
+from ..grading import grade_financials
 from ..repository import parse_uuid, save_financial_record
 from ..schemas import FinancialInput, StrictModel
 
@@ -21,6 +22,8 @@ class CalculateRequest(StrictModel):
 
 async def run_and_store(data: FinancialInput, sme_id: str | None, persist: bool, source: str) -> dict:
     computed = await run_in_threadpool(calculate_financials, data)
+    computed["businessMetrics"] = await run_in_threadpool(calculate_business_metrics, data)
+    computed["grading"] = await run_in_threadpool(grade_financials, data)
     # JSON mode: date and Decimal become strings, which is what a JSONB column
     # accepts and what keeps money exact (no float round-trip).
     payload = data.model_dump(mode="json")

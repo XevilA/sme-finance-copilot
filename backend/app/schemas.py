@@ -61,6 +61,18 @@ class FinancialInput(StrictModel):
     minimum_cash_reserve: PositiveMoney | None = None
     buyer_deposit: PositiveMoney | None = None
     committed_funding: PositiveMoney | None = None
+    revenue: PositiveMoney | None = None
+    cost_of_goods_sold: PositiveMoney | None = None
+    operating_expenses: PositiveMoney | None = None
+    interest_expense: PositiveMoney | None = None
+    tax_expense: PositiveMoney | None = None
+    operating_cash_outflow: PositiveMoney | None = None
+    units_sold: int | None = Field(default=None, strict=True, ge=0, le=1_000_000_000)
+    unit_price: PositiveMoney | None = None
+    variable_cost_per_unit: PositiveMoney | None = None
+    fixed_costs: PositiveMoney | None = None
+    initial_investment: PositiveMoney | None = None
+    investment_net_gain: Money | None = None
     loan: LoanTerms | None = None
 
     @model_validator(mode="after")
@@ -72,6 +84,14 @@ class FinancialInput(StrictModel):
             difference = self.assets - self.liabilities - self.equity
         if abs(difference) > Decimal("0.01"):
             raise ValueError(f"Balance sheet mismatch: assets - liabilities - equity = {difference}")
+        profit_fields = [self.revenue, self.cost_of_goods_sold, self.operating_expenses,
+                         self.interest_expense, self.tax_expense, self.net_income]
+        if all(value is not None for value in profit_fields):
+            with localcontext() as context:
+                context.prec = 50
+                profit = self.revenue - self.cost_of_goods_sold - self.operating_expenses - self.interest_expense - self.tax_expense
+                if abs(profit - self.net_income) > Decimal("0.01"):
+                    raise ValueError("net_income must reconcile with revenue and supplied expenses within THB 0.01")
         if self.current_assets is not None and self.current_assets > self.assets:
             raise ValueError("current_assets cannot exceed assets")
         if self.current_liabilities is not None and self.current_liabilities > self.liabilities:

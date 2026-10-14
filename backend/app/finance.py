@@ -1,7 +1,7 @@
 """Deterministic financial metrics with explicit missing/undefined outcomes."""
 
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP, localcontext
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP, localcontext
 from typing import Literal
 
 from pydantic import BaseModel
@@ -120,3 +120,63 @@ def calculate_financials(data: FinancialInput) -> dict:
             "period": f"{data.period_start.isoformat()}/{data.period_end.isoformat()}",
             "unit": data.currency,
         }
+
+
+def calculate_business_metrics(data: FinancialInput) -> dict:
+    """Period profit, unit economics, break-even and simple net ROI."""
+    with localcontext() as context:
+        context.prec = 50
+        metrics: dict[str, Metric] = {}
+        definitions = {
+            "gross_profit": (["revenue", "cost_of_goods_sold"], "THB", "revenue - cost_of_goods_sold"),
+            "operating_profit": (["revenue", "cost_of_goods_sold", "operating_expenses"], "THB",
+                                 "revenue - cost_of_goods_sold - operating_expenses"),
+            "net_profit": (["revenue", "cost_of_goods_sold", "operating_expenses", "interest_expense", "tax_expense"],
+                           "THB", "revenue - cost_of_goods_sold - operating_expenses - interest_expense - tax_expense"),
+            "total_cost": (["cost_of_goods_sold", "operating_expenses", "interest_expense", "tax_expense"],
+                           "THB", "cost_of_goods_sold + operating_expenses + interest_expense + tax_expense"),
+            "cost_per_unit": (["cost_of_goods_sold", "operating_expenses", "units_sold"], "THB",
+                              "(cost_of_goods_sold + operating_expenses) / units_sold"),
+            "contribution_per_unit": (["unit_price", "variable_cost_per_unit"], "THB", "unit_price - variable_cost_per_unit"),
+            "breakeven_units": (["fixed_costs", "unit_price", "variable_cost_per_unit"], "units",
+                                "ceil(fixed_costs / (unit_price - variable_cost_per_unit))"),
+            "roi": (["investment_net_gain", "initial_investment"], "%", "investment_net_gain / initial_investment * 100"),
+            "debt_ratio": (["liabilities", "assets"], "ratio", "liabilities / assets"),
+            "cash_reserve_months": (["cash_balance", "operating_cash_outflow"], "months",
+                                    "cash_balance / (operating_cash_outflow * 30 / period_days)"),
+        }
+        for name, (fields, unit, formula) in definitions.items():
+            missing = [field for field in fields if getattr(data, field) is None]
+            if missing:
+                metrics[name] = unavailable(unit, formula, missing=missing)
+                continue
+            reason = None
+            if name == "gross_profit":
+                value = data.revenue - data.cost_of_goods_sold
+            elif name == "operating_profit":
+                value = data.revenue - data.cost_of_goods_sold - data.operating_expenses
+            elif name == "net_profit":
+                value = data.revenue - data.cost_of_goods_sold - data.operating_expenses - data.interest_expense - data.tax_expense
+            elif name == "total_cost":
+                value = data.cost_of_goods_sold + data.operating_expenses + data.interest_expense + data.tax_expense
+            elif name == "cost_per_unit":
+                reason = "units_sold is zero" if data.units_sold == 0 else None
+                value = ZERO if reason else (data.cost_of_goods_sold + data.operating_expenses) / data.units_sold
+            elif name == "contribution_per_unit":
+                value = data.unit_price - data.variable_cost_per_unit
+            elif name == "breakeven_units":
+                contribution = data.unit_price - data.variable_cost_per_unit
+                reason = "Unit contribution must be positive" if contribution <= 0 else None
+                value = ZERO if reason else (data.fixed_costs / contribution).to_integral_value(rounding=ROUND_CEILING)
+            elif name == "roi":
+                reason = "initial_investment is zero" if data.initial_investment == 0 else None
+                value = ZERO if reason else data.investment_net_gain / data.initial_investment * 100
+            elif name == "debt_ratio":
+                reason = "assets is zero" if data.assets == 0 else None
+                value = ZERO if reason else data.liabilities / data.assets
+            else:
+                reason = "operating_cash_outflow is zero" if data.operating_cash_outflow == 0 else None
+                days = Decimal((data.period_end - data.period_start).days + 1)
+                value = ZERO if reason else data.cash_balance / (data.operating_cash_outflow * 30 / days)
+            metrics[name] = unavailable(unit, formula, reason=reason) if reason else result(value, unit, formula)
+        return {name: metric.model_dump() for name, metric in metrics.items()}
