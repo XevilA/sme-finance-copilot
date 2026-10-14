@@ -1,0 +1,33 @@
+{
+  "currency": "THB",
+  "kind": "simulated",
+  "period_start": "2026-09-01",
+  "period_end": "2026-09-30",
+  "assets": "1000000.00",
+  "liabilities": "600000.00",
+  "equity": "400000.00",
+  "opening_assets": "900000.00",
+  "opening_equity": "350000.00",
+  "current_assets": "300000.00",
+  "current_liabilities": "150000.00",
+  "cash_balance": "80000.00",
+  "net_income": "50000.00",
+  "operating_cash_flow": "70000.00",
+  "investing_cash_flow": "-20000.00",
+  "financing_cash_flow": "-10000.00",
+  "capital_expenditure": "20000.00",
+  "cash_available_for_debt_service": "60000.00",
+  "debt_principal_due": "25000.00",
+  "debt_interest_due": "5000.00",
+  "working_capital_needed": "150000.00",
+  "minimum_cash_reserve": "30000.00",
+  "buyer_deposit": "20000.00",
+  "committed_funding": "10000.00",
+  "loan": {
+    "principal": "120000.00",
+    "annual_interest_rate": "0.12",
+    "periods": 12,
+    "payments_per_year": 12,
+    "timing": "end"
+  }
+}

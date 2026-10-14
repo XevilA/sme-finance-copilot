@@ -26,6 +26,15 @@ dist-ssr
 # Vercel
 .vercel
 
+# Python backend runtime and private uploads
+backend/.venv/
+backend/.deps/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+backend/uploads/
+.env
+
 # Apple Double & OS metadata
 ._*
 .DS_Store

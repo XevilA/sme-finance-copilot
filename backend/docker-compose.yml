@@ -1,0 +1,32 @@
+# Postgres for local development. No psql install needed: everything in ./db is
+# executed in alphabetical order on first boot (schema.sql, then seed.sql).
+#
+#   docker compose -f backend/docker-compose.yml up -d
+#
+# Wipe and re-apply the schema after editing db/*.sql:
+#   docker compose -f backend/docker-compose.yml down -v && docker compose -f backend/docker-compose.yml up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sme_swarm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sme_swarm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # Local-only container; trust auth keeps the dev loop short.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d:ro
+      - sme_swarm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sme_swarm"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  sme_swarm_pgdata:

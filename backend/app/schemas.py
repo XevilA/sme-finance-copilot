@@ -1,0 +1,83 @@
+"""Validated input contract. Money and rates use Decimal, never binary floats."""
+
+from datetime import date
+from decimal import Decimal, InvalidOperation, localcontext
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+
+
+def parse_decimal(value: object) -> Decimal:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        raise ValueError("Expected a finite numeric value, not a boolean")
+    try:
+        number = Decimal(str(value).strip())
+    except InvalidOperation as exc:
+        raise ValueError("Expected a numeric value without currency symbols or separators") from exc
+    if not number.is_finite():
+        raise ValueError("NaN and infinity are not allowed")
+    return number
+
+
+Money = Annotated[Decimal, BeforeValidator(parse_decimal), Field(max_digits=20, decimal_places=2)]
+PositiveMoney = Annotated[Money, Field(ge=0)]
+Rate = Annotated[Decimal, BeforeValidator(parse_decimal), Field(ge=0, le=1, max_digits=12, decimal_places=10)]
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class LoanTerms(StrictModel):
+    principal: PositiveMoney
+    annual_interest_rate: Rate
+    periods: int = Field(strict=True, gt=0, le=1200)
+    payments_per_year: int = Field(strict=True, gt=0, le=365)
+    timing: Literal["end", "beginning"] = "end"
+
+
+class FinancialInput(StrictModel):
+    currency: Literal["THB"]
+    kind: Literal["actual", "forecast", "simulated"]
+    period_start: date
+    period_end: date
+    assets: PositiveMoney
+    liabilities: PositiveMoney
+    equity: Money
+    opening_assets: PositiveMoney | None = None
+    opening_equity: Money | None = None
+    current_assets: PositiveMoney | None = None
+    current_liabilities: PositiveMoney | None = None
+    cash_balance: PositiveMoney | None = None
+    net_income: Money | None = None
+    operating_cash_flow: Money | None = None
+    investing_cash_flow: Money | None = None
+    financing_cash_flow: Money | None = None
+    capital_expenditure: PositiveMoney | None = None
+    cash_available_for_debt_service: Money | None = None
+    debt_principal_due: PositiveMoney | None = None
+    debt_interest_due: PositiveMoney | None = None
+    working_capital_needed: PositiveMoney | None = None
+    minimum_cash_reserve: PositiveMoney | None = None
+    buyer_deposit: PositiveMoney | None = None
+    committed_funding: PositiveMoney | None = None
+    loan: LoanTerms | None = None
+
+    @model_validator(mode="after")
+    def validate_financials(self) -> "FinancialInput":
+        if self.period_end < self.period_start:
+            raise ValueError("period_end must be on or after period_start")
+        with localcontext() as context:
+            context.prec = 50
+            difference = self.assets - self.liabilities - self.equity
+        if abs(difference) > Decimal("0.01"):
+            raise ValueError(f"Balance sheet mismatch: assets - liabilities - equity = {difference}")
+        if self.current_assets is not None and self.current_assets > self.assets:
+            raise ValueError("current_assets cannot exceed assets")
+        if self.current_liabilities is not None and self.current_liabilities > self.liabilities:
+            raise ValueError("current_liabilities cannot exceed liabilities")
+        if self.cash_balance is not None:
+            cash_limit = self.current_assets if self.current_assets is not None else self.assets
+            if self.cash_balance > cash_limit:
+                raise ValueError("cash_balance cannot exceed current_assets or assets")
+        return self
