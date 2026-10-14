@@ -259,6 +259,45 @@ docker exec -i sme_swarm_db psql -U postgres -d sme_swarm -v ON_ERROR_STOP=1 < b
 
 `totalCost`/`totalProfit` ใน `/swarm/proposal` คำนวณจาก `sme_profiles.cost_per_unit` ของแต่ละร้าน ถ้าร้านใดไม่มีค่านี้จะคืน 0 พร้อม `missing: ["shop_unit_cost"]` ไม่นับแบบครึ่ง ๆ
 
+### Contract ที่เหลือ 11 เส้นทาง (ครบ 16/16)
+
+| Endpoint | สร้างจาก |
+| --- | --- |
+| `GET /api/v1/shops` | `sme_profiles` + allocation ล่าสุดของแต่ละร้าน |
+| `GET /api/v1/order` | `swarm_projects` ล่าสุด |
+| `GET /api/v1/shops/{id}/finance` | allocation + cost lines + `cash_events` · รับ `?order_ref=` เพื่อกำหนดโครงการแน่นอน |
+| `GET /api/v1/cashflow/timeline` | `cash_events` คิดยอดสะสมจากเงินสดต้นงวด |
+| `GET /api/v1/funding/options` | `funding_products` + PMT จาก engine เดิม + เกณฑ์วงเงิน/DSCR |
+| `GET /api/v1/sales/products` · `/sales/channels` | `sales_products` · `sales_channels` |
+| `GET /api/v1/unlock/resources` | `shared_resources` |
+| `GET /api/v1/simulator/chaos` | `chaos_scenarios` |
+| `GET /api/v1/projects` | `swarm_projects` + `project_deliveries` |
+| `GET /api/v1/funder/projects` | `swarm_projects` + `project_evidence` + ผลรวมส่วนขาด |
+
+`/funding/options` ตรวจเฉพาะเกณฑ์ที่เก็บไว้กับผลิตภัณฑ์ได้จริง (ช่วงวงเงิน, DSCR ขั้นต่ำ)
+ส่วน `matchScore` เป็นการจัดอันดับซึ่งเป็น Module 4 ของ Codex จึงคืน 0 พร้อมประกาศใน `missing`
+PMT เรียกจาก engine เดิมไม่เขียนสูตรซ้ำ — ทดสอบแล้วว่าผลิตภัณฑ์ดอกเบี้ย 0% ผ่อนครบเท่าเงินต้นพอดี
+
+`/cashflow/timeline` ออกแถวเฉพาะวันที่มี event จริง ไม่เติมวันว่างระหว่างกลาง เพราะการกระจาย
+ยอดรวมของงวดลงรายวันคือการสมมติรูปของเส้นกราฟที่ข้อมูลไม่รองรับ
+
+### RBAC
+
+`app/rbac.py` ถือ role model และจุดตัดสินใจ **ไม่ใช่ authentication** — ตัวตนมาจาก header
+`X-User-Email` ซึ่งใครก็ตั้งได้ ใช้เป็นสวิตช์ role สำหรับเดโมเท่านั้น ห้ามใช้เป็นเส้นแบ่งความปลอดภัย
+
+ค่าเริ่มต้นคือ **ปิด** เพราะ frontend ที่ deploy แล้วเรียกโดยไม่ส่ง header เปิดด้วย `RBAC_ENFORCED=true`
+
+| กรณี | ผล |
+| --- | --- |
+| ปิด ไม่ส่ง header | 200 + `rbacEnforced: false` + `missing: ["rbac_not_enforced"]` |
+| เปิด ไม่ส่ง header | 401 |
+| เปิด อีเมลไม่รู้จัก | 403 (คำตอบเดียวกับบัญชีที่ปิดใช้งาน) |
+| เปิด บัญชี investor | 200 · `hasAccessPermission: true` |
+| เปิด บัญชี sme_owner | 200 · `hasAccessPermission: false` |
+
+บันทึกความคืบหน้าทั้งหมดอยู่ใน `docs/progress.md`
+
 ### เชื่อม Frontend แบบไม่แตะ UI
 
 `src/services/api.ts` เป็นไฟล์ใหม่ล้วน ไม่ import component ไม่แตะ CSS/Tailwind/layout และ **ไม่มีใคร import มัน** Vite จึง tree-shake ออกจาก bundle ทั้งหมด ยืนยันด้วยการ build: hash ของ `index-*.js` และ `index-*.css` เท่าเดิมทุกตัว และ module count เท่าเดิมที่ 1955

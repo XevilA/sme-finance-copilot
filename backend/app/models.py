@@ -37,6 +37,10 @@ class SmeProfile(Base):
     minimum_cash_reserve: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
     contact_email: Mapped[str | None] = mapped_column(Text)
     contact_phone: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(Text)
+    location: Mapped[str | None] = mapped_column(Text)
+    tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    status_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -96,10 +100,25 @@ class SwarmProject(Base):
     deposit_ratio: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False, default=0)
     deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
+    code: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    buyer_rating: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+    delivery_location: Mapped[str | None] = mapped_column(Text)
+    standard: Mapped[str | None] = mapped_column(Text)
+    payment_terms_text: Mapped[str | None] = mapped_column(Text)
+    start_date: Mapped[date | None] = mapped_column(Date)
+    progress_percent: Mapped[int | None] = mapped_column(SmallInteger)
+    risk_level: Mapped[str | None] = mapped_column(Text)
+    roi_estimate_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
+    duration_months: Mapped[int | None] = mapped_column(SmallInteger)
+    fund_purpose: Mapped[str | None] = mapped_column(Text)
+    evidence_level: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     allocations: Mapped[list["SwarmAllocation"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    deliveries: Mapped[list["ProjectDelivery"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    evidence: Mapped[list["ProjectEvidence"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class SwarmAllocation(Base):
@@ -115,6 +134,15 @@ class SwarmAllocation(Base):
     funding_gap: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
     version: Mapped[str] = mapped_column(Text, nullable=False, default="v1")
+    selling_price_per_unit: Mapped[Decimal | None] = mapped_column(MONEY)
+    raw_material_cost: Mapped[Decimal | None] = mapped_column(MONEY)
+    additional_labor_cost: Mapped[Decimal | None] = mapped_column(MONEY)
+    delivery_cost: Mapped[Decimal | None] = mapped_column(MONEY)
+    service_fee: Mapped[Decimal | None] = mapped_column(MONEY)
+    buyer_signed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    shop_signed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    logistics_signed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    funder_signed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     project: Mapped[SwarmProject] = relationship(back_populates="allocations")
@@ -236,3 +264,138 @@ class InvestorMatch(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (UniqueConstraint("investor_id", "sme_id", "project_id", name="one_match_per_investor"),)
+
+
+class CashEvent(Base):
+    """A dated cash movement. The only honest basis for a day-level forecast."""
+
+    __tablename__ = "cash_events"
+
+    id: Mapped[uuid.UUID] = pk()
+    sme_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("swarm_projects.id", ondelete="CASCADE"))
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    day_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    is_inflow: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    partner: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="projected")
+    impact_reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SalesProduct(Base):
+    __tablename__ = "sales_products"
+
+    id: Mapped[uuid.UUID] = pk()
+    sme_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    units_sold: Mapped[int] = mapped_column(Integer, nullable=False)
+    revenue: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    cost: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    turnover_days: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("sme_id", "name", "period_start", "period_end", name="one_product_per_period"),
+    )
+
+
+class SalesChannel(Base):
+    __tablename__ = "sales_channels"
+
+    id: Mapped[uuid.UUID] = pk()
+    sme_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"), nullable=False)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    gross_sales: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    commission_fee: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    ad_cost: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    delivery_cost: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("sme_id", "channel", "period_start", "period_end", name="one_channel_per_period"),
+    )
+
+
+class SharedResource(Base):
+    """A resource one SME offers to the swarm (SME UNLOCK)."""
+
+    __tablename__ = "shared_resources"
+
+    id: Mapped[uuid.UUID] = pk()
+    owner_sme_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("sme_profiles.id", ondelete="SET NULL"))
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    category_label: Mapped[str] = mapped_column(Text, nullable=False)
+    location: Mapped[str] = mapped_column(Text, nullable=False)
+    capacity_text: Mapped[str] = mapped_column(Text, nullable=False)
+    price_text: Mapped[str] = mapped_column(Text, nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    availability: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(Text)
+    impact_additional_cost: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    impact_delay_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    impact_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    affected_sme_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    owner: Mapped["SmeProfile | None"] = relationship()
+
+
+class ChaosScenario(Base):
+    __tablename__ = "chaos_scenarios"
+
+    id: Mapped[uuid.UUID] = pk()
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    severity: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger_node_id: Mapped[str] = mapped_column(Text, nullable=False)
+    propagation_path: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    cash_impact_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    deficit_days: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    contingency_options: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    revenue_loss: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    additional_cost: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    new_deficit_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    delivery_delay_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProjectDelivery(Base):
+    __tablename__ = "project_deliveries"
+
+    id: Mapped[uuid.UUID] = pk()
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("swarm_projects.id", ondelete="CASCADE"), nullable=False)
+    day: Mapped[int] = mapped_column(Integer, nullable=False)
+    delivery_date: Mapped[date] = mapped_column(Date, nullable=False)
+    target_units: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    delivered_units: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+
+    project: Mapped[SwarmProject] = relationship(back_populates="deliveries")
+
+    __table_args__ = (UniqueConstraint("project_id", "day", name="one_delivery_per_day"),)
+
+
+class ProjectEvidence(Base):
+    __tablename__ = "project_evidence"
+
+    id: Mapped[uuid.UUID] = pk()
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("swarm_projects.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    document_date: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    project: Mapped[SwarmProject] = relationship(back_populates="evidence")

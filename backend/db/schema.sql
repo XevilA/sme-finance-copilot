@@ -234,6 +234,162 @@ EXCEPTION
 END;
 $$;
 
+-- 11. Columns the frontend contracts need on existing tables -----------------
+-- Added with ALTER ... IF NOT EXISTS so this file stays re-runnable.
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS category      TEXT;
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS location      TEXT;
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS tags          JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS status_note   TEXT;
+
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS code                TEXT;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS title               TEXT;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS buyer_rating        NUMERIC(3,1) CHECK (buyer_rating BETWEEN 0 AND 5);
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS delivery_location   TEXT;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS standard            TEXT;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS payment_terms_text  TEXT;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS start_date          DATE;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS progress_percent    SMALLINT CHECK (progress_percent BETWEEN 0 AND 100);
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS risk_level          TEXT CHECK (risk_level IN ('low', 'medium', 'high'));
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS roi_estimate_pct    NUMERIC(8,2);
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS duration_months     SMALLINT CHECK (duration_months > 0);
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS fund_purpose        TEXT;
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS evidence_level      TEXT;
+
+-- Per-shop cost lines and sign-off, which the shop finance screen itemises.
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS selling_price_per_unit NUMERIC(20,2) CHECK (selling_price_per_unit >= 0);
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS raw_material_cost      NUMERIC(20,2) CHECK (raw_material_cost >= 0);
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS additional_labor_cost  NUMERIC(20,2) CHECK (additional_labor_cost >= 0);
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS delivery_cost          NUMERIC(20,2) CHECK (delivery_cost >= 0);
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS service_fee            NUMERIC(20,2) CHECK (service_fee >= 0);
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS buyer_signed           BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS shop_signed            BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS logistics_signed       BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS funder_signed          BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 12. Dated cash events -------------------------------------------------------
+-- Feeds the cashflow timeline and each shop's cash schedule. Dated rows are the
+-- only honest source for a day-level forecast; a period total cannot be spread
+-- across days without inventing the shape of the curve.
+CREATE TABLE IF NOT EXISTS cash_events (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sme_id          UUID        REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    project_id      UUID        REFERENCES swarm_projects (id) ON DELETE CASCADE,
+    event_date      DATE        NOT NULL,
+    day_index       INTEGER     NOT NULL,
+    type            TEXT        NOT NULL
+                    CHECK (type IN ('buy_materials', 'produce', 'deliver', 'receive_payment', 'pay_obligations')),
+    title           TEXT        NOT NULL,
+    amount          NUMERIC(20,2) NOT NULL CHECK (amount >= 0),
+    is_inflow       BOOLEAN     NOT NULL,
+    partner         TEXT,
+    status          TEXT        NOT NULL DEFAULT 'projected'
+                    CHECK (status IN ('confirmed', 'projected', 'simulated')),
+    impact_reason   TEXT        NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS cash_events_timeline_idx ON cash_events (sme_id, event_date);
+CREATE INDEX IF NOT EXISTS cash_events_project_idx ON cash_events (project_id, day_index);
+
+-- 13. Sales analytics ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sales_products (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sme_id          UUID        NOT NULL REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    name            TEXT        NOT NULL,
+    category        TEXT        NOT NULL,
+    period_start    DATE        NOT NULL,
+    period_end      DATE        NOT NULL,
+    units_sold      INTEGER     NOT NULL CHECK (units_sold >= 0),
+    revenue         NUMERIC(20,2) NOT NULL CHECK (revenue >= 0),
+    cost            NUMERIC(20,2) NOT NULL CHECK (cost >= 0),
+    turnover_days   NUMERIC(8,2) CHECK (turnover_days >= 0),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT sales_products_period CHECK (period_end >= period_start),
+    CONSTRAINT one_product_per_period UNIQUE (sme_id, name, period_start, period_end)
+);
+CREATE INDEX IF NOT EXISTS sales_products_sme_idx ON sales_products (sme_id, period_end DESC);
+
+CREATE TABLE IF NOT EXISTS sales_channels (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sme_id          UUID        NOT NULL REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    channel         TEXT        NOT NULL,
+    period_start    DATE        NOT NULL,
+    period_end      DATE        NOT NULL,
+    gross_sales     NUMERIC(20,2) NOT NULL CHECK (gross_sales >= 0),
+    commission_fee  NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (commission_fee >= 0),
+    ad_cost         NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (ad_cost >= 0),
+    delivery_cost   NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (delivery_cost >= 0),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT sales_channels_period CHECK (period_end >= period_start),
+    CONSTRAINT one_channel_per_period UNIQUE (sme_id, channel, period_start, period_end)
+);
+CREATE INDEX IF NOT EXISTS sales_channels_sme_idx ON sales_channels (sme_id, period_end DESC);
+
+-- 14. Shared resources (SME UNLOCK) ------------------------------------------
+CREATE TABLE IF NOT EXISTS shared_resources (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_sme_id            UUID        REFERENCES sme_profiles (id) ON DELETE SET NULL,
+    title                   TEXT        NOT NULL,
+    category                TEXT        NOT NULL
+                            CHECK (category IN ('kitchen', 'truck', 'machine', 'team', 'space')),
+    category_label          TEXT        NOT NULL,
+    location                TEXT        NOT NULL,
+    capacity_text           TEXT        NOT NULL,
+    price_text              TEXT        NOT NULL,
+    unit_price              NUMERIC(20,2) NOT NULL CHECK (unit_price >= 0),
+    availability            TEXT        NOT NULL,
+    status                  TEXT        NOT NULL CHECK (status IN ('offered', 'confirmed')),
+    image_url               TEXT,
+    -- What breaks if this resource is pulled out of the plan.
+    impact_additional_cost  NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (impact_additional_cost >= 0),
+    impact_delay_days       INTEGER     NOT NULL DEFAULT 0 CHECK (impact_delay_days >= 0),
+    impact_message          TEXT        NOT NULL DEFAULT '',
+    affected_sme_ids        JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shared_resources_category_idx ON shared_resources (category);
+
+-- 15. Chaos scenarios for the simulator --------------------------------------
+CREATE TABLE IF NOT EXISTS chaos_scenarios (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug                    TEXT        NOT NULL UNIQUE,
+    title                   TEXT        NOT NULL,
+    category                TEXT        NOT NULL,
+    severity                TEXT        NOT NULL CHECK (severity IN ('low', 'medium', 'high')),
+    description             TEXT        NOT NULL,
+    trigger_node_id         TEXT        NOT NULL,
+    propagation_path        JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    cash_impact_amount      NUMERIC(20,2) NOT NULL DEFAULT 0,
+    deficit_days            JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    contingency_options     JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    revenue_loss            NUMERIC(20,2) NOT NULL DEFAULT 0,
+    additional_cost         NUMERIC(20,2) NOT NULL DEFAULT 0,
+    new_deficit_amount      NUMERIC(20,2) NOT NULL DEFAULT 0,
+    delivery_delay_days     INTEGER     NOT NULL DEFAULT 0,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 16. Delivery schedule and funder evidence ----------------------------------
+CREATE TABLE IF NOT EXISTS project_deliveries (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id      UUID        NOT NULL REFERENCES swarm_projects (id) ON DELETE CASCADE,
+    day             INTEGER     NOT NULL CHECK (day > 0),
+    delivery_date   DATE        NOT NULL,
+    target_units    NUMERIC(20,2) NOT NULL CHECK (target_units >= 0),
+    delivered_units NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (delivered_units >= 0),
+    status          TEXT        NOT NULL CHECK (status IN ('done', 'on_schedule', 'delayed')),
+    CONSTRAINT one_delivery_per_day UNIQUE (project_id, day)
+);
+
+CREATE TABLE IF NOT EXISTS project_evidence (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id      UUID        NOT NULL REFERENCES swarm_projects (id) ON DELETE CASCADE,
+    title           TEXT        NOT NULL,
+    verified        BOOLEAN     NOT NULL DEFAULT FALSE,
+    document_date   DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS project_evidence_project_idx ON project_evidence (project_id);
+
 -- updated_at triggers --------------------------------------------------------
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
 BEGIN
