@@ -6,7 +6,11 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .schemas import FinancialInput, LoanTerms
+from engines.financial_engine import (
+    calculate_dscr, calculate_fcf, calculate_liquidity, calculate_net_profit,
+    calculate_pmt, calculate_roa, calculate_roe,
+)
+from .schemas import FinancialInput
 
 ZERO = Decimal("0")
 
@@ -34,19 +38,6 @@ def unavailable(unit: str, formula: str, missing: list[str] | None = None, reaso
                   missingFields=missing or [], reason=reason)
 
 
-def calculate_pmt(loan: LoanTerms) -> Decimal:
-    """Positive installment; nominal annual rate; no fees or balloon payment."""
-    with localcontext() as context:
-        context.prec = 50
-        rate = loan.annual_interest_rate / loan.payments_per_year
-        if rate == 0:
-            return loan.principal / loan.periods
-        # Discounted form avoids large positive powers for long loan terms.
-        discount = (1 + rate) ** -loan.periods
-        payment = loan.principal * rate / (1 - discount)
-        return payment / (1 + rate) if loan.timing == "beginning" else payment
-
-
 def calculate_financials(data: FinancialInput) -> dict:
     with localcontext() as context:
         context.prec = 50
@@ -62,7 +53,7 @@ def calculate_financials(data: FinancialInput) -> dict:
         name = "fcf"
         formula = "operating_cash_flow - capital_expenditure"
         if not missing_for(["operating_cash_flow", "capital_expenditure"], "THB", formula):
-            metrics[name] = result(data.operating_cash_flow - data.capital_expenditure, "THB", formula)
+            metrics[name] = result(calculate_fcf(data.operating_cash_flow, data.capital_expenditure), "THB", formula)
 
         name = "net_cash_flow"
         fields = ["operating_cash_flow", "investing_cash_flow", "financing_cash_flow"]
@@ -73,16 +64,17 @@ def calculate_financials(data: FinancialInput) -> dict:
         for name, opening, closing in [("roa", "opening_assets", "assets"), ("roe", "opening_equity", "equity")]:
             formula = f"net_income / (({opening} + {closing}) / 2) * 100"
             if not missing_for(["net_income", opening, closing], "%", formula):
-                average = (getattr(data, opening) + getattr(data, closing)) / 2
+                calculate_return = calculate_roa if name == "roa" else calculate_roe
+                value = calculate_return(data.net_income, getattr(data, opening), getattr(data, closing))
                 metrics[name] = (unavailable("%", formula, reason=f"Average {closing} must be positive")
-                                 if average <= 0 else result(data.net_income / average * 100, "%", formula))
+                                 if value is None else result(value, "%", formula))
 
         name = "liquidity"
         formula = "current_assets / current_liabilities"
         if not missing_for(["current_assets", "current_liabilities"], "ratio", formula):
+            value = calculate_liquidity(data.current_assets, data.current_liabilities)
             metrics[name] = (unavailable("ratio", formula, reason="current_liabilities is zero")
-                             if data.current_liabilities == 0 else
-                             result(data.current_assets / data.current_liabilities, "ratio", formula))
+                             if value is None else result(value, "ratio", formula))
 
         name = "funding_gap"
         fields = ["working_capital_needed", "cash_balance", "minimum_cash_reserve", "buyer_deposit", "committed_funding"]
@@ -95,9 +87,9 @@ def calculate_financials(data: FinancialInput) -> dict:
         fields = ["cash_available_for_debt_service", "debt_principal_due", "debt_interest_due"]
         formula = "cash_available_for_debt_service / (debt_principal_due + debt_interest_due)"
         if not missing_for(fields, "ratio", formula):
-            debt_service = data.debt_principal_due + data.debt_interest_due
-            metrics[name] = (unavailable("ratio", formula, reason="Debt service is zero") if debt_service == 0
-                             else result(data.cash_available_for_debt_service / debt_service, "ratio", formula))
+            value = calculate_dscr(data.cash_available_for_debt_service, data.debt_principal_due, data.debt_interest_due)
+            metrics[name] = (unavailable("ratio", formula, reason="Debt service is zero") if value is None
+                             else result(value, "ratio", formula))
 
         name = "pmt"
         formula = "principal * r / (1 - (1 + r)^(-periods)); r = annual_interest_rate / payments_per_year"
@@ -145,6 +137,9 @@ def calculate_business_metrics(data: FinancialInput) -> dict:
             "cash_reserve_months": (["cash_balance", "operating_cash_outflow"], "months",
                                     "cash_balance / (operating_cash_outflow * 30 / period_days)"),
         }
+        if data.total_expenses is not None:
+            definitions["net_profit"] = (["revenue", "total_expenses"], "THB", "revenue - total_expenses")
+            definitions["total_cost"] = (["total_expenses"], "THB", "total_expenses")
         for name, (fields, unit, formula) in definitions.items():
             missing = [field for field in fields if getattr(data, field) is None]
             if missing:
@@ -156,9 +151,11 @@ def calculate_business_metrics(data: FinancialInput) -> dict:
             elif name == "operating_profit":
                 value = data.revenue - data.cost_of_goods_sold - data.operating_expenses
             elif name == "net_profit":
-                value = data.revenue - data.cost_of_goods_sold - data.operating_expenses - data.interest_expense - data.tax_expense
+                value = (calculate_net_profit(data.revenue, data.total_expenses) if data.total_expenses is not None else
+                         data.revenue - data.cost_of_goods_sold - data.operating_expenses - data.interest_expense - data.tax_expense)
             elif name == "total_cost":
-                value = data.cost_of_goods_sold + data.operating_expenses + data.interest_expense + data.tax_expense
+                value = (data.total_expenses if data.total_expenses is not None else
+                         data.cost_of_goods_sold + data.operating_expenses + data.interest_expense + data.tax_expense)
             elif name == "cost_per_unit":
                 reason = "units_sold is zero" if data.units_sold == 0 else None
                 value = ZERO if reason else (data.cost_of_goods_sold + data.operating_expenses) / data.units_sold

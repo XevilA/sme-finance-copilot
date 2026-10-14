@@ -62,6 +62,7 @@ class FinancialInput(StrictModel):
     buyer_deposit: PositiveMoney | None = None
     committed_funding: PositiveMoney | None = None
     revenue: PositiveMoney | None = None
+    total_expenses: PositiveMoney | None = None
     cost_of_goods_sold: PositiveMoney | None = None
     operating_expenses: PositiveMoney | None = None
     interest_expense: PositiveMoney | None = None
@@ -84,6 +85,21 @@ class FinancialInput(StrictModel):
             difference = self.assets - self.liabilities - self.equity
         if abs(difference) > Decimal("0.01"):
             raise ValueError(f"Balance sheet mismatch: assets - liabilities - equity = {difference}")
+        with localcontext() as context:
+            context.prec = 50
+            expenses = [self.cost_of_goods_sold, self.operating_expenses, self.interest_expense, self.tax_expense]
+            if self.total_expenses is not None:
+                known_expenses = sum((value for value in expenses if value is not None), Decimal(0))
+                if known_expenses - self.total_expenses > Decimal("0.01"):
+                    raise ValueError("Known expense categories cannot exceed total_expenses")
+                if all(value is not None for value in expenses) and abs(known_expenses - self.total_expenses) > Decimal("0.01"):
+                    raise ValueError("total_expenses must reconcile with supplied expense categories within THB 0.01")
+                if self.revenue is not None:
+                    profit = self.revenue - self.total_expenses
+                    if self.net_income is None:
+                        self.net_income = profit
+                    elif abs(profit - self.net_income) > Decimal("0.01"):
+                        raise ValueError("net_income must reconcile with revenue - total_expenses within THB 0.01")
         profit_fields = [self.revenue, self.cost_of_goods_sold, self.operating_expenses,
                          self.interest_expense, self.tax_expense, self.net_income]
         if all(value is not None for value in profit_fields):
