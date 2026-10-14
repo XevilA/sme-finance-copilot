@@ -1,20 +1,45 @@
-"""Persistence path. Skipped unless DATABASE_URL points at a schema-loaded database.
+"""Persistence path. Skipped unless a reachable DATABASE_URL is configured.
 
   docker compose -f backend/docker-compose.yml up -d
-  $env:DATABASE_URL = "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/sme_swarm"
+
+backend/.env supplies DATABASE_URL, so these run by default once the container
+is up and skip when it is not.
 """
 
+import asyncio
 import json
 import os
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
-from app.db import DB_ENABLED
+from app.db import DB_ENABLED, session_scope
 from app.main import app
 
-pytestmark = pytest.mark.skipif(not DB_ENABLED, reason="DATABASE_URL is not set")
+
+def database_reachable() -> bool:
+    """backend/.env sets DATABASE_URL for everyone, so DB_ENABLED alone is not
+    enough: skip rather than fail when the container simply is not running."""
+    if not DB_ENABLED:
+        return False
+
+    async def ping() -> None:
+        async with session_scope() as session:
+            await session.execute(text("SELECT 1"))
+
+    try:
+        asyncio.run(ping())
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not database_reachable(),
+    reason="no reachable DATABASE_URL (start it with: docker compose -f backend/docker-compose.yml up -d)",
+)
 
 # UUIDs from db/seed.sql.
 BAAN_SUAN = "11111111-1111-4111-8111-111111111111"

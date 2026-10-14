@@ -18,10 +18,22 @@ python -m pip --python backend/.venv/Scripts/python.exe install -r backend/requi
 
 ## เริ่มใช้งานและแก้ 404 ที่หน้าแรก
 
+วิธีที่สั้นสุด ใช้ได้ทั้ง cmd.exe และ PowerShell โดยไม่ต้องตั้ง environment variable เอง เพราะสคริปต์อ่าน `backend\.env` ให้
+
+```powershell
+backend\run.cmd
+```
+
+เปลี่ยน port ด้วย `set PORT=8001 && backend\run.cmd` (cmd.exe) หรือ `$env:PORT="8001"; backend\run.cmd` (PowerShell)
+
+หรือเรียก uvicorn ตรง ๆ พร้อม auto-reload
+
 ```powershell
 Set-Location "D:\code-project\sme-finance-copilot"
 & backend/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload --reload-dir backend/app
 ```
+
+ระวัง: `DATABASE_URL=... command` เป็น syntax ของ bash ใช้ใน cmd.exe ไม่ได้ จึงควรตั้งค่าใน `backend\.env` แทน ถ้าแก้ `.env` ขณะ server รันอยู่ ต้องรีสตาร์ท server เพราะ `--reload` เฝ้าแค่ `backend/app`
 
 - เปิด [หน้าเริ่มต้น](http://127.0.0.1:8000/) ระบบจะพาไป API Docs อัตโนมัติ
 - เปิด [API Docs](http://127.0.0.1:8000/docs) เพื่อทดลองส่ง JSON หรืออัปโหลด Excel ผ่าน **Try it out**
@@ -152,6 +164,29 @@ PMT รับอัตราดอกเบี้ยเป็นสัดส่�
 ผลลัพธ์ระดับบนมี `data`, `kind`, `status`, `missing`, `asOf`, `analyzedAt`, `period` และ `unit` หากสถานะระดับบนเป็น `insufficient_data` แสดงว่ามีตัวชี้วัดที่ข้อมูลขาดหรือคำนวณไม่ได้ ให้ตรวจ `status` และ `reason` ของแต่ละตัว
 
 ## ฐานข้อมูลและการเชื่อม frontend
+
+### เริ่ม PostgreSQL โดยไม่ต้องติดตั้ง psql
+
+`docker-compose.yml` สั่งรันทุกไฟล์ใน `db/` อัตโนมัติตอน boot ครั้งแรก จึงไม่ต้องติดตั้ง PostgreSQL หรือ psql client ในเครื่อง
+
+```powershell
+docker compose -f backend/docker-compose.yml up -d
+```
+
+`backend/.env` (คัดลอกจาก `.env.example` ให้อัตโนมัติเมื่อรัน `run.cmd`) ถือค่า `DATABASE_URL` ไว้แล้ว ไฟล์นี้อยู่ใน `.gitignore` จึงไม่ถูก commit
+
+`db/schema.sql` สร้างตารางทั้ง 9 ตาราง แล้ว `db/seed.sql` ใส่ข้อมูลตัวอย่าง: SME 3 ราย, ผลิตภัณฑ์สินเชื่อ 4 รายการ และคำสั่งซื้อ 1 รายการ โดยใช้ UUID คงที่ หลังแก้ไฟล์ใน `db/` ต้องลบ volume เพื่อให้ init script รันใหม่
+
+```powershell
+docker compose -f backend/docker-compose.yml down -v
+docker compose -f backend/docker-compose.yml up -d
+```
+
+ถ้ามี PostgreSQL ติดตั้งอยู่แล้ว ใช้ `psql -d sme_swarm -f backend/db/schema.sql -f backend/db/seed.sql` ได้ผลเหมือนกัน
+
+### Connection pool
+
+asyncpg ผูก connection ไว้กับ event loop ที่เปิดมัน จึงนำ connection จาก pool ไปใช้ข้าม loop ไม่ได้ ซึ่งเป็นสิ่งที่ `TestClient` (สร้าง loop ใหม่ทุก request) และ serverless ทำ ค่าเริ่มต้นจึงเป็น `NullPool` คือเปิด connection ใหม่ต่อหนึ่ง session หากรันหลัง uvicorn ที่อยู่ยาว ให้ตั้ง `DB_POOL=queue` เพื่อใช้ pool จริง
 
 หากไม่กำหนด `DATABASE_URL` ระบบทำงานโดยไม่บันทึกลงฐานข้อมูล เส้นทางที่อ่านข้อมูลที่บันทึกไว้จำเป็นต้องเปิดใช้ฐานข้อมูล ส่วน routers สำหรับคำนวณและ SWARM สามารถบันทึกผลเมื่อกำหนดฐานข้อมูลและส่ง `persist: true` ได้ ระบบไม่เก็บไฟล์ Excel ต้นฉบับ
 
