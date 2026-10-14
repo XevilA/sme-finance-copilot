@@ -19,6 +19,7 @@ from .db import DB_ENABLED, dispose_engine
 from .extraction import ExtractionError, MAX_UPLOAD_BYTES, parse_excel
 from .finance import calculate_financials
 from .routers import calculate as calculate_router
+from .routers import frontend as frontend_router
 from .routers import analyze as analyze_router
 from .routers import simulate as simulate_router
 from .routers import swarm as swarm_router
@@ -40,8 +41,11 @@ app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in o
 
 # Mounted twice on purpose: /api/* is the backend contract agreed for this
 # sprint, /api/v1/* is what the deployed frontend client already calls.
-for router in (calculate_router.router, swarm_router.router, analyze_router.router,
-               upload_router.router, simulate_router.router):
+# frontend_router goes first: its literal /swarm/proposal must be matched
+# before swarm_router's /swarm/{order_ref}, which would otherwise capture
+# "proposal" as an order reference and 404.
+for router in (frontend_router.router, calculate_router.router, swarm_router.router,
+               analyze_router.router, upload_router.router, simulate_router.router):
     app.include_router(router, prefix="/api")
     app.include_router(router, prefix="/api/v1", include_in_schema=False)
 

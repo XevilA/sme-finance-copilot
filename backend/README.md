@@ -225,6 +225,40 @@ docker exec -i sme_swarm_db psql -U postgres -d sme_swarm -v ON_ERROR_STOP=1 < b
 
 ถ้า scenario ดันงบออกนอกสัญญา input (เช่น เงินสดเกินสินทรัพย์หมุนเวียน) จะได้ 422 พร้อมชื่อฟิลด์ที่ผิด ไม่ส่งตัวเลขการเงินกลับไปใน error
 
+### Adapter สำหรับ contract เดิมของ frontend (P0)
+
+`src/api/client.ts` เรียก 16 เส้นทางใต้ `/api/v1` ซึ่งเดิม **404 ทั้งหมด** ทำให้ปลดจาก mock mode ไม่ได้เลย รอบนี้ทำ 5 เส้นทางที่ engine มีข้อมูลพร้อมแล้ว
+
+| Endpoint | สร้างจาก |
+| --- | --- |
+| `GET /api/v1/overview` | `calculate_financials` + `calculate_business_metrics` + `findings` จาก `build_analysis` |
+| `GET /api/v1/health/indicators` | `build_analysis().indicators` ซึ่งตรงกับ type `HealthIndicator` อยู่แล้ว |
+| `GET /api/v1/ai/explain?page=` | `build_analysis().explanation` ตรงกับ type `AIResponse` |
+| `GET /api/v1/cost/breakdown` | `calculate_business_metrics` + บรรทัดต้นทุนใน input |
+| `GET /api/v1/swarm/proposal` | โครงการที่อัปเดตล่าสุดใน `swarm_projects` + `swarm_allocations` |
+
+ทุกเส้นทางเสิร์ฟทั้ง `/api/*` และ `/api/v1/*` เหมือน router อื่น
+
+**ลำดับการลงทะเบียน router มีผล:** `frontend_router` ต้องมาก่อน `swarm_router` ไม่งั้น `/swarm/{order_ref}` จะจับคำว่า `proposal` เป็นเลขออเดอร์แล้วตอบ 404
+
+**ที่มาของข้อมูล** ตอบตามลำดับนี้และบอกไว้ในฟิลด์ `source` ทุกครั้ง:
+1. `?sme_id=<uuid>` + มี `DATABASE_URL` → งบล่าสุดของ SME รายนั้น พร้อมงบงวดก่อนหน้าเพื่อคำนวณส่วนต่างจริง (`source: "stored_record"`)
+2. ไม่ส่ง `sme_id` → ชุดข้อมูลตัวอย่าง `examples/analysis_input.json` (`source: "demo_dataset"`)
+
+ส่ง `sme_id` ที่ไม่มีในระบบจะได้ 404 ไม่ใช่เงียบ ๆ ตอบข้อมูลตัวอย่างกลับไป
+
+**กฎที่ยึดตลอด: ไม่สร้างตัวเลขขึ้นมาเอง** ชุดข้อมูลที่ไม่มีจะส่งค่าว่างและประกาศชื่อไว้ใน `missing` แล้วปล่อยให้ UI แสดงสถานะ insufficient-data ของตัวเอง แทนที่จะโชว์เลขที่ดูดีแต่อธิบายไม่ได้
+- `weeklyTrend: []` + `missing: ["weekly_cash_movements"]` — input contract ไม่มีความเคลื่อนไหวรายวัน
+- `trend: []` ของทุก indicator + `missing: ["indicator_history"]` — มีงบงวดเดียว
+- `investmentPlans: []` + `missing: ["investment_cash_schedule"]` — NPV/IRR/payback ต้องมีตารางกระแสเงินสดลงทุน
+- `lastPeriodDiff` เป็น 0 ทั้งหมด + `missing: ["previous_period_statement"]` เมื่อไม่มีงบงวดก่อน
+
+`status` ผูกกับ `missing` ตรง ๆ: ถ้า `missing` ไม่ว่าง `status` จะเป็น `insufficient_data` เสมอ ไม่มีกรณีอ้าง `ok` ทั้งที่ข้อมูลขาด
+
+`/api/v1/ai/explain` ส่ง `aiMode` กลับด้วย (`rules` หรือ `model`) เพื่อไม่ให้ UI ทำเหมือนเรียกโมเดลไปแล้วทั้งที่คำตอบมาจาก rule
+
+`totalCost`/`totalProfit` ใน `/swarm/proposal` คำนวณจาก `sme_profiles.cost_per_unit` ของแต่ละร้าน ถ้าร้านใดไม่มีค่านี้จะคืน 0 พร้อม `missing: ["shop_unit_cost"]` ไม่นับแบบครึ่ง ๆ
+
 ### เชื่อม Frontend แบบไม่แตะ UI
 
 `src/services/api.ts` เป็นไฟล์ใหม่ล้วน ไม่ import component ไม่แตะ CSS/Tailwind/layout และ **ไม่มีใคร import มัน** Vite จึง tree-shake ออกจาก bundle ทั้งหมด ยืนยันด้วยการ build: hash ของ `index-*.js` และ `index-*.css` เท่าเดิมทุกตัว และ module count เท่าเดิมที่ 1955

@@ -153,6 +153,90 @@ async def load_shop_capacities(session: AsyncSession | None, sme_ids: list[uuid.
     ]
 
 
+async def load_recent_records(
+    session: AsyncSession | None, sme_id: uuid.UUID | None, limit: int = 2
+) -> list[dict]:
+    """Latest statements for one SME, newest period first.
+
+    The frontend overview needs two: the current period and the one before it,
+    so a period-on-period difference can be computed instead of invented.
+    """
+    if session is None or sme_id is None:
+        return []
+    rows = (
+        await session.scalars(
+            select(FinancialRecord)
+            .where(FinancialRecord.sme_id == sme_id)
+            .order_by(FinancialRecord.period_end.desc(), FinancialRecord.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        {
+            "recordId": str(row.id),
+            "payload": row.payload,
+            "computed": row.computed,
+            "periodStart": row.period_start.isoformat(),
+            "periodEnd": row.period_end.isoformat(),
+            "kind": row.kind,
+            "source": row.source,
+        }
+        for row in rows
+    ]
+
+
+async def load_sme_name(session: AsyncSession | None, sme_id: uuid.UUID | None) -> str | None:
+    if session is None or sme_id is None:
+        return None
+    profile = await session.get(SmeProfile, sme_id)
+    return None if profile is None else profile.name
+
+
+async def load_active_swarm_proposal(session: AsyncSession | None) -> dict | None:
+    """The most recently updated project, which is what the UI calls active."""
+    if session is None:
+        return None
+    project = await session.scalar(
+        select(SwarmProject)
+        .order_by(SwarmProject.updated_at.desc(), SwarmProject.created_at.desc())
+        # The shop profile comes along so cost and profit are computed from the
+        # stored unit cost instead of being reported as zero.
+        .options(selectinload(SwarmProject.allocations).selectinload(SwarmAllocation.sme))
+        .limit(1)
+    )
+    if project is None or not project.allocations:
+        return None
+    return {
+        "project": {
+            "orderRef": project.order_ref,
+            "buyerName": project.buyer_name,
+            "targetCapacity": float(project.target_capacity),
+            "unit": project.unit,
+            "unitPrice": float(project.unit_price),
+            "durationDays": project.duration_days,
+            "paymentTermsDays": project.payment_terms_days,
+            "depositRatio": float(project.deposit_ratio),
+            "status": project.status,
+            "updatedAt": project.updated_at.isoformat() if project.updated_at else None,
+        },
+        "allocations": [
+            {
+                "shopId": str(allocation.sme_id),
+                "shopName": allocation.sme.name if allocation.sme else None,
+                "costPerUnit": float(allocation.sme.cost_per_unit) if allocation.sme else None,
+                "assignedRole": allocation.assigned_role,
+                "sharePerDay": float(allocation.share_per_day),
+                "workingCapitalNeeded": float(allocation.working_capital_needed),
+                "currentCash": float(allocation.current_cash),
+                "fundingGap": float(allocation.funding_gap),
+                "status": allocation.status,
+                "version": allocation.version,
+            }
+            for allocation in project.allocations
+        ],
+    }
+
+
 async def save_upload_event(
     session: AsyncSession | None,
     sme_id: uuid.UUID | None,
