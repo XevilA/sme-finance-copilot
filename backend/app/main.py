@@ -19,6 +19,7 @@ from .db import DB_ENABLED, dispose_engine
 from .extraction import ExtractionError, MAX_UPLOAD_BYTES, parse_excel
 from .finance import calculate_financials
 from .routers import calculate as calculate_router
+from .routers import analyze as analyze_router
 from .routers import swarm as swarm_router
 from .schemas import FinancialInput
 
@@ -29,7 +30,7 @@ async def lifespan(_: FastAPI):
     await dispose_engine()
 
 
-app = FastAPI(title="SME SWARM Finance Engine", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="SME SWARM Finance Engine", version="0.3.0", lifespan=lifespan)
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,https://sme-finance-copilot.vercel.app")
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in origins.split(",") if origin.strip()],
                    allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
@@ -37,7 +38,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in o
 
 # Mounted twice on purpose: /api/* is the backend contract agreed for this
 # sprint, /api/v1/* is what the deployed frontend client already calls.
-for router in (calculate_router.router, swarm_router.router):
+for router in (calculate_router.router, swarm_router.router, analyze_router.router):
     app.include_router(router, prefix="/api")
     app.include_router(router, prefix="/api/v1", include_in_schema=False)
 

@@ -194,6 +194,40 @@ asyncpg ผูก connection ไว้กับ event loop ที่เปิด
 
 CORS อนุญาต localhost พอร์ต 3000/5173 และเว็บไซต์ frontend ที่ deploy แล้ว เปลี่ยนได้ผ่าน `CORS_ORIGINS` โดยคั่นหลาย URL ด้วย comma ก่อนให้บริการข้อมูลการเงินจริงผ่านอินเทอร์เน็ต ต้องตั้งการยืนยันตัวตนและจำกัดขนาด request ที่จุดรับเข้า โดย CORS ไม่ใช่การยืนยันตัวตน
 
-การให้เกรดต้องปรับ DSCR กระแสเงินสด ภาระหนี้ และเงินสำรองให้เป็นคะแนนช่วงเดียวกันก่อนใช้สูตรถ่วงน้ำหนัก เพื่อหลีกเลี่ยงการรวมอัตราส่วนกับจำนวนเงินโดยตรง
+## วิเคราะห์ธุรกิจและเกรด A–D
+
+เพิ่มกำไร ต้นทุน จุดคุ้มทุน ROI และเกรด A–D แล้ว โดยเกรดใช้เกณฑ์เดโม `demo-v1` ปรับแต่ละองค์ประกอบเป็นคะแนน 0–100 ก่อนถ่วงน้ำหนัก 35% / 30% / 20% / 15% ข้อมูลที่ขาดไม่ถูกแทนด้วยศูนย์ และจะไม่ให้เกรดถ้ามีองค์ประกอบที่คำนวณไม่ได้ ดูสูตรและสัญญา API ใน [ANALYSIS_CONTRACT.md](docs/ANALYSIS_CONTRACT.md)
+
+```powershell
+$financialInput = Get-Content -Raw backend/examples/analysis_input.json | ConvertFrom-Json
+$analysisBody = @{ input = $financialInput; use_llm = $false } | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/analyze -ContentType application/json -Body $analysisBody
+```
+
+ตัวอย่างได้เกรด **B / 75.00**, กำไรสุทธิ 50,000 บาท, จุดคุ้มทุน 1,154 หน่วย และ ROI 15% API ยังคืนเหตุผล จุดแข็ง จุดอ่อน ความเสี่ยง และหลักฐานที่อ้างอิงตัวเลขจริงจากข้อมูลที่ส่งมา
+
+## ซ้อมเดโมผ่านหน้าเว็บ
+
+1. เปิด backend ที่พอร์ต 8000 ด้วย `backend\run.cmd`
+2. เปิด PowerShell อีกหน้าต่างที่โฟลเดอร์โครงการ แล้วรัน `pnpm install --frozen-lockfile` และ `pnpm dev`
+3. เปิด `http://localhost:3000` ไปหน้า **สุขภาพการเงิน**
+4. กด **Load simulated example** แล้ว **Calculate and analyze** เพื่อตรวจเกรดและสูตร
+5. กด **ให้ AI อธิบายตัวชี้วัด** เพื่อตรวจเหตุผลและเลือกหลักฐานที่เชื่อมกับการ์ด
+6. กด **Download Excel template** แล้วอัปโหลดไฟล์นั้นผ่าน **Analyze Excel** ต้องได้ผลตรงกับ JSON
+7. ลองเปลี่ยน `equity` เป็น `"1"` ต้องเห็น error งบบัญชีไม่สมดุล พร้อมแจ้งว่าผลเดิมล้าสมัย
+
+หาก backend เดิมรันอยู่ก่อนอัปเดตโค้ด ให้หยุดแล้วเริ่มใหม่ หรือใช้ `backend\run.cmd --reload --reload-dir backend/app`
+
+ตอนนี้เชื่อม backend จริงเฉพาะ flow วิเคราะห์ในหน้าสุขภาพการเงินและ AI Panel ของหน้านี้ ส่วน dashboard อื่นและหน้าฟอร์มเดิมยังใช้พฤติกรรมเดโมเดิม ผลวิเคราะห์ล่าสุดอยู่ในหน่วยความจำของ browser และหายเมื่อ reload หน้า
+
+Vite ตั้ง proxy `/api` ไปพอร์ต 8000 ให้แล้ว หาก backend อยู่ที่อื่น ให้ตั้ง `VITE_FINANCE_API_BASE_URL` เป็น URL ของ backend ที่ลงท้าย `/api/v1` สำหรับ Vercel ต้อง deploy backend แล้วตั้ง URL แบบ HTTPS และ rebuild frontend การ push โค้ด frontend ไม่ได้ deploy FastAPI ให้อัตโนมัติ
+
+## ทางเลือกใช้ AI Model
+
+โหมดเริ่มต้นเป็น **Rules-based** ใช้งานได้ทันทีโดยไม่ต้องมี API key หากต้องการให้โมเดลช่วยจัดลำดับประเด็น ให้เพิ่ม `OPENAI_API_KEY` และ `OPENAI_MODEL` ใน `backend/.env` แล้ว restart backend จากนั้นเลือก **Model-assisted priorities** ก่อนวิเคราะห์ ห้ามนำ API key ไปใส่ตัวแปรที่ขึ้นต้น `VITE_`
+
+โมเดลเลือกเฉพาะประเด็นที่ backend คำนวณและตรวจไว้แล้ว ไม่แก้สูตร ตัวเลข เกรด หรือหลักฐาน หากยังไม่มี key หรือโมเดลตอบผิด/timeout ระบบจะกลับมาใช้กฎพร้อมแจ้งสาเหตุ ไม่แสร้งว่าเรียกโมเดลสำเร็จ การเรียกโมเดลจริงยังต้องทดสอบด้วย key ที่ใช้งานได้
+
+งานถัดไปคือคาดการณ์เงินสดจากรายการรับ–จ่ายที่มีวันที่ การจับคู่ทุน และ Simulator ส่วนการยืนยันค่าใช้จ่ายผิดปกติต้องมีข้อมูลรายการหรือประวัติเปรียบเทียบก่อน ระบบจะระบุข้อมูลเหล่านี้เป็นสิ่งที่ยังไม่ทราบ
 
 เอกสารอ้างอิง: [คู่มืออ่านงบการเงินของ SEC](https://www.sec.gov/investor/pubs/begfinstmtguide.htm), [การวิเคราะห์สินเชื่อธุรกิจของ Federal Reserve](https://www.federalreserve.gov/boarddocs/supmanual/us_branches/3000_2.pdf)
