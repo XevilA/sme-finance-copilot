@@ -271,3 +271,70 @@ DEMO_LOGIN_PASSWORD='<รหัสที่ตั้ง>' python -m pytest -c ba
 **ยังไม่ทำ:** ไม่มี refresh token · ไม่มี blacklist เพิกถอน token ก่อนหมดอายุ
 (จึง clamp อายุไว้ไม่เกิน 7 วัน) · ไม่มี rate limit ที่หน้า login
 (ควรเพิ่มก่อนเปิด public) · ไม่มีการจำกัดจำนวนครั้งที่ลองผิด
+---
+
+## 🧪 เช็กลิสต์ก่อนทีม frontend มาทดสอบ
+
+### ตัวบล็อกเดียว: backend ต้องเข้าถึงได้
+
+ถ้าทีม frontend ทดสอบจากเครื่องตัวเอง **ต้อง deploy ก่อน** (ข้อ 1-4 ด้านบน)
+เพราะเว็บบน Vercel ยังไม่มี backend ให้คุย
+
+**ถ้าทดสอบบนเครื่องเดียวกัน** ใช้ local ได้เลย ไม่ต้อง deploy:
+
+```bash
+docker compose -f backend/docker-compose.yml up -d
+backendun.cmd
+```
+
+แล้วให้ frontend รัน `npm run dev` พร้อมตั้ง 2 ตัวแปรใน `.env.local` ที่ repo root:
+
+```
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+VITE_USE_MOCK=false
+```
+
+CORS อนุญาต `localhost:5173` และ `localhost:3000` ไว้แล้ว
+
+### ตรวจก่อนเริ่ม 3 คำสั่ง
+
+```bash
+curl http://127.0.0.1:8000/health
+curl "http://127.0.0.1:8000/api/v1/order"
+curl "http://127.0.0.1:8000/api/v1/shops"
+```
+
+`/order` ต้องได้ `PO-STP-2026-091` และ `status: "ok"` · ถ้าได้ `PO-PERSIST-TEST`
+หรือ `PO-LIVE-001` แปลว่าออเดอร์จากเทสต์ยังอยู่ ให้ reseed:
+
+```bash
+docker exec -i sme_swarm_db psql -U postgres -d sme_swarm < backend/db/seed.sql
+```
+
+### สิ่งที่ frontend จะเห็น (ไม่ส่ง query param เลย)
+
+16 contract ตอบ 200 ครบ และใช้ข้อมูลที่ seed ไว้จริง (`source: "stored_record"`)
+
+| หน้าจอ | ได้ข้อมูลของ |
+| --- | --- |
+| Overview, Health, Cost, AI explain | Baan Suan Kitchen (เกรด A) |
+| Funding options | Rung Charoen Foods — ร้านที่**มีส่วนขาดจริง** 45,000 บาท |
+| Order, Projects, Swarm proposal | `PO-STP-2026-091` ออเดอร์เดโม |
+| Shops, Resources, Chaos, Sales | ทั้ง 3 ร้าน / ข้อมูลเดโม |
+
+### เรื่องที่ควรบอกทีม frontend ล่วงหน้า
+
+1. **`status: "insufficient_data"` ไม่ใช่ error** — หมายถึงมีข้อมูลบางส่วน
+   และชื่อที่ขาดอยู่ใน `missing` · ให้แสดง empty state ของชุดข้อมูลนั้น
+   ไม่ต้องขึ้น error ทั้งหน้า · เช่น `/overview` จะมี `missing`
+   `["previous_period_statement", "weekly_cash_movements"]` เพราะมีงบงวดเดียว
+   จึงเทียบงวดก่อนไม่ได้และไม่มีความเคลื่อนไหวรายวัน
+2. **ทุก response มี `source`** (`stored_record` / `demo_dataset` / `none`)
+   ใช้แยกได้ว่าเลขนั้นมาจากฐานข้อมูลจริงหรือชุดตัวอย่าง
+3. **`/shops/{id}/finance` ต้องส่ง UUID** ที่ได้จาก `/api/v1/shops` ·
+   ถ้าส่ง id แบบ mock เดิม (`shop-1`) จะได้ envelope
+   `missing: ["unknown_shop_id"]` ไม่ใช่ error — แต่ก็ไม่มีข้อมูลให้แสดง
+4. **ยังไม่ต้องส่ง token** · `RBAC_ENFORCED=false` เป็นค่าเริ่มต้น
+   ทุก endpoint เรียกได้โดยไม่ต้องยืนยันตัวตน
+5. **`actionableItems` เป็นภาษาไทยแล้ว** แต่ `id`, `type`, `priority`
+   ยังเป็นอังกฤษตามสัญญาเดิม

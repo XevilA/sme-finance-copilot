@@ -154,8 +154,19 @@ def test_shop_finance_declares_party_signoff():
     assert set(data["partyAcceptance"]) == {"buyerSigned", "shopSigned", "logisticsSigned", "funderSigned"}
 
 
-def test_shop_finance_rejects_a_non_uuid_shop_id():
-    assert client.get("/api/v1/shops/not-a-uuid/finance").status_code == 422
+@needs_db
+def test_shop_finance_answers_an_unknown_id_with_an_envelope():
+    """Behaviour changed: this was a 422.
+
+    Every other contract answers with an envelope and the UI renders its own
+    empty state from one, so a screen still holding a mock id like "shop-1"
+    used to surface an error instead of an empty panel.
+    """
+    response = client.get("/api/v1/shops/not-a-uuid/finance")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "insufficient_data"
+    assert "unknown_shop_id" in body["missing"]
 
 
 # --- /cashflow/timeline ------------------------------------------------------

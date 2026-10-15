@@ -65,7 +65,32 @@ VALUES
    '2026-10-01', '2026-10-31', 35,
    'medium', 24.50, 2, 'เงินทุนหมุนเวียนซื้อวัตถุดิบและค่าแรงช่วงผลิต',
    'verified_documents')
-ON CONFLICT (id) DO NOTHING;
+-- DO UPDATE, not DO NOTHING. POST /api/swarm creates this project row with only
+-- the fields it needs, so a DO NOTHING seed could never fill in the demo
+-- metadata afterwards and the order screen stayed blank. Seeding the demo has to
+-- converge on the intended state, not just avoid duplicates.
+ON CONFLICT (id) DO UPDATE SET
+    buyer_name         = EXCLUDED.buyer_name,
+    target_capacity    = EXCLUDED.target_capacity,
+    unit_price         = EXCLUDED.unit_price,
+    duration_days      = EXCLUDED.duration_days,
+    payment_terms_days = EXCLUDED.payment_terms_days,
+    deposit_ratio      = EXCLUDED.deposit_ratio,
+    status             = EXCLUDED.status,
+    code               = EXCLUDED.code,
+    title              = EXCLUDED.title,
+    buyer_rating       = EXCLUDED.buyer_rating,
+    delivery_location  = EXCLUDED.delivery_location,
+    standard           = EXCLUDED.standard,
+    payment_terms_text = EXCLUDED.payment_terms_text,
+    start_date         = EXCLUDED.start_date,
+    deadline           = EXCLUDED.deadline,
+    progress_percent   = EXCLUDED.progress_percent,
+    risk_level         = EXCLUDED.risk_level,
+    roi_estimate_pct   = EXCLUDED.roi_estimate_pct,
+    duration_months    = EXCLUDED.duration_months,
+    fund_purpose       = EXCLUDED.fund_purpose,
+    evidence_level     = EXCLUDED.evidence_level;
 
 -- Allocations for the demo project, so the seed is self-contained and does not
 -- depend on POST /api/swarm having been called. The shares, working capital and

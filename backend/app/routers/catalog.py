@@ -58,11 +58,17 @@ async def order() -> dict:
 @router.get("/shops/{shop_id}/finance")
 async def shop_finance(shop_id: str, order_ref: str | None = Query(default=None)) -> dict:
     """Pass order_ref to pin the project; otherwise the latest one is used."""
-    owner = parse_uuid(shop_id)
-    if owner is None:
-        raise HTTPException(status_code=422, detail="shop_id must be a UUID")
     if not DB_ENABLED:
         return offline(None)
+    owner = parse_uuid(shop_id)
+    if owner is None:
+        # Every other contract answers with an envelope, and the UI renders its
+        # own empty state from one. A 422 here would surface as an error instead,
+        # which is what happened when a screen still held a mock id like
+        # "shop-1" rather than a stored UUID.
+        return adapters.envelope(
+            None, "forecast", ["unknown_shop_id"], "", source="none"
+        )
     async with session_scope() as session:
         stored = await catalog.load_shop_allocation(session, owner, order_ref)
     if stored is None:
@@ -131,16 +137,43 @@ async def funding_options(
         products = await catalog.load_funding_products(session)
         shops = await catalog.load_shops(session)
         records = await load_recent_records(session, owner, limit=1)
+        # The deployed client sends no parameters. This screen is about a
+        # funding need, so with no SME named it answers for the SME that
+        # actually has one - the largest stored funding gap among SMEs that also
+        # have a statement to score. Statement and gap always come from the same
+        # SME; they are never mixed. With no gap anywhere it falls back to the
+        # default statement, and the absent amount is declared.
+        default = None
+        if owner is not None:
+            pass
+        else:
+            default = await catalog.load_default_statement(session)
+            gapped = sorted(
+                (shop for shop in shops if (shop.get("fundingGap") or 0) > 0),
+                key=lambda shop: (-(shop["fundingGap"]), shop["id"]),
+            )
+            for shop in gapped:
+                candidate = await load_recent_records(session, parse_uuid(shop["id"]), limit=1)
+                if candidate:
+                    default = {
+                        "smeId": shop["id"],
+                        "payload": candidate[0]["payload"],
+                        "shopName": shop["name"],
+                    }
+                    break
+
+    payload = records[0]["payload"] if records else (default or {}).get("payload")
+    scored_sme = str(owner) if owner is not None else (default or {}).get("smeId")
 
     requested = amount
-    if requested is None and owner is not None:
-        match = next((shop for shop in shops if shop["id"] == str(owner)), None)
+    if requested is None and scored_sme:
+        match = next((shop for shop in shops if shop["id"] == scored_sme), None)
         requested = (match or {}).get("fundingGap") or 0.0
     requested = requested or 0.0
 
     matches = None
-    if records and requested > 0:
-        data = FinancialInput.model_validate(records[0]["payload"])
+    if payload and requested > 0:
+        data = FinancialInput.model_validate(payload)
         grade = await run_in_threadpool(grade_financials, data)
         matches = await run_in_threadpool(
             match_funding, data, grade, Decimal(str(requested)), products

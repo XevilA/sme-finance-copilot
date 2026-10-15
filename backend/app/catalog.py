@@ -7,12 +7,13 @@ never touch an ORM object outside a session.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .models import (
     CashEvent,
+    FinancialRecord,
     ChaosScenario,
     FundingProduct,
     InvestorProfile,
@@ -22,6 +23,17 @@ from .models import (
     SmeProfile,
     SwarmAllocation,
     SwarmProject,
+)
+
+
+# A project with a declared start_date is a committed engagement; one created
+# through POST /api/swarm without one is a draft proposal. Ordering by start_date
+# first means "the active project" is a real engagement rather than whatever was
+# written last - including by a test run against the same database.
+ACTIVE_PROJECT_ORDER = (
+    SwarmProject.start_date.desc().nullslast(),
+    SwarmProject.updated_at.desc(),
+    SwarmProject.created_at.desc(),
 )
 
 
@@ -126,9 +138,7 @@ async def load_latest_project(session: AsyncSession | None) -> dict | None:
     if session is None:
         return None
     project = await session.scalar(
-        select(SwarmProject)
-        .order_by(SwarmProject.updated_at.desc(), SwarmProject.created_at.desc())
-        .limit(1)
+        select(SwarmProject).order_by(*ACTIVE_PROJECT_ORDER).limit(1)
     )
     return None if project is None else project_row(project)
 
@@ -139,7 +149,7 @@ async def load_projects_with_detail(session: AsyncSession | None) -> list[dict]:
     projects = (
         await session.scalars(
             select(SwarmProject)
-            .order_by(SwarmProject.updated_at.desc())
+            .order_by(*ACTIVE_PROJECT_ORDER)
             .options(
                 selectinload(SwarmProject.allocations).selectinload(SwarmAllocation.sme),
                 selectinload(SwarmProject.deliveries),
@@ -198,7 +208,7 @@ async def load_shop_allocation(
         select(SwarmAllocation)
         .join(SwarmProject, SwarmProject.id == SwarmAllocation.project_id)
         .where(SwarmAllocation.sme_id == sme_id)
-        .order_by(SwarmProject.updated_at.desc())
+        .order_by(*ACTIVE_PROJECT_ORDER)
         .options(selectinload(SwarmAllocation.sme), selectinload(SwarmAllocation.project))
         .limit(1)
     )
@@ -417,3 +427,41 @@ async def load_investor_profiles(session: AsyncSession | None) -> list[dict]:
         }
         for row in rows
     ]
+
+
+async def load_default_statement(session: AsyncSession | None) -> dict | None:
+    """The statement to answer with when the caller names no SME.
+
+    The deployed frontend client sends no query parameters, so without this the
+    dashboard screens fall back to the example JSON and show a placeholder shop
+    name while real seeded data sits unused. Stored data wins over the example.
+
+    Deterministic: an `actual` statement outranks a forecast or a scenario, then
+    the most recent period, then the SME name, so the same row is chosen on
+    every request.
+    """
+    if session is None:
+        return None
+    kind_rank = case(
+        (FinancialRecord.kind == "actual", 0),
+        (FinancialRecord.kind == "forecast", 1),
+        else_=2,
+    )
+    row = (
+        await session.execute(
+            select(FinancialRecord, SmeProfile.name)
+            .join(SmeProfile, SmeProfile.id == FinancialRecord.sme_id)
+            .order_by(kind_rank, FinancialRecord.period_end.desc(), SmeProfile.name)
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    record, shop_name = row
+    return {
+        "smeId": str(record.sme_id),
+        "shopName": shop_name,
+        "payload": record.payload,
+        "kind": record.kind,
+        "periodEnd": record.period_end.isoformat(),
+    }

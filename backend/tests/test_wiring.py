@@ -145,12 +145,33 @@ def test_total_repayment_spans_the_facility_not_the_reporting_period():
 
 
 @needs_db
-def test_funding_options_declares_a_missing_statement_instead_of_scoring_blind():
-    body = client.get("/api/v1/funding/options?amount=465000").json()
+def test_funding_options_scores_against_a_resolved_statement():
+    """Behaviour changed: with no sme_id it now resolves one rather than
+    listing products unranked.
+
+    This screen is about a funding need, so it answers for the SME that has the
+    largest stored gap and also has a statement to score. Statement and gap
+    always come from the same SME.
+    """
+    body = client.get("/api/v1/funding/options").json()
+    assert body["status"] == "ok"
+    assert body["missing"] == []
+    assert body["requestedAmount"] > 0
+    # Every product carries a verdict and a reason from the matcher.
+    for option in body["data"]:
+        assert option["status"] in {"eligible", "requires_info", "not_eligible"}
+        assert option["matchReason"]
+        assert option["notice"]
+
+
+@needs_db
+def test_funding_options_declares_a_missing_statement_when_there_is_none():
+    """An SME with no stored statement cannot be scored, and says so."""
+    unknown = "99999999-9999-4999-8999-999999999999"
+    body = client.get(f"/api/v1/funding/options?sme_id={unknown}&amount=465000").json()
     assert body["status"] == "insufficient_data"
     assert "financial_record_for_matching" in body["missing"]
     assert all(option["matchScore"] == 0 for option in body["data"])
-    assert all(option["status"] == "requires_info" for option in body["data"])
 
 
 # --- GET /api/forecast -------------------------------------------------------

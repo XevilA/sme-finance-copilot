@@ -20,7 +20,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 
-from .. import adapters
+from .. import adapters, catalog
 from ..analysis import build_analysis
 from ..db import DB_ENABLED, session_scope
 from ..finance import calculate_business_metrics, calculate_financials
@@ -63,6 +63,16 @@ async def resolve(sme_id: str | None) -> Resolved:
         data = FinancialInput.model_validate(records[0]["payload"])
         previous = records[1] if len(records) > 1 else None
         return Resolved(data, previous, shop_name, "stored_record")
+
+    # The deployed client sends no query parameters, so prefer a stored
+    # statement over the bundled example: a real seeded SME is more useful on
+    # screen than a placeholder, and `source` still says which one answered.
+    if DB_ENABLED:
+        async with session_scope() as session:
+            default = await catalog.load_default_statement(session)
+        if default is not None:
+            data = FinancialInput.model_validate(default["payload"])
+            return Resolved(data, None, default["shopName"], "stored_record")
 
     payload = json.loads(DEMO_DATASET.read_text(encoding="utf-8"))
     return Resolved(FinancialInput.model_validate(payload), None, None, "demo_dataset")

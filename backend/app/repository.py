@@ -237,7 +237,14 @@ async def load_active_swarm_proposal(session: AsyncSession | None) -> dict | Non
         return None
     project = await session.scalar(
         select(SwarmProject)
-        .order_by(SwarmProject.updated_at.desc(), SwarmProject.created_at.desc())
+        # Same rule as catalog.ACTIVE_PROJECT_ORDER: a declared start_date means
+        # a committed engagement, so a draft written by a test does not become
+        # "the active proposal".
+        .order_by(
+            SwarmProject.start_date.desc().nullslast(),
+            SwarmProject.updated_at.desc(),
+            SwarmProject.created_at.desc(),
+        )
         # The shop profile comes along so cost and profit are computed from the
         # stored unit cost instead of being reported as zero.
         .options(selectinload(SwarmProject.allocations).selectinload(SwarmAllocation.sme))
