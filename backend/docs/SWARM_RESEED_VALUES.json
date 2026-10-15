@@ -1,0 +1,47 @@
+{
+  "order_ref": "PO-STP-2026-091",
+  "engine": "swarm-allocator/v2",
+  "business_assumption": "finite_order",
+  "database_updated": false,
+  "allocations": [
+    {
+      "shopId": "33333333-3333-4333-8333-333333333333",
+      "name": "Sahai Packing Co",
+      "sharePerDay": "450.00",
+      "revenue": "1350000.00",
+      "cost": "742500.00",
+      "grossProfit": "607500.00",
+      "workingCapitalNeeded": "742500.00",
+      "usableCash": "900000.00",
+      "depositApplied": "270000.00",
+      "fundingGap": "0.00",
+      "formula": "finite order; working_capital = peak cumulative production-cost deficit after buyer collections, excluding initial deposit; funding_gap = max(0, peak cumulative deficit including deposit - max(0, cash_balance - minimum_cash_reserve)); costs precede same-day collections"
+    },
+    {
+      "shopId": "11111111-1111-4111-8111-111111111111",
+      "name": "Baan Suan Kitchen",
+      "sharePerDay": "500.00",
+      "revenue": "1500000.00",
+      "cost": "900000.00",
+      "grossProfit": "600000.00",
+      "workingCapitalNeeded": "900000.00",
+      "usableCash": "4800000.00",
+      "depositApplied": "300000.00",
+      "fundingGap": "0.00",
+      "formula": "finite order; working_capital = peak cumulative production-cost deficit after buyer collections, excluding initial deposit; funding_gap = max(0, peak cumulative deficit including deposit - max(0, cash_balance - minimum_cash_reserve)); costs precede same-day collections"
+    },
+    {
+      "shopId": "22222222-2222-4222-8222-222222222222",
+      "name": "Rung Charoen Foods",
+      "sharePerDay": "50.00",
+      "revenue": "150000.00",
+      "cost": "105000.00",
+      "grossProfit": "45000.00",
+      "workingCapitalNeeded": "105000.00",
+      "usableCash": "30000.00",
+      "depositApplied": "30000.00",
+      "fundingGap": "45000.00",
+      "formula": "finite order; working_capital = peak cumulative production-cost deficit after buyer collections, excluding initial deposit; funding_gap = max(0, peak cumulative deficit including deposit - max(0, cash_balance - minimum_cash_reserve)); costs precede same-day collections"
+    }
+  ]
+}

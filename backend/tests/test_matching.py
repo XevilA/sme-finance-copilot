@@ -67,6 +67,15 @@ def test_zero_existing_debt_uses_new_loan_service():
     assert Decimal(row["post_funding_dscr"]) > 1
 
 
+def test_unrounded_coverage_controls_eligibility_at_a_display_rounding_boundary():
+    below = funding(value=data(cash_available_for_debt_service="46332.73"))[0]
+    above = funding(value=data(cash_available_for_debt_service="46332.74"))[0]
+    assert below["post_funding_dscr"] == "1.5000"
+    assert below["status"] == "not_eligible"
+    assert "unrounded" in below["match_reason"]
+    assert above["status"] == "eligible"
+
+
 def test_grants_add_no_loan_payment_and_do_not_require_cfads_without_a_dscr_mandate():
     value = data(cash_available_for_debt_service=None)
     row = match_funding(value, {"grade": "B", "score": "75"}, Decimal(10000),

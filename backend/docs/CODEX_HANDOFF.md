@@ -222,3 +222,38 @@ inserted as live news. News is not added to financial findings/grades automatica
 No table or API route was created by CODEX. An actual GDELT smoke request during
 implementation returned HTTP 429; outage handling is a verified runtime path,
 not evidence that live headlines were successfully fetched.
+
+## Final verification and remaining integration
+
+- The final full suite passed 308 tests with Postgres. The original 225 baseline
+  tests still pass, with formula-specific expectations deliberately changed for
+  the finite-order business assumption. One existing Starlette/httpx deprecation
+  warning remains; no unrelated dependency upgrade was performed.
+- Docker Compose was started without deleting volumes. `backend/run.cmd` starts
+  the API on 127.0.0.1:8000. Real HTTP checks returned 200 for health, docs, and
+  the P0 finite-order example, which returned THB 28,000 working capital/gap.
+- Pure matcher and forecaster were also exercised against all four catalog
+  funding rows and seven dated cash_events from Postgres, without database writes.
+- `SWARM_RESEED_VALUES.json` contains exact v2 allocation values for
+  PO-STP-2026-091, computed from the current demo profiles. Rung Charoen's new
+  allocation working capital is THB 105,000 and gap THB 45,000. Stored seed/DB
+  allocations were not updated; CLAUDE must update the seed and reseed.
+- OPENAI_API_KEY and OPENAI_MODEL remain unset. The user has no OpenAI credits,
+  so no paid/live LLM request was attempted or represented as tested. Nine new
+  HTTP-transport mock cases cover valid structured JSON, malformed JSON/model
+  output, refusal, timeout, 401/403 credential failures, 429 credit/rate failure,
+  and 500 server failure. Financial metrics/grades/findings remain unchanged and
+  rules mode remains available. Official Structured Outputs reference:
+  https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses
+- Real news API probes returned HTTP 429, then timeout. The last smoke response
+  was unavailable with zero articles, recorded locally in uploads. No live
+  headline retrieval or publication-date verification is claimed.
+- Post-funding eligibility comparisons use unrounded ratios. A displayed 1.5000
+  can still be below a 1.5 threshold before rounding; the rejection reason states
+  that distinction rather than presenting a contradictory rounded comparison.
+- New logic is not automatically wired into CLAUDE's endpoints. Required work:
+  forward SWARM inputs/catch validation errors; reseed; wire ranking and persist
+  matches; scope/project cash events and confirm horizon completeness; add news
+  storage/rate coordination and route integration.
+- No changes were made to src/, adapters, catalog, repository, models, routers,
+  RBAC, schema.sql, or seed.sql relative to implementation baseline 94ad7ab.

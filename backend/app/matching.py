@@ -131,7 +131,7 @@ def match_funding(data: FinancialInput, grade: dict, requested_amount: Decimal, 
                     if not (grant and data.cash_available_for_debt_service >= 0):
                         missing.append("defined_dscr")
                 elif dscr is not None and floor is not None and dscr < floor:
-                    rejected.append(f"post_funding_dscr: {dscr:.4f} is below required {floor}")
+                    rejected.append(f"post_funding_dscr: unrounded coverage is below required {floor}; displayed ratio={dscr:.4f}")
             grade_points = (health.score or Decimal(0)) * Decimal("0.25")
             coverage_points = Decimal(45) if grant else (Decimal(0) if dscr is None else min(Decimal(1), max(Decimal(0), dscr / max(floor, Decimal("1.5")))) * 45)
             exact_payment = Decimal(0) if grant else calculate_pmt(LoanTerms(principal=amount, annual_interest_rate=product.annual_rate, periods=product.term_months, payments_per_year=12))

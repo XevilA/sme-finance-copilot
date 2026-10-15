@@ -1,5 +1,35 @@
 # CODEX remaining work and demo readiness
 
+## Update: 2026-10-15
+
+The historical audit below described commit 87c8d64. CLAUDE subsequently completed
+the Role 2 frontend contracts, RBAC demo layer, simulator infrastructure, and
+catalog data at 99c2aab, with a 225-test baseline. Its old 404 and missing-Role-2
+findings below are historical, not the current API state.
+
+CODEX has now implemented finite-order SWARM exposure and business/distance
+eligibility, pure debt/equity ranking, dated 30/60/90-day forecasts and projected
+obligations, and news ingestion with stale/unavailable states. See
+`CODEX_HANDOFF.md` for exact function signatures, result shapes, schema requests,
+and the protected-file boundary. Final regression coverage is 308 passing tests
+with Postgres, including the original baseline and the updated finite-order expectations.
+
+Current integration gates:
+
+- CLAUDE must update allocation seed values and reseed. Reference values are in
+  `SWARM_RESEED_VALUES.json`; existing stored allocations still use the old formula.
+- Forward new SWARM eligibility/schedule inputs and map core validation errors to 422.
+- Wire funding/investor ranking and persistence, forecast inputs/coverage, and news
+  storage/fetch coordination into the already established API contracts.
+- Keep rules mode disclosed: there are no OpenAI credits; live LLM is unverified.
+  Valid JSON and failure recovery were tested through mock HTTP transport only.
+- Live news probes returned 429 and timeout. Unavailable state is working;
+  successful fresh headline retrieval is not claimed.
+- The API is running locally on port 8000, with real HTTP health/docs/P0 checks.
+  Hosted deployment and a fully integrated website rehearsal remain team work.
+
+## Historical audit: 2026-10-14
+
 Reviewed on 2026-10-14 (Asia/Bangkok) against implementation commit `87c8d64`.
 Role source: `AI_DEVELOPMENT_GUIDELINES.md`. All implementation work stays in
 `backend/`; existing frontend styling, components, and layouts remain unchanged.
@@ -116,5 +146,5 @@ Do not switch mock mode off until the required adapters and hosted base URL work
   entire website flow against the hosted backend; passing isolated unit tests
   does not establish end-to-end demo readiness.
 
-Current readiness: deterministic backend analysis can be demonstrated through
+Readiness at the original audit: deterministic backend analysis could be demonstrated through
 API docs. The requested full AI/funding/SWARM/forecast website demo is not ready yet.
