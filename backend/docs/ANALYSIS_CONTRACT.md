@@ -276,7 +276,17 @@ current_total * observed_month_count > baseline_sum * 1.50
   ไม่มีข้อมูลตุลาคม จึงยังสรุปไม่ได้ · Baan Suan ทั้งสามหมวดไม่เกิด finding โดยเดือน
   ที่มีข้อมูลล่าสุดคือกันยายน ใช้ฐานกรกฎาคม–สิงหาคม และแจ้งว่าขาดข้อมูลมิถุนายน
 
-**สถานะการต่อระบบ:** Core ทดสอบกับ loader และ forecast HTTP จริงแล้ว แต่ route วิเคราะห์
-และ overview ของ Claude ยังเรียก `build_analysis(data)` โดยไม่ส่งสองพารามิเตอร์ใหม่นี้ ·
-ยังไม่อ้างว่า finding ใหม่แสดงบนเว็บแล้ว · ให้ Claude ต่อข้อมูล SME เดียวกันและยืนยัน
-วันที่ยอดเงินสดกับความครบของตารางก่อนเรียกใช้
+**สถานะการต่อระบบ ณ `addf28e`:** CLAUDE ส่งข้อมูลเสริมเข้า `POST /api/analyze`,
+`/api/v1/overview`, `/api/v1/health/indicators` และ `/api/v1/ai/explain` แล้ว ·
+ใช้ SME เดียวกับงบ เงินสดปิดงบ และ `period_end` เป็นวันเริ่ม forecast ·
+ความครบยังต้องยืนยันด้วย `schedule_complete_through` ใน body ของ analyze หรือ query
+ของสามเส้นทาง GET · ไม่ระบุ SME/ไม่มี DB คือไม่สอบถาม (`None`) ไม่ใช่ประวัติว่าง
+
+Adapter ยก missing ของ forecast และ sub-status ของ expense comparison ขึ้น envelope
+โดยลดสถานะได้อย่างเดียว · Excel ยังไม่มี SME ให้ระบุจึงประกาศข้อมูลเสริมว่าไม่ทราบ ·
+ยังไม่มีแคช analysis และ `inputHash` ยังระบุเฉพาะงบ ห้ามใช้เพียงตัวเดียวเมื่อเริ่มทำแคช
+
+Tests ของการต่อข้อมูลทั้ง 17 กรณีผ่านกับ PostgreSQL ในรอบตรวจ 2026-10-15 ·
+server พอร์ต 8000 ที่เปิดก่อน commit ล่าสุดยังแสดงสัญญาเก่า ต้องโหลด checkout ปัจจุบัน
+ก่อนตรวจ HTTP ซ้ำ · **ยังไม่อ้างว่า finding ใหม่แสดงบนเว็บที่ deploy แล้ว** ·
+simulator ยังสร้าง metrics/grading ไม่ได้สร้าง analysis findings หรือโหลดข้อมูลเสริมเอง

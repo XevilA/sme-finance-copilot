@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
+from itertools import permutations
 
 import httpx
 import pytest
@@ -54,6 +55,39 @@ def test_deduplicates_tracking_urls_and_syndicated_titles_deterministically():
     forward = analyze_industry_articles(rows, "food_processing", as_of=NOW)
     reverse = analyze_industry_articles(list(reversed(rows)), "food_processing", as_of=NOW)
     assert forward == reverse
+    assert len(forward["articles"]) == 1
+
+
+def test_duplicate_url_uses_latest_fetch_independent_of_input_order():
+    stale = article(fetched_at=(NOW - timedelta(hours=2)).isoformat())
+    fresh = article(url="https://news.example/story?utm_source=refresh")
+    for rows in permutations([stale, fresh]):
+        result = analyze_industry_articles(list(rows), "food_processing", as_of=NOW)
+        assert result["status"] == "ok"
+        assert len(result["articles"]) == 1
+        assert result["articles"][0]["fetched_at"] == NOW.isoformat()
+        assert result["findings"][0]["status"] == "fresh"
+
+
+def test_duplicate_url_uses_latest_fetched_headline_and_its_own_evidence():
+    old = article(title="Food supply shortage", fetched_at=(NOW - timedelta(hours=1)).isoformat())
+    updated = article(title="New market grant for exporters")
+    expected = analyze_industry_articles([updated], "food_processing", as_of=NOW)
+    for rows in permutations([old, updated]):
+        assert analyze_industry_articles(list(rows), "food_processing", as_of=NOW) == expected
+    assert [item["category"] for item in expected["findings"]] == ["opportunity"]
+    assert expected["articles"][0]["published_at"] is None
+
+
+@pytest.mark.parametrize("change", [
+    {"title": "New market grant for exporters"},
+    {"published_at": (NOW - timedelta(hours=3)).isoformat()},
+    {"date_source": "source_publication_date"},
+])
+def test_duplicate_timestamp_ties_have_a_total_deterministic_order(change):
+    rows = [article(), article(**change)]
+    forward = analyze_industry_articles(rows, "food_processing", as_of=NOW)
+    assert forward == analyze_industry_articles(list(reversed(rows)), "food_processing", as_of=NOW)
     assert len(forward["articles"]) == 1
 
 

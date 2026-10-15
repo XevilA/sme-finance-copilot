@@ -36,7 +36,7 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 (ต่อจาก `c07405b`) · **472 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
+> อัปเดต 2026-10-15 (ต่อจาก `addf28e`) · **477 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
 > **34 API routes** · **27 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
@@ -56,7 +56,7 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 472 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
+python -m pytest -c backend/pytest.ini -q    # 477 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -88,9 +88,9 @@ python -m pytest -c backend/pytest.ini -q    # 472 ผ่าน + 3 skip (ยั
 | 5 · SWARM | `swarm.py` v2 | ออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
 | 7 · แนวโน้มอุตสาหกรรม | `industry.py` | GDELT + สถานะ stale/unavailable |
 | ต่อ LLM จริง | `ai_provider.py` | ตรวจ Structured Outputs จริงแล้ว · โมเดลและผลอยู่ใน `LIVE_PROVIDER_VERIFICATION.md` |
-| รับ forecast ในการวิเคราะห์ | `build_analysis(data, *, forecast=None, expense_history=None)` | ตรวจด้วยผล `/api/forecast` จริงแล้ว · มีหลักฐานวันเริ่มขาดเงินสด เงินสดต่ำสุด และยอด 30/60/90 วัน · ไม่คำนวณ forecast ซ้ำ · **ยังรอ CLAUDE ส่งต่อผ่าน route** |
-| เทียบประวัติค่าใช้จ่าย | `analysis.py` | ทดสอบข้อมูลเดโมจริง: Rung Charoen วัตถุดิบ 168,000 เทียบฐาน 99,166.67 เพิ่ม 69.41% · Baan Suan ไม่ถูกแจ้งเตือน · เกณฑ์และช่วงอยู่ใน `ANALYSIS_CONTRACT.md` · **ยังรอ CLAUDE ส่งต่อผ่าน route** |
-| ตรวจทรัพยากรของร้านใน SWARM | `ShopCapacity.resources`, `shop_eligibility()` | ตรวจ required ที่ยังไม่พร้อมก่อนจัดสรร · API แบบส่งร้าน inline ใช้ได้จริงแล้ว · เหตุผลอยู่ใน `audit.eligibility` · **ยังรอ CLAUDE ต่อ loader สำหรับ `sme_ids`** |
+| รับ forecast ในการวิเคราะห์ | `build_analysis(data, *, forecast=None, expense_history=None)` | มีหลักฐานวันเริ่มขาดเงินสด เงินสดต่ำสุด และยอด 30/60/90 วัน · ไม่คำนวณซ้ำ · CLAUDE ต่อ route แล้วใน `addf28e` |
+| เทียบประวัติค่าใช้จ่าย | `analysis.py` | Rung Charoen วัตถุดิบ 168,000 เทียบฐาน 99,166.67 เพิ่ม 69.41% · Baan Suan ไม่ถูกแจ้งเตือน · CLAUDE ต่อ route แล้ว · เกณฑ์อยู่ใน `ANALYSIS_CONTRACT.md` |
+| ตรวจทรัพยากรของร้านใน SWARM | `ShopCapacity.resources`, `shop_eligibility()` | ตรวจ required ก่อนจัดสรร พร้อมเหตุผลใน `audit.eligibility` · CLAUDE ต่อ `sme_ids` และกรองตามโครงการแล้วใน `addf28e` |
 
 ### ✅ CLAUDE (บทบาทที่ 2)
 
@@ -113,6 +113,15 @@ python -m pytest -c backend/pytest.ini -q    # 472 ผ่าน + 3 skip (ยั
 ## 🔜 4. งานที่เหลือ
 
 เรียงตามผลกระทบ · แต่ละข้อบอกชัดว่า **ใครทำ** และ **ขั้นถัดไปคืออะไร**
+
+**ผลตรวจ CODEX หลัง `addf28e`:** gate และการต่อข้อมูลสี่จุด/ทรัพยากรเสร็จแล้ว ·
+แก้ Core ข่าวซ้ำที่เคยขึ้นกับลำดับขาเข้า เพิ่ม 5 regression tests รวม **477 ผ่าน + 3 skip** ·
+เป็นการตรวจด้วยข้อมูลจำลอง ไม่ได้ยืนยันข่าวสดเพิ่ม
+
+**ก่อนตรวจ HTTP บนเครื่องอีกครั้ง — เจ้าของ: ผู้ดูแล server:** พอร์ต 8000 ยังเป็น
+Python PID `34040` ที่เริ่มก่อนสอง commit ของ CLAUDE · health ผ่าน แต่ OpenAPI ยังไม่มี
+พารามิเตอร์ข้อมูลเสริม และ overview ยังไม่คืน finding ใหม่ · ต้องโหลด checkout ปัจจุบัน
+ก่อนเดโม · รอบนี้ไม่เปิด server ซ้ำหรือหยุด process เดิม รายละเอียดใน `CODEX_HANDOFF.md`
 
 ### 🔴 บล็อกการเดโมเว็บจริง
 
@@ -142,6 +151,12 @@ python -m pytest -c backend/pytest.ini -q    # 472 ผ่าน + 3 skip (ยั
   `source_error="provider_gate_closed"` และเทสต์นับจำนวนการเปิด connection
 - **ขั้นถัดไป:** ทีมลองจากโฮสต์ที่ deploy ซึ่ง egress ต่างกันและอาจผ่าน TLS ·
   รายละเอียดใน `CODEX_HANDOFF.md`
+
+**งานส่งต่อ Module 6 — เจ้าของ: CLAUDE:** simulator ยังสร้าง metrics/grading และ
+ตรวจ resources ที่ส่งมาแบบ inline แต่ไม่ได้โหลด forecast/expense history หรือสร้าง
+analysis findings ของ Plan A/B · หากจะเพิ่ม ให้กำหนดวิธีปรับ cash events ตาม scenario
+และต่อข้อมูล SME เดียวกันก่อน ห้ามนำ forecast ของ baseline ไปยืนยันผล scenario ·
+ไม่ใช่งานแก้ Core ที่ CODEX ควรทำข้ามบทบาท
 
 **4. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
 

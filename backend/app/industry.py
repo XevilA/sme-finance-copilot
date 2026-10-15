@@ -96,7 +96,14 @@ def _articles(rows: list[dict], sector: str, as_of: datetime) -> list[dict]:
         except (ValidationError, ValueError, TypeError):
             continue
     seen_urls, seen_titles, result = set(), set(), []
-    for item in sorted(valid, key=lambda row: (row["observed_at"], row["url"]), reverse=True):
+    # Preserve observation/URL ordering, then prefer the latest fetched snapshot
+    # of a duplicate. Remaining source fields break exact timestamp ties so
+    # input order cannot change freshness, headline signals or date evidence.
+    for item in sorted(valid, key=lambda row: (
+        datetime.fromisoformat(row["observed_at"]), row["url"],
+        datetime.fromisoformat(row["fetched_at"]), row["published_at"] or "",
+        row["title"], row["date_source"],
+    ), reverse=True):
         title_key = " ".join(item["title"].casefold().split())
         if item["url"] in seen_urls or title_key in seen_titles:
             continue
