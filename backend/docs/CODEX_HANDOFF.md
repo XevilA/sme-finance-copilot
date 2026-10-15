@@ -1,28 +1,28 @@
 # การส่งมอบงานของ CODEX
 
-## Latest verification: 2026-10-15
+## ผลการตรวจสอบล่าสุด: 2026-10-15
 
-This update supersedes earlier notes below about missing OpenAI credentials and
-the previous unverified live LLM path. Claude's wiring/reseed work is recorded in
-`progress.md`; the historical notes below are not a current integration backlog.
+ข้อมูลอัปเดตส่วนนี้ใช้แทนบันทึกเดิมด้านล่างเรื่องยังไม่มีข้อมูลลับสำหรับเรียก OpenAI
+และยังไม่เคยตรวจเส้นทาง LLM จริง · งานต่อระบบและ reseed ของ Claude บันทึกไว้ใน
+`progress.md` · หมายเหตุประวัติด้านล่างจึงไม่ใช่รายการงานต่อระบบที่ยังค้างอยู่ในปัจจุบัน
 
-- `backend/.env` now holds the local key and `OPENAI_MODEL=gpt-6-luna`; the key is
-  ignored by Git and is never included in handoff artifacts.
-- Two real HTTP analysis requests completed with `aiMode: openai`. Metrics,
-  grades and every complete finding by ID were byte-identical to rules output;
-  only permitted ordering within severity groups changed in the shortfall case.
-- Usage-priced cost including cache writes: **$0.00144635**; estimated remainder
-  from the reported $5.98: **$5.97855365**. Actual billing balance is unverified.
-- All 12 finding/action branches and the explanation summary/reasoning are Thai.
-  IDs, categories, severity, evidence references, targets and JSON shape remain
-  unchanged. Both demo overview endpoints returned Thai action fields over HTTP.
-- News remains honestly unavailable. DNS/TCP succeed, HTTPS TLS stalls, and a
-  separate plain-HTTP diagnostic returns 429. No successful articles or live
-  deduplication/publication-date checks are claimed. Claude still owns provider
-  scheduling; network/provider TLS diagnosis is also needed at deployment.
-- Frontend and all Claude-owned files remain unchanged.
+- `backend/.env` มี key บนเครื่องและ `OPENAI_MODEL=gpt-6-luna` แล้ว · Git ละเว้น key
+  และไม่มีการใส่ key ลงในเอกสารหรือไฟล์ส่งมอบงาน
+- คำขอวิเคราะห์ HTTP จริงสองคำขอสำเร็จด้วย `aiMode: openai` · ตัวชี้วัด เกรด
+  และ finding ทุกฟิลด์เมื่อเทียบตาม ID ตรงกับผลระบบกฎเกณฑ์ทุกไบต์ ·
+  กรณีเงินสดขาดมือเปลี่ยนเฉพาะลำดับภายในกลุ่ม severity ตามที่อนุญาตไว้
+- ค่าใช้จ่ายตาม usage รวมการเขียนลงแคช: **$0.00144635** · ประมาณการยอดคงเหลือ
+  จากยอด $5.98 ที่ผู้ใช้แจ้ง: **$5.97855365** · ยังไม่ได้ยืนยันยอด billing จริง
+- finding/action ทั้ง 12 เงื่อนไข และ summary/reasoning ใน explanation เป็นภาษาไทยแล้ว ·
+  ID, category, severity, การอ้างอิงหลักฐาน, ปลายทาง และโครงสร้าง JSON คงเดิม ·
+  Endpoint overview ของ SME เดโมทั้งสองรายส่งฟิลด์คำแนะนำภาษาไทยผ่าน HTTP จริงแล้ว
+- ข่าวยังมีสถานะ unavailable ตามข้อเท็จจริง · DNS/TCP สำเร็จ แต่ HTTPS ค้างที่ TLS
+  และการวินิจฉัยแยกผ่าน HTTP ธรรมดาตอบ 429 · ไม่ได้อ้างว่าดึงบทความสำเร็จ
+  หรือตรวจการตัดข่าวซ้ำและวันเผยแพร่จากข้อมูลจริงแล้ว · Claude ยังรับผิดชอบการกำหนด
+  จังหวะคำขอผู้ให้บริการ และต้องตรวจเครือข่ายหรือ TLS ของผู้ให้บริการตอน deploy เพิ่มเติม
+- Frontend และไฟล์ของ Claude ทั้งหมดคงเดิม
 
-Detailed evidence and limitations: `LIVE_PROVIDER_VERIFICATION.md`.
+หลักฐานและข้อจำกัดโดยละเอียด: `LIVE_PROVIDER_VERIFICATION.md`.
 
 > แปลจากต้นฉบับภาษาอังกฤษของ CODEX · signature ของฟังก์ชัน ชื่อฟิลด์ ชื่อ key ตัวเลข
 > และ code block ทั้งหมดคงเดิม · หัวข้อที่ CLAUDE ดำเนินการแล้วหรือยังค้าง มีหมายเหตุกำกับ

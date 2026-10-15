@@ -1,106 +1,103 @@
-# Live provider verification
+# ผลการตรวจสอบผู้ให้บริการจริง
 
-Verified on 2026-10-15 from the Windows development machine. Synthetic financial
-inputs were used; no workbook, contact details or credentials are included here.
+ตรวจสอบเมื่อ 2026-10-15 จากเครื่องพัฒนาระบบ Windows โดยใช้ข้อมูลทางการเงินสังเคราะห์ ·
+เอกสารนี้ไม่มีไฟล์งบบัญชี ข้อมูลติดต่อ หรือข้อมูลลับสำหรับเข้าใช้บริการ
 
-## Backend regression checks
+## การตรวจสอบว่า Backend ยังทำงานถูกต้อง
 
-- Docker Compose confirmed the existing PostgreSQL container running; no volume
-  was removed or reset.
-- The full suite passed **330 tests**, with one existing Starlette/httpx
-  deprecation warning, after the final mocked-provider assertions were added.
-- `backend/run.cmd` restarted the backend at `127.0.0.1:8000`; `/health` reported
-  `persistence: true`. A rules-only HTTP analysis remained grade B / 75.00 with
-  `aiMode: rules` and no warning.
-- The 12 translated finding branches were compared with the original Git source
-  across positive and negative financial cases. Only finding/action text and
-  explanation summary/reasoning/suggestions differed, excluding the independent
-  per-request `analyzedAt` timestamp. Numerical values and all identifiers stayed
-  unchanged. The code structure was also compared with string values excluded.
-- Both seeded SME overview endpoints returned Thai `title`, `description` and
-  `actionText`. Stable action IDs included `act-debt_service_coverage` for Baan
-  Suan and `act-debt_service_shortfall` for Rung Charoen.
-- The diff against baseline `6dc7f6b` was empty for `src/` and every protected
-  Claude-owned path listed in the assignment. The ignored `.env` was not staged.
+- Docker Compose ยืนยันว่า PostgreSQL container เดิมทำงานอยู่ · ไม่มีการลบหรือรีเซ็ต volume
+- หลังเพิ่มการตรวจสอบในเทสต์จำลองผู้ให้บริการรอบสุดท้าย ชุดเทสต์ทั้งหมดผ่าน **330 รายการ** ·
+  ยังมีคำเตือนเรื่องการเลิกใช้ความสามารถเดิมของ Starlette/httpx จำนวนหนึ่งรายการ
+- เริ่ม Backend ใหม่ด้วย `backend/run.cmd` ที่ `127.0.0.1:8000` · `/health` รายงาน
+  `persistence: true` · การวิเคราะห์ผ่าน HTTP ด้วยระบบกฎเกณฑ์เพียงอย่างเดียวยังได้
+  เกรด B / 75.00 พร้อม `aiMode: rules` และไม่มีคำเตือน
+- เปรียบเทียบข้อความที่แปลแล้วทั้ง 12 เงื่อนไขของ finding กับโค้ดต้นฉบับใน Git
+  ทั้งกรณีผลการเงินดีและมีปัญหา · ต่างเฉพาะข้อความ finding/action และ
+  summary/reasoning/suggestions ใน explanation โดยไม่นับเวลา `analyzedAt`
+  ที่สร้างแยกในแต่ละคำขอ · ตัวเลขและตัวระบุทั้งหมดคงเดิม · ตรวจโครงสร้างโค้ดซ้ำ
+  โดยไม่นับค่าข้อความแล้วด้วย
+- Endpoint overview ของ SME เดโมทั้งสองรายคืน `title`, `description` และ
+  `actionText` เป็นภาษาไทย · ID ของ action ยังคงเดิม เช่น `act-debt_service_coverage`
+  ของ Baan Suan และ `act-debt_service_shortfall` ของ Rung Charoen
+- เทียบกับ baseline `6dc7f6b` แล้ว ไม่มีความเปลี่ยนแปลงใน `src/` หรือไฟล์ของ Claude
+  ที่ระบุว่าห้ามแก้ไขในคำสั่งงาน · ไฟล์ `.env` ถูก Git ละเว้นและไม่ได้ถูกนำเข้า staging
 
-## OpenAI
+## ผลการตรวจสอบ OpenAI
 
-Authenticated model listing succeeded with HTTP 200 and included `gpt-6-luna`.
-The configured model is the cheapest current, non-deprecated compatible text
-model in the official catalog reviewed for this run. Legacy `gpt-5-nano` and
-`gpt-4.1-nano` are cheaper in some token categories but marked deprecated.
+เรียกรายชื่อโมเดลโดยยืนยันตัวตนสำเร็จด้วย HTTP 200 และพบ `gpt-6-luna` ในบัญชี ·
+โมเดลที่ตั้งค่าเป็นโมเดลข้อความรุ่นปัจจุบันที่รองรับงานนี้ ราคาต่ำสุด และยังไม่ถูกประกาศ
+เลิกใช้ในรายการทางการที่ตรวจสอบรอบนี้ · รุ่นเก่า `gpt-5-nano` และ `gpt-4.1-nano`
+มีราคาถูกกว่าในบางประเภท token แต่ถูกประกาศเลิกใช้แล้ว
 
-Exactly two paid generation requests were made through the real local HTTP
-analysis endpoint at 2026-10-15 01:55 UTC. Both returned valid Structured Outputs,
-`status: completed`, `aiMode: openai`, `aiModel: gpt-6-luna`, and no warning.
-No paid failure probes or live test-suite loops were run.
+ส่งคำขอสร้างผลลัพธ์ที่มีค่าใช้จ่ายจริงทั้งหมดสองครั้ง ผ่าน endpoint วิเคราะห์ HTTP
+บนเครื่อง เมื่อ 2026-10-15 เวลา 01:55 UTC · ทั้งสองครั้งคืน Structured Outputs
+ที่ถูกต้อง พร้อม `status: completed`, `aiMode: openai`, `aiModel: gpt-6-luna`
+และไม่มีคำเตือน · ไม่ได้ใช้คำขอที่เสียเงินเพื่อทดสอบกรณีล้มเหลว หรือรันชุดเทสต์วนกับโมเดลจริง
 
-| Case | Input tokens | Cache-write tokens within input | Cached input tokens | Output tokens including reasoning | Cost at published rates, USD |
+| กรณีทดสอบ | Token ขาเข้า | Token ขาเข้าส่วนที่เขียนลงแคช | Token ขาเข้าที่อ่านจากแคช | Token ขาออกรวมการให้เหตุผล | ค่าใช้จ่ายตามราคาที่ประกาศ (USD) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Synthetic example | 4,565 | 4,562 | 0 | 128 | 0.00063455 |
-| Synthetic cash shortfall | 5,759 | 5,756 | 0 | 184 | 0.00081180 |
-| Total | 10,324 | 10,318 | 0 | 312 | **0.00144635** |
+| ตัวอย่างข้อมูลสังเคราะห์ | 4,565 | 4,562 | 0 | 128 | 0.00063455 |
+| ข้อมูลสังเคราะห์กรณีเงินสดขาดมือ | 5,759 | 5,756 | 0 | 184 | 0.00081180 |
+| รวม | 10,324 | 10,318 | 0 | 312 | **0.00144635** |
 
-Standard rates per million tokens: uncached input $0.10, cached input $0.01,
-cache write $0.125, output $0.50. Input tokens are separated into these three
-input categories; cache writes are not counted again at the ordinary input rate.
-Output usage already includes reasoning tokens, so reasoning is not added twice.
-No tools, regional processing, Fast mode or long-context pricing were requested.
+อัตรามาตรฐานต่อหนึ่งล้าน token: ขาเข้าที่ไม่ใช้แคช $0.10, ขาเข้าที่อ่านจากแคช $0.01,
+การเขียนลงแคช $0.125 และขาออก $0.50 · แบ่ง token ขาเข้าออกเป็นสามประเภทนี้
+โดยไม่คิดส่วนที่เขียนลงแคชซ้ำในอัตราขาเข้าปกติ · ยอดขาออกรวม token สำหรับการให้เหตุผลแล้ว
+จึงไม่นำมาบวกซ้ำ · ไม่ได้ขอใช้เครื่องมือ การประมวลผลเฉพาะภูมิภาค โหมด Fast
+หรืออัตราราคาสำหรับบริบทขนาดยาว
 
-The resulting **usage-based cost is $0.00144635**. Subtracting it from the user's
-reported $5.98 leaves **$5.97855365**. This is an estimate from observed usage and
-published rates, **not a verified billing debit or account balance**. No billing
-dashboard or organization Costs API was accessed; other account activity, taxes
-and billing adjustments are not known.
+ผลคำนวณ **ค่าใช้จ่ายตามการใช้งานคือ $0.00144635** · หักจากยอด $5.98 ที่ผู้ใช้แจ้ง
+จะเหลือ **$5.97855365** · ตัวเลขนี้เป็นประมาณการจาก usage ที่ตรวจพบและราคาที่ประกาศ
+**ยังไม่ใช่ยอดหักเงินจริงหรือยอดคงเหลือในบัญชีที่ยืนยันแล้ว** · ไม่ได้เข้าถึงหน้า billing
+หรือ Costs API ระดับองค์กร และไม่ทราบการใช้งานอื่น ภาษี หรือการปรับยอดของบัญชี
 
-Metrics and grades matched the rules path byte-for-byte under canonical JSON.
-Every finding matched byte-for-byte when keyed by ID. The shortfall case changed
-array order within fixed severity groups, as intended; it did not change facts.
-The synthetic example retained its array order. `max_output_tokens` remains 600.
-The nine mocked provider cases remain automated coverage and now assert complete
-finding preservation, severity order, model ID and the output-token cap.
+ตัวชี้วัดและเกรดตรงกับระบบกฎเกณฑ์ทุกไบต์เมื่อจัดรูปแบบเป็น canonical JSON ·
+finding แต่ละรายการตรงกันทุกไบต์เมื่อเทียบตาม ID · กรณีเงินสดขาดมือเปลี่ยนเฉพาะ
+ลำดับในอาร์เรย์ภายในกลุ่ม severity เดียวกันตามที่ออกแบบไว้ โดยไม่เปลี่ยนข้อเท็จจริง ·
+กรณีตัวอย่างสังเคราะห์คงลำดับเดิม · `max_output_tokens` ยังคงเป็น 600 ·
+เทสต์จำลองผู้ให้บริการเก้ากรณียังคงเป็นการทดสอบอัตโนมัติ และเพิ่มการยืนยันว่า
+finding ทุกฟิลด์คงเดิม ลำดับ severity ถูกต้อง พร้อมตรวจ model ID และเพดาน token ขาออก
 
-Sources: [model pricing and capabilities](https://developers.openai.com/api/docs/models/gpt-6-luna),
-[official pricing](https://developers.openai.com/api/docs/pricing),
-[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
+แหล่งอ้างอิง: [ราคาและความสามารถของโมเดล](https://developers.openai.com/api/docs/models/gpt-6-luna),
+[ราคาทางการ](https://developers.openai.com/api/docs/pricing),
+[การกำหนดโครงสร้างผลลัพธ์ (Structured Outputs)](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
 
-## Industry news: not successfully fetched
+## ข่าวอุตสาหกรรม: ยังดึงข่าวจริงไม่สำเร็จ
 
-Provider remains `https://api.gdeltproject.org/api/v2/doc/doc`. No provider switch,
-TLS verification bypass, HTTP downgrade or fabricated headline was introduced.
+ยังใช้ผู้ให้บริการที่ `https://api.gdeltproject.org/api/v2/doc/doc` · ไม่มีการเปลี่ยน
+ผู้ให้บริการ ข้ามการตรวจสอบ TLS ลดระดับไปใช้ HTTP หรือสร้างหัวข้อข่าวขึ้นเอง
 
-Observed diagnostics:
+ผลการวินิจฉัยที่ตรวจพบ:
 
-| Probe | Observed result |
+| การตรวจสอบ | ผลที่พบ |
 | --- | --- |
-| DNS for `api.gdeltproject.org` | Resolved to `104.197.47.124` during this run |
-| Production query: sector `food_processing`, ArtList JSON, 50 records, 7 days | `ConnectTimeout`, approximately 5.5-5.8 seconds |
-| Simplified HTTPS query: `food`, 5 records, 24 hours | Same `ConnectTimeout` |
-| Direct TCP connections to provider ports 443 and 80 | Connected in approximately 0.2-0.3 seconds |
-| TLS handshake to provider port 443, with normal certificate verification and SNI | Timed out after approximately 5.3 seconds |
-| Public GDELT homepage HTTPS control | HTTP 301 |
-| Plain HTTP API diagnostic, no redirects followed | HTTP 429; provider body requests at most one request per five seconds |
-| Local `GET /api/industry/trends?sector=food_processing` | HTTP 200 envelope, `status: unavailable`, `sourceError: timeout`, zero articles, zero stored rows |
+| DNS ของ `api.gdeltproject.org` | แปลงชื่อเป็น `104.197.47.124` ในรอบตรวจสอบนี้ |
+| คำค้นที่ระบบใช้งาน: sector `food_processing`, ArtList JSON, 50 รายการ, 7 วัน | `ConnectTimeout` หลังประมาณ 5.5-5.8 วินาที |
+| ลดความซับซ้อนของคำค้น HTTPS: `food`, 5 รายการ, 24 ชั่วโมง | ยังพบ `ConnectTimeout` เช่นเดิม |
+| เชื่อมต่อ TCP โดยตรงไปยังพอร์ต 443 และ 80 ของผู้ให้บริการ | เชื่อมต่อได้ในประมาณ 0.2-0.3 วินาที |
+| TLS handshake ไปยังพอร์ต 443 โดยตรวจใบรับรองตามปกติและใช้ SNI | หมดเวลารอหลังประมาณ 5.3 วินาที |
+| ใช้หน้าแรกสาธารณะของ GDELT เป็นตัวเทียบการเชื่อมต่อ HTTPS | HTTP 301 |
+| วินิจฉัย API ผ่าน HTTP ธรรมดา โดยไม่ตามการเปลี่ยนเส้นทาง | HTTP 429 · ข้อความจากผู้ให้บริการระบุให้ส่งคำขอไม่เกินหนึ่งครั้งต่อห้าวินาที |
+| เรียก `GET /api/industry/trends?sector=food_processing` บนเครื่อง | โครงสร้างคำตอบ HTTP 200 พร้อม `status: unavailable`, `sourceError: timeout`, บทความศูนย์รายการ และแถวที่บันทึกศูนย์แถว |
 
-There are two observed issues: HTTPS stalls at TLS from this environment, and a
-separate plain-HTTP diagnostic reaches a rate-limited API. Query syntax cannot
-explain a TLS handshake timeout because no HTTP query has been sent at that
-stage. These observations do **not** establish whether the TLS problem is the
-provider, an intermediary, or destination-specific local/network filtering.
-General outbound HTTPS works, as shown by the authenticated OpenAI calls.
+พบปัญหาสองส่วน: HTTPS จากสภาพแวดล้อมนี้ค้างในขั้น TLS และการวินิจฉัยแยกผ่าน HTTP
+เข้าถึง API ได้แต่ติดข้อจำกัดอัตราคำขอ · รูปแบบคำค้นอธิบายการหมดเวลาของ TLS handshake
+ไม่ได้ เพราะยังไม่ได้ส่งคำค้น HTTP ในขั้นนั้น · ผลเหล่านี้ **ยังยืนยันไม่ได้** ว่าปัญหา TLS
+เกิดจากผู้ให้บริการ ตัวกลาง หรือการกรองปลายทางเฉพาะบนเครื่องหรือเครือข่าย ·
+HTTPS ขาออกทั่วไปทำงานได้ตามหลักฐานการเรียก OpenAI ที่ยืนยันตัวตนสำเร็จ
 
-A working environment needs a successful certificate-verified TLS handshake to
-the provider, followed by a successful ArtList JSON response. Recheck from the
-intended deployment host, and inspect destination-specific firewall/proxy/TLS
-inspection rules or provider health if the handshake still fails. Do not disable
-certificate verification or silently use plain HTTP to hide this limitation.
+สภาพแวดล้อมที่จะใช้งานได้ต้องทำ TLS handshake พร้อมตรวจสอบใบรับรองของผู้ให้บริการ
+สำเร็จ แล้วได้รับคำตอบ ArtList JSON ที่ถูกต้อง · ให้ตรวจซ้ำจากเครื่องที่จะใช้ deploy จริง
+และตรวจ firewall/proxy/กฎตรวจสอบ TLS ที่เจาะจงปลายทาง หรือสถานะผู้ให้บริการ
+หากยังเชื่อมต่อไม่สำเร็จ · ห้ามปิดการตรวจสอบใบรับรองหรือเปลี่ยนไปใช้ HTTP ธรรมดา
+โดยไม่แจ้งเพื่อปิดบังข้อจำกัดนี้
 
-Claude still owns `industry_news_fetch_state` and provider-wide scheduling across
-workers and sectors. Respect the provider's minimum interval and any Retry-After
-before retrying; a database limiter cannot itself repair a failing TLS handshake.
-No schema or Claude-owned API/cache file was changed in this work.
+Claude ยังคงรับผิดชอบ `industry_news_fetch_state` และการกำหนดจังหวะคำขอระดับ
+ผู้ให้บริการร่วมกันระหว่าง worker และ sector · ก่อนลองใหม่ต้องเคารพช่วงเวลาขั้นต่ำ
+ของผู้ให้บริการและค่า Retry-After หากมี · ตัวจำกัดอัตราในฐานข้อมูลแก้ TLS handshake
+ที่ล้มเหลวไม่ได้ด้วยตัวเอง · งานรอบนี้ไม่ได้แก้ schema หรือไฟล์ API/แคชของ Claude
 
-Successful live deduplication and publication-date checks remain **unverified**
-because no real articles were retrieved. Mocked normalization/deduplication tests
-still pass. GDELT `seendate` remains `observed_at`; `published_at` stays null when
-the source supplies no actual publication date. Empty/unavailable is truthful.
+การยืนยันว่าตัดข่าวซ้ำและจัดการวันเผยแพร่จากข้อมูลจริงได้สำเร็จยัง **ไม่ได้ตรวจพิสูจน์**
+เพราะยังไม่ได้รับบทความจริง · เทสต์จำลองการปรับข้อมูลให้อยู่ในรูปแบบเดียวกันและตัดข้อมูลซ้ำ
+ยังผ่าน · ค่า `seendate` ของ GDELT ยังคงถูกใช้เป็น `observed_at` และ `published_at`
+ยังเป็น null เมื่อแหล่งข่าวไม่ระบุวันเผยแพร่จริง · สถานะว่างหรือ unavailable จึงตรงกับข้อเท็จจริง

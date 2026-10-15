@@ -47,7 +47,7 @@
 | --- | --- | --- |
 | Read Data | `POST /api/upload` | ✅ |
 | Calculate | `POST /api/calculate` | ✅ |
-| AI Analyze | `POST /api/analyze` | ✅ rules + live OpenAI verified with `gpt-6-luna` on 2026-10-15 |
+| AI Analyze | `POST /api/analyze` | ✅ ระบบกฎเกณฑ์ + ตรวจ OpenAI จริงด้วย `gpt-6-luna` แล้วเมื่อ 2026-10-15 |
 | Match Funding | `POST /api/match-funding` | ✅ |
 | Simulate | `POST /api/simulate` | ✅ |
 | Return JSON | `/api/v1/*` 16 contract | ✅ ตอบ 200 ครบ |
@@ -63,8 +63,8 @@
 | 4 · จับคู่แหล่งทุนและนักลงทุน | ✅ | `matching.py` · ให้คะแนน 0-100 + ตรวจ DSCR หลังรับทุน |
 | 5 · SWARM Logic | ✅ | `swarm.py` v2 แบบออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
 | 7 · แนวโน้มอุตสาหกรรม | ✅ | `industry.py` · ดึงข่าวผ่าน GDELT + สถานะ stale/unavailable |
-| Live LLM verification | ✅ | Two real Structured Outputs calls; deterministic metrics/grades and complete findings preserved; model `gpt-6-luna`; output cap 600 |
-| Thai analysis actions | ✅ | All 12 finding branches and their actions translated; overview HTTP checked for both demo SMEs; IDs and shape unchanged |
+| ตรวจสอบ LLM จริง | ✅ | เรียก Structured Outputs จริงสองคำขอ · ตัวชี้วัด เกรด และ finding ทุกฟิลด์คงเดิม · โมเดล `gpt-6-luna` · เพดาน token ขาออก 600 |
+| คำแนะนำจากการวิเคราะห์เป็นภาษาไทย | ✅ | แปล finding และ action ครบทั้ง 12 เงื่อนไข · ตรวจ overview ผ่าน HTTP ของ SME เดโมทั้งสองรายแล้ว · ID และโครงสร้างคงเดิม |
 
 ### ✅ CLAUDE (บทบาทที่ 2) — ทำแล้ว
 
@@ -85,7 +85,7 @@
 | **Deploy backend ขึ้น host** | CLAUDE | ต้องใช้บัญชี/credential ของทีม · **นี่คือตัวบล็อกใหญ่สุดของการเดโมเว็บจริง** |
 | **ปลด frontend จากโหมด mock** | CLAUDE | ต้อง deploy ก่อน แล้วตั้ง `VITE_API_BASE_URL` + `VITE_USE_MOCK=false` |
 | **Authentication จริง** | CLAUDE | ตอนนี้ใช้ header `X-User-Email` ซึ่งใครก็ตั้งได้ · ต้องมี token ที่เซ็น/ตรวจได้ |
-| Successful live industry fetch | CODEX / hosting team | Still unverified: DNS and TCP succeed, HTTPS TLS handshake times out; separate HTTP diagnostic returns 429. Query simplification does not fix TLS. Deployment-host TLS connectivity and provider rate coordination are needed; see `LIVE_PROVIDER_VERIFICATION.md`. |
+| ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ | CODEX / ทีมดูแลโฮสต์ | ยังไม่สำเร็จ: DNS และ TCP เชื่อมต่อได้ แต่ HTTPS TLS handshake หมดเวลารอ · การวินิจฉัยแยกผ่าน HTTP ตอบ 429 · ลดความซับซ้อนของคำค้นแล้วไม่แก้ TLS · ต้องตรวจ TLS จากโฮสต์ที่จะ deploy และประสานจำกัดอัตราคำขอผู้ให้บริการ · ดู `LIVE_PROVIDER_VERIFICATION.md` |
 | พิกัดร้านค้าจริง | ทีม | คอลัมน์ `latitude`/`longitude` พร้อมแล้วแต่ยังไม่มีข้อมูล · ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
 | `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker ควรเพิ่มก่อนรันหลายเครื่อง |
 | ต่อ `project_cash_events()` เข้า route | CLAUDE | ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ |
