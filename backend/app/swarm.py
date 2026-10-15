@@ -5,13 +5,15 @@ working-capital exposure and funding gap. Pure Decimal math, no I/O, no RNG:
 the same request always yields the same proposal.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP, localcontext
-from typing import Literal
+from math import atan2, cos, radians, sin, sqrt
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
-from .schemas import PositiveMoney, Rate
+from .order_cash import finite_order_schedule, peak_cash_deficit
+from .schemas import PositiveMoney, Rate, parse_decimal
 
 ZERO = Decimal("0")
 # A shop is flagged "review" rather than "blocked" while its gap stays within
@@ -25,8 +27,18 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class Coordinates(StrictModel):
+    latitude: Annotated[Decimal, BeforeValidator(parse_decimal), Field(ge=-90, le=90, max_digits=12, decimal_places=8)]
+    longitude: Annotated[Decimal, BeforeValidator(parse_decimal), Field(ge=-180, le=180, max_digits=12, decimal_places=8)]
+
+
+class BuyerCollection(StrictModel):
+    day_index: int = Field(strict=True, ge=0, le=10000)
+    fraction: Rate
+
+
 class ShopCapacity(StrictModel):
-    shop_id: str
+    shop_id: str = Field(min_length=1, max_length=128)
     name: str
     capacity_total: PositiveMoney
     capacity_used: PositiveMoney = Decimal("0")
@@ -34,6 +46,21 @@ class ShopCapacity(StrictModel):
     cash_balance: PositiveMoney = Decimal("0")
     minimum_cash_reserve: PositiveMoney = Decimal("0")
     assigned_role: str | None = None
+    business_type: str | None = None
+    coordinates: Coordinates | None = None
+
+    @field_validator("shop_id")
+    @classmethod
+    def normalize_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("shop_id cannot be blank")
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_capacity(self):
+        if self.capacity_used > self.capacity_total:
+            raise ValueError("capacity_used cannot exceed capacity_total")
+        return self
 
 
 class SwarmRequest(StrictModel):
@@ -46,6 +73,50 @@ class SwarmRequest(StrictModel):
     payment_terms_days: int = Field(strict=True, ge=0, le=365)
     deposit_ratio: Rate = Decimal("0")
     shops: list[ShopCapacity] = Field(min_length=1, max_length=200)
+    production_start: date | None = None
+    collection_schedule: list[BuyerCollection] | None = Field(default=None, max_length=100)
+    required_business_types: list[str] = Field(default_factory=list, max_length=30)
+    buyer_coordinates: Coordinates | None = None
+    max_distance_km: PositiveMoney | None = None
+
+    @model_validator(mode="after")
+    def validate_allocation_inputs(self):
+        ids = [shop.shop_id for shop in self.shops]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate shop ids are not allowed")
+        if self.max_distance_km is not None and self.buyer_coordinates is None:
+            raise ValueError("buyer_coordinates are required for a distance limit")
+        if self.required_business_types and any(not value.strip() for value in self.required_business_types):
+            raise ValueError("required_business_types cannot contain blank values")
+        if self.collection_schedule is not None and sum((row.fraction for row in self.collection_schedule), ZERO) != 1:
+            raise ValueError("Collection fractions must sum to one for the invoice balance")
+        if self.production_start is not None:
+            last_day = max([self.duration_days + self.payment_terms_days, *(row.day_index for row in self.collection_schedule or [])])
+            if self.production_start.toordinal() + last_day > date.max.toordinal():
+                raise ValueError("Cash schedule dates exceed the supported calendar")
+        return self
+
+
+def shop_eligibility(shop: ShopCapacity, request: SwarmRequest) -> dict:
+    """Haversine distance in km, not road distance or travel time."""
+    reasons = []
+    allowed = {value.strip().casefold() for value in request.required_business_types}
+    if allowed and (shop.business_type or "").strip().casefold() not in allowed:
+        reasons.append("Business type is missing or does not match the order")
+    distance = None
+    if request.buyer_coordinates is not None and shop.coordinates is not None:
+        origin, target = request.buyer_coordinates, shop.coordinates
+        lat1, lat2 = radians(float(origin.latitude)), radians(float(target.latitude))
+        delta_lon = radians(float(target.longitude - origin.longitude))
+        a = sin((lat2 - lat1) / 2) ** 2 + cos(lat1) * cos(lat2) * sin(delta_lon / 2) ** 2
+        a = max(0.0, min(1.0, a))
+        distance = Decimal(str(6371.0088 * 2 * atan2(sqrt(a), sqrt(1 - a)))).quantize(Decimal("0.000001"))
+    if request.max_distance_km is not None:
+        if distance is None:
+            reasons.append("Shop coordinates are required to verify distance eligibility")
+        elif distance > request.max_distance_km:
+            reasons.append("Shop exceeds max_distance_km")
+    return {"eligible": not reasons, "distance_km": None if distance is None else str(distance), "reasons": reasons}
 
 
 def money(value: Decimal) -> Decimal:
@@ -67,11 +138,13 @@ def _allocate(request: SwarmRequest) -> dict:
     cash_cycle_days = Decimal(request.duration_days + request.payment_terms_days)
     duration = Decimal(request.duration_days)
 
-    # Cheapest unit cost first; ties broken by larger free capacity, then shop_id
-    # so the ordering is stable regardless of request order.
+    assessments = {shop.shop_id: shop_eligibility(shop, request) for shop in request.shops}
+    # Eligibility precedes cost, distance, free capacity, and stable id ranking.
     candidates = sorted(
-        request.shops,
-        key=lambda shop: (shop.cost_per_unit, -(shop.capacity_total - shop.capacity_used), shop.shop_id),
+        [shop for shop in request.shops if assessments[shop.shop_id]["eligible"]],
+        key=lambda shop: (shop.cost_per_unit,
+                          Decimal(assessments[shop.shop_id]["distance_km"]) if assessments[shop.shop_id]["distance_km"] is not None else Decimal("Infinity"),
+                          -(shop.capacity_total - shop.capacity_used), shop.shop_id),
     )
 
     remaining = request.target_capacity
@@ -89,11 +162,17 @@ def _allocate(request: SwarmRequest) -> dict:
 
         revenue = share * duration * request.unit_price
         cost = share * duration * shop.cost_per_unit
-        # Cash locked up for one full produce-to-payment cycle.
-        working_capital = share * shop.cost_per_unit * cash_cycle_days
+        # Business assumption: a finite order, with no production during credit days.
+        schedule = finite_order_schedule(
+            daily_cost=share * shop.cost_per_unit, revenue=revenue,
+            duration_days=request.duration_days, payment_terms_days=request.payment_terms_days,
+            deposit_ratio=request.deposit_ratio, start_date=request.production_start,
+            collections=None if request.collection_schedule is None else [(row.day_index, row.fraction) for row in request.collection_schedule],
+        )
+        working_capital = peak_cash_deficit(schedule, include_deposit=False)
         deposit = revenue * request.deposit_ratio
         usable_cash = max(ZERO, shop.cash_balance - shop.minimum_cash_reserve)
-        funding_gap = max(ZERO, working_capital - usable_cash - deposit)
+        funding_gap = max(ZERO, peak_cash_deficit(schedule) - usable_cash)
 
         if funding_gap == 0:
             status: Literal["ready", "review", "blocked"] = "ready"
@@ -124,8 +203,8 @@ def _allocate(request: SwarmRequest) -> dict:
             "usableCash": format(money(usable_cash), "f"),
             "depositApplied": format(money(deposit), "f"),
             "fundingGap": format(money(funding_gap), "f"),
-            "formula": "working_capital = share_per_day * cost_per_unit * (duration_days + payment_terms_days); "
-                       "funding_gap = max(0, working_capital - max(0, cash_balance - minimum_cash_reserve) - revenue * deposit_ratio)",
+            "formula": "finite order; working_capital = peak cumulative production-cost deficit after buyer collections, excluding initial deposit; "
+                       "funding_gap = max(0, peak cumulative deficit including deposit - max(0, cash_balance - minimum_cash_reserve)); costs precede same-day collections",
         })
 
         totals["capacity"] += share
@@ -149,10 +228,11 @@ def _allocate(request: SwarmRequest) -> dict:
 
     deficit = max(ZERO, remaining)
     if deficit > 0:
+        exclusions = "; ".join(f"{shop_id}: {', '.join(item['reasons'])}" for shop_id, item in sorted(assessments.items()) if not item["eligible"])
         stuck_reasons.append({
             "type": "capacity",
             "title": "Swarm capacity is short of the order",
-            "message": f"{money(deficit)} {request.unit}/day unassigned out of a target of {money(request.target_capacity)}.",
+            "message": f"{money(deficit)} {request.unit}/day unassigned out of a target of {money(request.target_capacity)}." + (f" Exclusions: {exclusions}" if exclusions else ""),
             "actionLabel": "Invite more shops",
             "actionTarget": "/api/swarm",
         })
@@ -178,7 +258,7 @@ def _allocate(request: SwarmRequest) -> dict:
             "totalFundingGap": as_number(totals["gap"]),
             "status": proposal_status,
             "stuckReasons": stuck_reasons,
-            "version": "v1",
+            "version": "v2",
         },
         "kind": "forecast",
         "status": "ok" if proposal_status == "ready" else "insufficient_data" if proposal_status == "incomplete" else "stale",
@@ -187,8 +267,8 @@ def _allocate(request: SwarmRequest) -> dict:
         "analyzedAt": now,
         "unit": "THB",
         "audit": {
-            "engine": "swarm-allocator/v1",
-            "rule": "cheapest unit cost first, then largest free capacity",
+            "engine": "swarm-allocator/v2",
+            "rule": "finite order; eligible business type and distance, then cost, distance, free capacity, shop_id",
             "cashCycleDays": int(cash_cycle_days),
             "totalWorkingCapital": format(money(totals["wc"]), "f"),
             "shops": audit,

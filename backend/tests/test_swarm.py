@@ -61,15 +61,15 @@ def test_allocates_cheapest_capacity_first():
 def test_working_capital_and_funding_gap_math():
     data = client.post("/api/swarm", json=order()).json()["data"]
     shops = {shop["shopId"]: shop for shop in data["shops"]}
-    # 400 boxes * 70 THB * (30 produce + 30 payment terms) days
-    assert shops["shop-b"]["workingCapitalNeeded"] == 1680000.0
+    # Finite order: credit days delay receipts but do not add production costs.
+    assert shops["shop-b"]["workingCapitalNeeded"] == 840000.0
     # Shop B holds no cash, so the whole need is a gap.
-    assert shops["shop-b"]["fundingGap"] == 1680000.0
+    assert shops["shop-b"]["fundingGap"] == 840000.0
     assert shops["shop-b"]["status"] == "blocked"
-    # Shop A: 500 * 60 * 60 = 1,800,000 against 5,000,000 usable cash.
+    # Shop A: 500 * 60 * 30 = 900,000 against 5,000,000 usable cash.
     assert shops["shop-a"]["fundingGap"] == 0.0
     assert shops["shop-a"]["status"] == "ready"
-    assert data["totalFundingGap"] == 1680000.0
+    assert data["totalFundingGap"] == 840000.0
 
 
 def test_revenue_cost_and_profit_totals():
@@ -83,9 +83,9 @@ def test_revenue_cost_and_profit_totals():
 def test_deposit_closes_the_funding_gap():
     body = order(target_capacity="400", deposit_ratio="0.5", shops=[order()["shops"][1]])
     data = client.post("/api/swarm", json=body).json()["data"]
-    # Deposit of 50% on 1,200,000 revenue covers less than the 1,680,000 need.
+    # Deposit of 50% on 1,200,000 revenue offsets the finite 840,000 cost.
     shop = data["shops"][0]
-    assert shop["fundingGap"] == 1680000.0 - 600000.0
+    assert shop["fundingGap"] == 840000.0 - 600000.0
     assert data["status"] == "has_issues"
 
 
