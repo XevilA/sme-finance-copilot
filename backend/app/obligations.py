@@ -174,3 +174,49 @@ async def upsert_projected_events(session: AsyncSession | None, events: list[dic
         stored += 1
     await session.flush()
     return stored
+
+
+async def load_shop_resources(session: AsyncSession | None, sme_ids: list[uuid.UUID]) -> dict:
+    """Resources each shop depends on, keyed by shop id as a string.
+
+    Returns `{}` when nothing was queried, and omits a shop with no recorded
+    dependency, so the allocator can tell "needs nothing recorded" apart from
+    "needs nothing".
+
+    `available` reflects the resource status: a resource still only offered is
+    not yet secured, which is what makes a required one a real constraint.
+    """
+    if session is None or not sme_ids:
+        return {}
+
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT a.sme_id, r.id, r.title, r.category, r.status,
+                       ar.required, ar.note, r.owner_sme_id
+                FROM allocation_resources ar
+                JOIN swarm_allocations a ON a.id = ar.allocation_id
+                JOIN shared_resources r ON r.id = ar.resource_id
+                WHERE a.sme_id = ANY(:ids)
+                ORDER BY a.sme_id, ar.required DESC, r.title
+                """
+            ),
+            {"ids": [str(value) for value in sme_ids]},
+        )
+    ).all()
+
+    grouped: dict = {}
+    for sme_id, resource_id, title, category, status, required, note, owner in rows:
+        grouped.setdefault(str(sme_id), []).append({
+            "resource_id": str(resource_id),
+            "title": title,
+            "category": category,
+            "status": status,
+            # A resource that is merely offered is not secured yet.
+            "available": status == "confirmed",
+            "required": bool(required),
+            "owned_by_shop": str(owner) == str(sme_id) if owner else False,
+            "note": note,
+        })
+    return grouped

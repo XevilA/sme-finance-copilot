@@ -166,25 +166,44 @@ def test_token_lifetime_is_clamped():
 
 # --- the login route ---------------------------------------------------------
 
+def clear_throttle(*identifiers: str) -> None:
+    """The throttle lives in the database, so a prior test can leave a lockout
+    behind. These tests are about the response text, not the rate limit."""
+    import asyncio
+
+    from app.db import session_scope
+    from app.throttle import record_success
+
+    async def run() -> None:
+        async with session_scope() as session:
+            for identifier in identifiers:
+                await record_success(session, identifier)
+
+    asyncio.run(run())
+
+
 @pytest.mark.skipif(not DB_ENABLED, reason="login reads the users table")
 def test_every_failed_login_gives_the_same_answer():
     """The response must not reveal which addresses exist or have a password."""
     with_secret()
+    probes = ["fund@example.test", "nobody-at-all@example.test", "admin@example.test"]
+    clear_throttle(*probes)
+
     answers = set()
-    for body in (
-        {"email": "fund@example.test", "password": "definitely-wrong"},
-        {"email": "nobody-at-all@example.test", "password": "definitely-wrong"},
-        {"email": "admin@example.test", "password": "definitely-wrong"},
-    ):
-        response = client.post("/api/auth/login", json=body)
-        assert response.status_code == 401
+    for email in probes:
+        response = client.post(
+            "/api/auth/login", json={"email": email, "password": "definitely-wrong"}
+        )
+        assert response.status_code == 401, response.json()
         answers.add(response.json()["detail"])
     assert len(answers) == 1, answers
+    clear_throttle(*probes)
 
 
 @pytest.mark.skipif(not DB_ENABLED, reason="login reads the users table")
 def test_login_never_echoes_a_credential():
     with_secret()
+    clear_throttle("fund@example.test")
     body = client.post(
         "/api/auth/login", json={"email": "fund@example.test", "password": "definitely-wrong"}
     ).text

@@ -338,3 +338,39 @@ def test_expired_throttle_rows_are_purgeable():
         {"old": old, "k": throttle.throttle_key(stale)},
     ))
     assert run(lambda session: throttle.purge_expired(session)) >= 1
+
+
+# --- shop resource dependencies ---------------------------------------------
+
+def test_no_session_means_no_resource_claims():
+    from app.obligations import load_shop_resources
+
+    assert asyncio.run(load_shop_resources(None, [BAAN_SUAN])) == {}
+    assert asyncio.run(load_shop_resources(None, [])) == {}
+
+
+@needs_db
+def test_shop_resources_separate_required_from_preference():
+    """A required resource is a constraint; a preference is not."""
+    from app.obligations import load_shop_resources
+
+    grouped = run(lambda session: load_shop_resources(session, [BAAN_SUAN, RUNG_CHAROEN]))
+    assert str(BAAN_SUAN) in grouped
+    for rows in grouped.values():
+        for row in rows:
+            assert {"resource_id", "title", "category", "status",
+                    "available", "required", "owned_by_shop"} <= set(row)
+            assert isinstance(row["required"], bool)
+            # Only a confirmed resource counts as secured.
+            assert row["available"] == (row["status"] == "confirmed")
+    assert any(row["required"] for row in grouped[str(BAAN_SUAN)])
+
+
+@needs_db
+def test_a_shop_with_no_recorded_dependency_is_omitted():
+    """Absent is not the same as needing nothing, so the key is left out."""
+    from app.obligations import load_shop_resources
+
+    unknown = uuid.UUID("99999999-9999-4999-8999-999999999999")
+    grouped = run(lambda session: load_shop_resources(session, [unknown]))
+    assert str(unknown) not in grouped
