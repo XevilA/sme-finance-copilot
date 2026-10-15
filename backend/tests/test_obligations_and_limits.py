@@ -374,3 +374,72 @@ def test_a_shop_with_no_recorded_dependency_is_omitted():
     unknown = uuid.UUID("99999999-9999-4999-8999-999999999999")
     grouped = run(lambda session: load_shop_resources(session, [unknown]))
     assert str(unknown) not in grouped
+
+
+# --- the gate actually has to stop the call ---------------------------------
+
+class CountingClient:
+    """Stands in for httpx.AsyncClient and records that one was opened.
+
+    Opening a client is the moment a provider call becomes inevitable, so
+    counting constructions is what proves the gate held. No request is ever
+    sent: `get` raises the same timeout the real provider produces here.
+    """
+
+    opened = 0
+
+    def __init__(self, *args, **kwargs):
+        type(self).opened += 1
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get(self, *args, **kwargs):
+        import httpx
+
+        raise httpx.TimeoutException("blocked by test")
+
+
+@needs_db
+def test_a_shut_gate_serves_the_cache_without_calling_the_provider():
+    """The gate exists to stop the call. It has to stop the call.
+
+    A stale cache is the normal state - rows are kept for seven days but count
+    as fresh for five minutes - so if the shut-gate branch can still reach the
+    network, the backoff never applies to anything and the 429s it was built
+    for come straight back.
+    """
+    import app.industry as industry
+    from app import fetch_state
+    from app.routers.insights import PROVIDER
+
+    # Close the gate for real, through the same table the route reads.
+    run(lambda session: fetch_state.record_failure(session, PROVIDER, "timeout", None))
+    gate = run(lambda session: fetch_state.acquire(session, PROVIDER))
+    assert gate.allowed is False, "the gate was expected to be shut for this test"
+    assert gate.reason == "rate_limited"
+
+    original = industry.httpx.AsyncClient
+    CountingClient.opened = 0
+    industry.httpx.AsyncClient = CountingClient
+    try:
+        response = client.get("/api/v1/industry/trends")
+    finally:
+        industry.httpx.AsyncClient = original
+
+    assert response.status_code == 200
+    assert CountingClient.opened == 0, (
+        "the gate was shut, yet the route still opened a provider connection"
+    )
+
+    body = response.json()
+    assert body["data"]["sourceStatus"] == "unavailable"
+    assert body["data"]["sourceError"] == "provider_gate_closed"
+    # The closed gate is declared rather than hidden behind an empty answer.
+    assert any(item.startswith("provider_gate:") for item in body["missing"]), body["missing"]
+    assert body["status"] != "ok"
+
+    run(lambda session: fetch_state.record_success(session, PROVIDER))

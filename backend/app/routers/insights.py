@@ -16,7 +16,7 @@ from ..db import DB_ENABLED, session_scope
 from ..forecasting import forecast_cashflow, project_cash_events
 from .. import fetch_state
 from ..fetch_state import Gate
-from ..industry import fetch_industry_trends
+from ..industry import analyze_industry_articles, fetch_industry_trends
 from ..news_cache import load_cached_articles, upsert_articles
 from ..obligations import load_obligations, upsert_projected_events
 from ..repository import parse_uuid
@@ -133,8 +133,16 @@ async def industry_trends(
 
     if not gate.allowed:
         # Not an error: the cache is the answer while the gate is shut.
-        result = await fetch_industry_trends(
-            sector, as_of=as_of, cached_articles=cached, force_refresh=False
+        #
+        # Analysed directly rather than through fetch_industry_trends, which
+        # calls the provider whenever the cache is not fresh within five
+        # minutes - and a seven-day cache is almost never that fresh. Routing
+        # the shut-gate branch through it meant the gate stopped nothing in the
+        # case it exists for, and the backoff never applied. Found by Codex
+        # against a stubbed transport; a test now counts connections.
+        result = analyze_industry_articles(
+            cached, sector, as_of=as_of,
+            source_status="unavailable", source_error="provider_gate_closed",
         )
         async with session_scope() as session:
             provider_status = await fetch_state.status(session, PROVIDER)
