@@ -36,7 +36,7 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 (commit `f54ec8f`+) · **419 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
+> อัปเดต 2026-10-15 (ต่อจาก `d13bac5`) · **454 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
 > **34 API routes** · **27 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
@@ -56,7 +56,7 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 419 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
+python -m pytest -c backend/pytest.ini -q    # 454 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -88,6 +88,9 @@ python -m pytest -c backend/pytest.ini -q    # 419 ผ่าน + 3 skip (ยั
 | 5 · SWARM | `swarm.py` v2 | ออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
 | 7 · แนวโน้มอุตสาหกรรม | `industry.py` | GDELT + สถานะ stale/unavailable |
 | ต่อ LLM จริง | `ai_provider.py` | ตรวจ Structured Outputs จริงแล้ว · โมเดลและผลอยู่ใน `LIVE_PROVIDER_VERIFICATION.md` |
+| รับ forecast ในการวิเคราะห์ | `build_analysis(data, *, forecast=None, expense_history=None)` | ตรวจด้วยผล `/api/forecast` จริงแล้ว · มีหลักฐานวันเริ่มขาดเงินสด เงินสดต่ำสุด และยอด 30/60/90 วัน · ไม่คำนวณ forecast ซ้ำ · **ยังรอ CLAUDE ส่งต่อผ่าน route** |
+| เทียบประวัติค่าใช้จ่าย | `analysis.py` | ทดสอบข้อมูลเดโมจริง: Rung Charoen วัตถุดิบ 168,000 เทียบฐาน 99,166.67 เพิ่ม 69.41% · Baan Suan ไม่ถูกแจ้งเตือน · เกณฑ์และช่วงอยู่ใน `ANALYSIS_CONTRACT.md` · **ยังรอ CLAUDE ส่งต่อผ่าน route** |
+| ตรวจทรัพยากรของร้านใน SWARM | `ShopCapacity.resources`, `shop_eligibility()` | ตรวจ required ที่ยังไม่พร้อมก่อนจัดสรร · API แบบส่งร้าน inline ใช้ได้จริงแล้ว · เหตุผลอยู่ใน `audit.eligibility` · **ยังรอ CLAUDE ต่อ loader สำหรับ `sme_ids`** |
 
 ### ✅ CLAUDE (บทบาทที่ 2)
 
@@ -125,40 +128,35 @@ python -m pytest -c backend/pytest.ini -q    # 419 ผ่าน + 3 skip (ยั
 
 ### 🟡 ทำได้แต่ยังไม่จำเป็นต่อการเดโม
 
-**3. เทียบประวัติค่าใช้จ่าย + finding "ค่าใช้จ่ายผิดปกติ"** — เจ้าของ: **CODEX**
+**3. ส่ง forecast และประวัติค่าใช้จ่ายเข้าการวิเคราะห์ผ่าน API** — เจ้าของ: **CLAUDE**
 
-- ข้อมูลรออยู่แล้ว: ตาราง `expense_transactions` (16 แถว) และ loader
-  `obligations.py::load_expense_history` มีเทสต์ครบ
-- `analysis.py:139` ยังประกาศเป็นช่องว่างอยู่
-  (`"No expense transaction history or comparable prior period..."`)
-- เคสทดสอบที่ seed ไว้: วัตถุดิบของ Rung Charoen เดือน ต.ค. **168,000**
-  เทียบค่าเฉลี่ยสามเดือนของตัวเอง **99,166.67** (96,000 / 102,000 / 99,500) = **+69.4%**
-- **ขั้นถัดไป:** CODEX ใช้ประวัติใน `analysis.py` → แล้ว CLAUDE ส่งต่อเข้า route
+- Core ของ CODEX พร้อมและทดสอบกับข้อมูลจริงแล้ว · ให้ส่งผลของ `forecast_cashflow()`
+  เข้าค่า `forecast` และผล `load_expense_history()` เข้าค่า `expense_history`
+- Caller เดิมที่เรียก `build_analysis(data)` ยังคงทำงานเหมือนเดิมและแจ้ง unknowns
+  เพราะยังไม่ได้รับข้อมูลเสริม · ห้ามสรุปว่า overview แสดง finding ใหม่แล้ว
+- ใช้ SME เดียวกันสำหรับทุก loader และยืนยันวันของยอดเงินสดกับความครบของตาราง
+  ก่อนส่ง forecast · อย่าถือว่าวันที่มีรายการสุดท้ายคือหลักฐานว่าตารางครบ
 
-**4. resource eligibility ใน SWARM allocator** — เจ้าของ: **CODEX**
+**4. ส่งทรัพยากรจาก loader เข้า SWARM สำหรับ `sme_ids`** — เจ้าของ: **CLAUDE**
 
-- ข้อมูลรออยู่แล้ว: ตาราง `allocation_resources` (5 แถว) และ loader
-  `obligations.py::load_shop_resources` · `available` ตามสถานะทรัพยากร เพราะ
-  ทรัพยากรที่แค่ "ถูกเสนอ" ยังไม่ถือว่าได้มา ซึ่งคือเหตุที่ทรัพยากรแบบ required
-  เป็นข้อจำกัดจริง · ร้านที่ไม่มีการบันทึกการพึ่งพาถูกตัดออกจาก dict
-  ไม่ใช่คืน list ว่าง เพื่อให้ "ไม่ได้บันทึก" ต่างจาก "ไม่ต้องใช้อะไร"
-- `swarm.py::ShopCapacity` มี `business_type` และ `coordinates` แล้ว
-  แต่**ยังไม่มีฟิลด์ resources** และ `shop_eligibility()` ยังไม่มีเกณฑ์นี้
-- **ขั้นถัดไป:** CODEX เพิ่มฟิลด์ลง `ShopCapacity` + เกณฑ์ใน `shop_eligibility()`
-  → แล้ว CLAUDE ส่งต่อผ่าน route แบบเดียวกับที่ `business_type`/`coordinates` ทำอยู่
-
-> ⚠️ loader ทั้งสองตัวของข้อ 3 และ 4 **ยังไม่มี caller** มีแต่เทสต์ ·
-> ข้อมูลจึงยังไม่ไปถึง API จนกว่า CODEX จะส่งฝั่งตัวเองมาและ CLAUDE ต่อ route ให้ ·
-> อย่าอ่านว่า "เสร็จแล้ว" เพราะเห็นว่ามีตารางและมีฟังก์ชัน
+- ฟิลด์คือ `ShopCapacity.resources` · ส่ง `resource_map.get(shop_id)` เพื่อคง
+  `None` เมื่อไม่มีข้อมูลการพึ่งพา · อย่าแทนด้วย `[]` โดยอัตโนมัติ
+- `POST /api/swarm` แบบส่ง `shops` inline ใช้ฟิลด์ใหม่ได้แล้วและตรวจผ่าน HTTP จริง ·
+  เส้นทางที่โหลดจาก `sme_ids` ยังต้องต่อ `load_shop_resources()` เพิ่ม
+- ใช้ dependency ของออเดอร์ที่กำลังจัดทีม · loader ปัจจุบันยังรวมการจัดสรรทุกโครงการ
+  ของร้าน จึงควรกำหนดขอบเขตโครงการก่อนใช้งานหลายออเดอร์
 
 **5. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
 
 - เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้สำเร็จ
 - อาการ: DNS และ TCP ต่อได้ แต่ **HTTPS TLS handshake หมดเวลารอ** ·
   ทดสอบแยกผ่าน HTTP ได้ 429 · ลดความซับซ้อนของคำค้นแล้วไม่ช่วย
-- gate สำหรับ backoff มีแล้ว (`fetch_state.py`) ที่เหลือเป็นเรื่องเครือข่าย
-- **ขั้นถัดไป:** ลองยิงจากโฮสต์ที่ deploy (egress ต่างกัน อาจผ่าน) ·
-  รายละเอียดใน `LIVE_PROVIDER_VERIFICATION.md`
+- รอบล่าสุดเรียกผ่าน route เมื่อ gate เปิดแล้ว ยังได้ `timeout` และบทความ 0 รายการ ·
+  ทดสอบ TLS แยกยังหมดเวลารอประมาณ 5.28 วินาที · ยังไม่ได้ยืนยันข่าวจริงหรือการตัดซ้ำจากข่าวจริง
+- **พบงานของ CLAUDE เพิ่ม:** เมื่อ gate ปิดและแคชว่าง route ยังเรียก fetcher ซึ่ง
+  พยายามออกไปยัง provider · ยืนยันด้วย HTTP transport จำลองหนึ่งคำขอ โดยไม่ยิงข่าวจริงซ้ำ
+- **ขั้นถัดไป:** CLAUDE แก้เส้นทาง gate ปิดให้ตอบจากแคชโดยไม่เรียกเครือข่าย ·
+  ทีมลองจากโฮสต์ที่ deploy ซึ่ง egress ต่างกันและอาจผ่าน TLS · รายละเอียดใน `CODEX_HANDOFF.md`
 
 **6. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
 

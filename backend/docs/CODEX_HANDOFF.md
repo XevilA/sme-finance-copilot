@@ -1,5 +1,81 @@
 # การส่งมอบงานของ CODEX
 
+## รอบล่าสุด: รับ forecast, เทียบค่าใช้จ่าย และตรวจทรัพยากร — 2026-10-15
+
+ฐานก่อนเริ่มคือ `d13bac5` ซึ่งมี **419 tests ผ่าน + 3 skip** ไม่ใช่ 396 ตามไฟล์มอบหมาย
+รุ่นก่อน · รอบนี้เพิ่ม 35 เทสต์ รวมเป็น **454 tests ผ่าน + 3 skip** กับ PostgreSQL ·
+คำเตือน Starlette/httpx เดิมหนึ่งรายการยังอยู่ · ไม่มีการยิง LLM ที่เสียเงินในรอบนี้
+
+### สิ่งที่ CODEX ทำและตรวจแล้ว
+
+- `build_analysis(data, *, forecast=None, expense_history=None)` รับข้อมูลเสริมโดย
+  ไม่เรียก loader หรือคำนวณ forecast เอง · Caller เดิมยังทำงานเหมือนเดิม · เพิ่ม
+  `contextEvidence` / `expenseComparison` และ finding พร้อมหลักฐานตามสัญญาใน
+  `ANALYSIS_CONTRACT.md` · คงตัวชี้วัดทางการเงินเดิมและเกรดทุกค่า
+- ตรวจด้วย `load_expense_history()` จากฐานข้อมูลจริงและผล HTTP ของ `/api/forecast`
+  สำหรับ SME เดโมทั้งสองราย · Baan Suan ยังได้ A และไม่ถูกแจ้งค่าใช้จ่ายผิดปกติ ·
+  Rung Charoen ยังได้ D และมีค่าวัตถุดิบ 168,000 สูงกว่าฐาน 99,166.67 อยู่ 69.41%
+- ผล forecast ที่รับมาของ Rung Charoen ระบุวันเริ่มต่ำกว่าเงินสำรอง 150,000 คือ
+  2026-10-18 และเงินสดต่ำสุด 29,700 วันที่ 2026-10-28 · ใช้ snapshot 2026-09-30
+  พร้อมยืนยันตารางถึง 2026-12-29 ในการตรวจครั้งนี้ · ไม่มีการคำนวณค่าดังกล่าวซ้ำใน analysis
+- เพิ่ม `ShopCapacity.resources` แบบ optional · required ต้องมี `available=true`
+  **และ** `status="confirmed"` จึงผ่าน · ทรัพยากรที่เป็น preference ไม่ตัดร้านออก ·
+  `None` คือยังไม่ทราบ dependency ส่วน `[]` คือระบุว่าไม่มี dependency
+- เพิ่ม `audit.eligibility[shop_id]` ครบทุกผู้สมัคร รวมร้านที่ไม่ได้จัดสรร · มี
+  `resource_status`, `missing_resources`, `unavailable_preferences`, `resource_unknowns`
+  และ `reasons` โดยคง key เดิมทั้งหมด
+- ตรวจ `POST /api/swarm` จริงด้วย `shops` inline จากโปรไฟล์และ resource loader
+  โดย `persist=false` · รถห้องเย็นสถานะ offered ซึ่งเป็น required ทำให้ Baan Suan
+  และ Rung Charoen ไม่ผ่าน · Sahai ยังผ่านแม้เครื่องซีลที่เป็น preference ยัง offered ·
+  สถานะโครงการเป็น incomplete ตามกำลังผลิตที่เหลือ ไม่ได้เปลี่ยนฐานข้อมูลเดโม
+- Build frontend ผ่าน **1955 modules** และชื่อ asset คงเดิม:
+  `index-DEindwiw.css`, `index-DrkwTzbk.js` · ไม่แก้ `src/` หรือไฟล์ของ Claude
+
+### งานต่อระบบที่ยังเป็นของ CLAUDE
+
+```python
+analysis = build_analysis(
+    financial_input,
+    forecast=forecast_result,
+    expense_history=expense_rows,
+)
+shop = ShopCapacity.model_validate({
+    **capacity_row,
+    "resources": resource_map.get(capacity_row["shop_id"]),
+})
+```
+
+- ส่ง forecast และประวัติ SME เดียวกันผ่านเส้นทางที่สร้าง analysis และ simulator ตามที่
+  ต้องการ · กำหนดวันที่ยอดเงินสดและความครบของตารางอย่างชัดเจน ไม่อนุมานจากวันสุดท้าย
+- ส่ง resource map ผ่านเส้นทางที่ใช้ `sme_ids` และ simulator · ห้ามใช้ `.get(id, [])`
+  เพราะจะเปลี่ยนความหมายจากไม่ทราบเป็นไม่มี dependency · API แบบ inline ใช้ได้แล้ว
+- กรอง resource dependency ตามออเดอร์หรือโครงการปัจจุบันก่อนส่งเข้า engine ·
+  `load_shop_resources()` ปัจจุบันรวม allocations ของ SME จากทุกโครงการ ซึ่งอาจได้
+  resource ID ซ้ำหรือ dependency ของคนละออเดอร์ · Core ปฏิเสธ ID ซ้ำต่อร้าน
+- การตรวจนี้เป็นความพร้อมของทรัพยากรตามสถานะ ไม่ได้จองทรัพยากรหรือแบ่งกำลังของ
+  ทรัพยากรที่ใช้ร่วมกัน เพราะยังไม่ได้รับข้อมูลจำนวนหรือช่วงเวลาการใช้งาน · ไม่สร้างข้อมูลเอง
+- ข้อมูลเสริมมีช่วงเวลาแยกจากงบ · ให้ใช้วันที่ที่แสดงในหลักฐาน และอย่าใช้ `inputHash`
+  ของงบเพียงอย่างเดียวเป็น cache key ของผลวิเคราะห์ที่รวมข้อมูลเสริม
+
+### ข่าวสดยังไม่สำเร็จ และมีจุดที่ต้องแก้ใน gate
+
+- เมื่อ 2026-10-15 เรียก route จริงหลัง `next_allowed_at` ผ่านแล้ว โดยไม่ force:
+  `status="unavailable"`, `sourceError="timeout"`, บทความ 0 รายการ · gate บันทึก
+  `consecutiveFailures=2` และ backoff 120 วินาที · ไม่ได้อ้างว่าดึงข่าวจริงสำเร็จ
+- ทดสอบแยก: DNS เป็น `104.197.47.124`, TCP ต่อได้ แต่ TLS ที่ตรวจใบรับรองตามปกติ
+  ยังหมดเวลาประมาณ 5.28 วินาที · ยังบอกไม่ได้ว่ามาจาก provider ตัวกลาง หรือการกรองปลายทาง
+  ต้องลองจาก Railway หลัง deploy ซึ่ง egress อาจต่างกัน
+- **ยืนยันบั๊กด้วย transport จำลอง:** ใน `routers/insights.py` เมื่อ
+  `Gate(allowed=False, reason="rate_limited")` และ cache ว่าง ยังเกิดความพยายาม
+  เรียก provider หนึ่งครั้ง เพราะ branch นี้เรียก `fetch_industry_trends()` ซึ่งจะ fetch
+  หากไม่มี cache สด · การตรวจนี้ไม่ส่ง HTTP ไปยัง provider จริง
+- CLAUDE ต้องแก้ branch ที่ gate ปิดให้วิเคราะห์ cache โดยไม่เรียกเครือข่าย เช่นใช้
+  `analyze_industry_articles(..., source_status="unavailable", source_error="provider_gate_closed")`
+  ที่มีอยู่แล้ว เพื่อรักษาสถานะ stale/unavailable และข้อมูล gate ตามจริง · CODEX ไม่แก้ไฟล์
+  route หรือ fetch_state ที่อยู่นอกขอบเขต
+- ยังไม่ได้ตรวจ deduplication และ `published_at` กับข่าวจริง เพราะยังไม่มีบทความจริง ·
+  เทสต์จำลองเดิมยังยืนยันว่า `seendate` คือ `observed_at` และไม่สร้างวันเผยแพร่ขึ้นเอง
+
 ## ผลการตรวจสอบล่าสุด: 2026-10-15
 
 ข้อมูลอัปเดตส่วนนี้ใช้แทนบันทึกเดิมด้านล่างเรื่องยังไม่มีข้อมูลลับสำหรับเรียก OpenAI

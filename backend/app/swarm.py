@@ -37,6 +37,24 @@ class BuyerCollection(StrictModel):
     fraction: Rate
 
 
+class ResourceDependency(StrictModel):
+    resource_id: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=500)
+    category: str = Field(min_length=1, max_length=200)
+    status: str = Field(min_length=1, max_length=50)
+    available: bool = Field(strict=True)
+    required: bool = Field(strict=True)
+    owned_by_shop: bool = Field(default=False, strict=True)
+    note: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("resource_id")
+    @classmethod
+    def normalize_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("resource_id cannot be blank")
+        return value.strip()
+
+
 class ShopCapacity(StrictModel):
     shop_id: str = Field(min_length=1, max_length=128)
     name: str
@@ -48,6 +66,7 @@ class ShopCapacity(StrictModel):
     assigned_role: str | None = None
     business_type: str | None = None
     coordinates: Coordinates | None = None
+    resources: list[ResourceDependency] | None = Field(default=None, max_length=200)
 
     @field_validator("shop_id")
     @classmethod
@@ -60,6 +79,9 @@ class ShopCapacity(StrictModel):
     def validate_capacity(self):
         if self.capacity_used > self.capacity_total:
             raise ValueError("capacity_used cannot exceed capacity_total")
+        ids = [row.resource_id for row in self.resources or []]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate resource ids are not allowed for one shop")
         return self
 
 
@@ -116,7 +138,22 @@ def shop_eligibility(shop: ShopCapacity, request: SwarmRequest) -> dict:
             reasons.append("Shop coordinates are required to verify distance eligibility")
         elif distance > request.max_distance_km:
             reasons.append("Shop exceeds max_distance_km")
-    return {"eligible": not reasons, "distance_km": None if distance is None else str(distance), "reasons": reasons}
+    missing_resources, preferences = [], []
+    for resource in sorted(shop.resources or [], key=lambda row: row.resource_id):
+        if resource.available and resource.status == "confirmed":
+            continue
+        item = {"resource_id": resource.resource_id, "title": resource.title,
+                "category": resource.category, "status": resource.status,
+                "required": resource.required, "reason": "Resource must be available and confirmed"}
+        if resource.required:
+            missing_resources.append(item)
+            reasons.append(f"Required resource unavailable: {resource.resource_id} ({resource.title}); status={resource.status}")
+        else:
+            preferences.append(item)
+    return {"eligible": not reasons, "distance_km": None if distance is None else str(distance), "reasons": reasons,
+            "resource_status": "unknown" if shop.resources is None else "known_empty" if not shop.resources else "checked",
+            "missing_resources": missing_resources, "unavailable_preferences": preferences,
+            "resource_unknowns": ["resource_dependencies"] if shop.resources is None else []}
 
 
 def money(value: Decimal) -> Decimal:
@@ -268,9 +305,10 @@ def _allocate(request: SwarmRequest) -> dict:
         "unit": "THB",
         "audit": {
             "engine": "swarm-allocator/v2",
-            "rule": "finite order; eligible business type and distance, then cost, distance, free capacity, shop_id",
+            "rule": "finite order; eligible business type, distance and required resources, then cost, distance, free capacity, shop_id",
             "cashCycleDays": int(cash_cycle_days),
             "totalWorkingCapital": format(money(totals["wc"]), "f"),
             "shops": audit,
+            "eligibility": {shop_id: assessments[shop_id] for shop_id in sorted(assessments)},
         },
     }
