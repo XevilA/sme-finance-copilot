@@ -36,15 +36,14 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 · **393 tests ผ่าน** (มี PostgreSQL) ·
+> อัปเดต 2026-10-15 (commit `4d7b4da`) · **396 tests ผ่าน + 2 skip** (มี PostgreSQL) ·
 > **31 API routes** · **26 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
 
 ```bash
 docker compose -f backend/docker-compose.yml up -d   # ฐานข้อมูล + schema + ข้อมูลเดโม
-backend
-un.cmd                                      # เซิร์ฟเวอร์ที่ 127.0.0.1:8000
+backend\run.cmd                                      # เซิร์ฟเวอร์ที่ 127.0.0.1:8000
 ```
 
 เปิด `http://127.0.0.1:8000/docs` แล้วลองยิง API ได้เลย · UUID เดโมคงที่:
@@ -57,7 +56,7 @@ un.cmd                                      # เซิร์ฟเวอร์�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip ถ้าไม่ตั้งรหัสผ่านเดโม)
+python -m pytest -c backend/pytest.ini -q    # 396 ผ่าน + 2 skip (2 skip คือ ยังไม่ตั้ง DEMO_LOGIN_PASSWORD)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -94,7 +93,7 @@ python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip �
 
 | Module | สถานะ | หมายเหตุ |
 | --- | --- | --- |
-| 8 · Database schema | ✅ | 20 ตาราง ครอบคลุม Users, SME Profiles, Investors, Projects, Analysis Results · `schema.sql` รันซ้ำได้ |
+| 8 · Database schema | ✅ | 26 ตาราง ครอบคลุม Users, SME Profiles, Investors, Projects, Analysis Results · `schema.sql` และ seed ทั้งสองไฟล์รันซ้ำได้ |
 | 8 · RESTful API | ✅ | 31 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
 | 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
@@ -125,19 +124,48 @@ python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip �
 
 ### 🟡 ทำได้แต่ยังไม่จำเป็นต่อการเดโม
 
-**3. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
+**3. เทียบประวัติค่าใช้จ่าย + finding "ค่าใช้จ่ายผิดปกติ"** — เจ้าของ: **CODEX**
+
+- ข้อมูลรออยู่แล้ว: ตาราง `expense_transactions` (16 แถว) และ loader
+  `obligations.py::load_expense_history` มีเทสต์ครบ
+- `analysis.py:139` ยังประกาศเป็นช่องว่างอยู่
+  (`"No expense transaction history or comparable prior period..."`)
+- เคสทดสอบที่ seed ไว้: วัตถุดิบของ Rung Charoen เดือน ต.ค. **168,000**
+  เทียบค่าเฉลี่ยสามเดือนของตัวเอง **99,166.67** (96,000 / 102,000 / 99,500) = **+69.4%**
+- **ขั้นถัดไป:** CODEX ใช้ประวัติใน `analysis.py` → แล้ว CLAUDE ส่งต่อเข้า route
+
+**4. resource eligibility ใน SWARM allocator** — เจ้าของ: **CODEX**
+
+- ข้อมูลรออยู่แล้ว: ตาราง `allocation_resources` (5 แถว) และ loader
+  `obligations.py::load_shop_resources` · `available` ตามสถานะทรัพยากร เพราะ
+  ทรัพยากรที่แค่ "ถูกเสนอ" ยังไม่ถือว่าได้มา ซึ่งคือเหตุที่ทรัพยากรแบบ required
+  เป็นข้อจำกัดจริง · ร้านที่ไม่มีการบันทึกการพึ่งพาถูกตัดออกจาก dict
+  ไม่ใช่คืน list ว่าง เพื่อให้ "ไม่ได้บันทึก" ต่างจาก "ไม่ต้องใช้อะไร"
+- `swarm.py::ShopCapacity` มี `business_type` และ `coordinates` แล้ว
+  แต่**ยังไม่มีฟิลด์ resources** และ `shop_eligibility()` ยังไม่มีเกณฑ์นี้
+- **ขั้นถัดไป:** CODEX เพิ่มฟิลด์ลง `ShopCapacity` + เกณฑ์ใน `shop_eligibility()`
+  → แล้ว CLAUDE ส่งต่อผ่าน route แบบเดียวกับที่ `business_type`/`coordinates` ทำอยู่
+
+> ⚠️ loader ทั้งสองตัวของข้อ 3 และ 4 **ยังไม่มี caller** มีแต่เทสต์ ·
+> ข้อมูลจึงยังไม่ไปถึง API จนกว่า CODEX จะส่งฝั่งตัวเองมาและ CLAUDE ต่อ route ให้ ·
+> อย่าอ่านว่า "เสร็จแล้ว" เพราะเห็นว่ามีตารางและมีฟังก์ชัน
+
+**5. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
 
 - เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้สำเร็จ
 - อาการ: DNS และ TCP ต่อได้ แต่ **HTTPS TLS handshake หมดเวลารอ** ·
   ทดสอบแยกผ่าน HTTP ได้ 429 · ลดความซับซ้อนของคำค้นแล้วไม่ช่วย
+- gate สำหรับ backoff มีแล้ว (`fetch_state.py`) ที่เหลือเป็นเรื่องเครือข่าย
 - **ขั้นถัดไป:** ลองยิงจากโฮสต์ที่ deploy (egress ต่างกัน อาจผ่าน) ·
   รายละเอียดใน `LIVE_PROVIDER_VERIFICATION.md`
 
-**4. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
+**6. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
 
-- คอลัมน์ `latitude`/`longitude` ใน `sme_profiles` พร้อมแล้วแต่ยังว่าง
+- คอลัมน์ `latitude`/`longitude` ใน `sme_profiles` พร้อมแล้วแต่ยังว่างทั้ง 3 ร้าน
 - ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี **โดยเจตนา**
   (ไม่เดาพิกัดจากชื่อจังหวัด)
+- `business_type` ก็ว่างทั้ง 3 ร้านเหมือนกัน แต่**ไม่ใช่ปัญหา**:
+  `repository.py:154` fallback ไป `sector` ซึ่งเป็น NOT NULL
 - **ขั้นถัดไป:** เติมพิกัดจริงลง `sme_profiles`
 
 ### 🟠 ต้องทำก่อนเปิดใช้กับข้อมูลจริง

@@ -11,14 +11,14 @@
 
 ## 📌 สถานะปัจจุบัน
 
-> 2026-10-15 · commit `5d583dd`
+> 2026-10-15 · commit `4d7b4da`
 
 | ตัวชี้วัด | ค่า |
 | --- | --- |
-| Backend tests | **372 ผ่าน** (มี PostgreSQL + `DEMO_LOGIN_PASSWORD`) · 370 + 2 skip ถ้าไม่ตั้งรหัสเดโม · 323 + 49 skip ถ้าไม่มี DB |
-| API routes | **31** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` |
-| ตารางฐานข้อมูล | **20** · `schema.sql` รันซ้ำได้ |
-| Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) |
+| Backend tests | **396 ผ่าน + 2 skip** (มี PostgreSQL) · 2 skip คือ ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` · **325 ผ่าน + 73 skip** ถ้าไม่มี DB |
+| API routes | **31** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` (+ 4 เส้นเฉพาะ `/api/v1/*` และ `/health`) |
+| ตารางฐานข้อมูล | **26** · `schema.sql`, `seed.sql`, `seed_obligations.sql` รันซ้ำได้ทั้งสามไฟล์ |
+| Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) · ทุกเส้นมี `source` และ `status` ตาม `missing` |
 | Frontend bundle | ไม่เปลี่ยนเลย — `1955 modules`, hash `index-DEindwiw.css` / `index-DrkwTzbk.js` |
 | Authentication | มีแล้ว (token HMAC + รหัสผ่าน scrypt) · **ปิด enforcement เป็นค่าเริ่มต้น** |
 | Deploy | config ครบและทดสอบด้วย container จริง · รอกดสร้าง service บนบัญชีทีม |
@@ -27,7 +27,148 @@
 
 ---
 
-## รอบ 2026-10-15 (ช่วงบ่าย) — เตรียม deploy และ Authentication
+## รอบ 2026-10-15 (ช่วงเย็น) — เปิดข้อมูลทรัพยากรร้านค้า `4d7b4da`
+
+`allocation_resources` ถูกสร้างและ seed ไว้ในรอบก่อน แต่**ไม่มี loader**
+ข้อมูลที่ Codex ต้องใช้ทำ resource eligibility จึงเอื้อมไม่ถึง
+ถ้าปล่อยไว้ งานจะบล็อกทันทีที่ Codex รับไป
+
+### `obligations.py::load_shop_resources`
+
+คืนทรัพยากรที่ร้านแต่ละร้านพึ่งพา โดย key เป็น shop id · สามการตัดสินใจ:
+
+| กฎ | เหตุผล |
+| --- | --- |
+| ร้านที่ไม่มีการบันทึกการพึ่งพา **ถูกตัดออกจาก dict** ไม่ใช่คืน list ว่าง | "ไม่ได้บันทึกว่าต้องใช้อะไร" ต้องแยกออกจาก "ไม่ต้องใช้อะไร" |
+| `available` ตามสถานะของทรัพยากร | ทรัพยากรที่แค่ "ถูกเสนอ" ยังไม่ถือว่าได้มา ซึ่งคือเหตุที่ทรัพยากรแบบ required เป็นข้อจำกัดจริง |
+
+**handshake ต่อจากนี้:** Codex เพิ่มฟิลด์ลง `ShopCapacity` + เกณฑ์ใน
+`shop_eligibility()` → ผมส่งต่อผ่าน route แบบเดียวกับที่ `business_type`
+และ `coordinates` ทำอยู่ · **ยังไม่มี caller ตอนนี้ มีแต่เทสต์**
+
+### 🐛 บั๊ก test pollution ข้ามไฟล์
+
+| อาการ | สาเหตุ | การแก้ |
+| --- | --- | --- |
+| `test_security.py` ล้มเฉพาะเมื่อรัน**หลัง** throttle tests · เทสต์ที่ยืนยันว่า login ล้มทุกแบบตอบข้อความเดียวกัน ได้ **429 แทน 401** | throttle เก็บใน DB ไม่ใช่ในหน่วยความจำ lockout ที่ไฟล์หนึ่งทิ้งไว้จึงข้ามไปอีกไฟล์ | เทสต์ล้าง throttle ของ address ที่ตัวเองจะยิงก่อน เพราะหัวข้อของมันคือ**ข้อความที่ตอบ** ไม่ใช่ rate limit · ยืนยันด้วยการรันทั้ง suite ติดกัน 2 รอบ |
+
+### สถานะหลังรอบนี้
+
+- **396 ผ่าน + 2 skip** (มี Postgres) · **325 ผ่าน + 73 skip** (ไม่มี DB) · รัน 2 รอบติดกันได้เท่ากัน
+- 31 routes · 26 ตาราง · frontend bundle ไม่ขยับ
+
+---
+
+## รอบ 2026-10-15 (ช่วงบ่ายแก่) — ภาระแบบระบุวันที่ และ rate limit `3f3417a`
+
+เคลียร์งานค้างฝั่งผมทั้งหมด · สามข้อแรกมีไว้ปลดบล็อก Codex ที่เดินต่อไม่ได้
+เพราะไม่มีข้อมูล · สองข้อหลังเป็นข้อจำกัดที่ขาดอยู่
+
+### หกตาราง → รวมเป็น 26 ตาราง
+
+| ตาราง | หน้าที่ |
+| --- | --- |
+| `receivables` · `payables` | ภาระแบบระบุวันที่ · แยกกันเพราะเงินเข้ามีใบแจ้งหนี้กับการเก็บเงิน ส่วนเงินออกครอบคลุมเจ้าหนี้การค้า ค่าดำเนินงาน และงวดชำระหนี้ · คอลัมน์ `kind` map ตรงกับสามหมวดเงินออกที่ forecaster รับ |
+| `expense_transactions` | ให้ "ค่าใช้จ่ายผิดปกติ" มีอะไรให้ผิดปกติเทียบกับ ซึ่ง `analysis.py` ประกาศเป็นช่องว่างอยู่ |
+| `allocation_resources` | บันทึกว่าส่วนแบ่งของร้านพึ่งพาอะไร = สิ่งที่ resource eligibility ใน allocator ต้องใช้ |
+| `provider_fetch_state` · `auth_throttle` | สอง rate limit |
+
+### `app/obligations.py` — รอยต่อไปยัง `app/forecasting.py`
+
+`forecasting.py` ไม่แตะฐานข้อมูลเลย · `obligations.py` บังคับสองกฎที่ forecaster พึ่งพา:
+
+- **หมวดที่ไม่รู้จักคงเป็น `None` ไม่ใช่ `[]`** → ตารางเวลาที่ไม่เคยถูก query
+  จะถูกเรียกว่า complete ไม่ได้
+- **projection เฉพาะแถวที่ยังค้าง** → บิลที่จ่ายแล้วอยู่ในยอดเงินสดแล้ว
+  ถ้า project ซ้ำคือนับสองครั้ง
+
+`GET /api/forecast` สร้าง projected event จากแถวเหล่านี้ upsert ด้วย stable id
+ของ forecaster เอง และไม่แตะ event ที่ยืนยันแล้ว · SME วิกฤตเงินขาดมือวันที่
+**2026-10-18** และใบแจ้งหนี้ที่เกินกำหนดถูกรายงานใน `overdue` พร้อม**ขอวันที่
+เลื่อนนัดจริง** ไม่ใช่ย้ายไปวันที่ประดิษฐ์เอง
+
+### `app/fetch_state.py` — gate ทุกการเรียกผู้ให้บริการภายนอก
+
+`next_allowed_at` เว้นจังหวะ · `pg_try_advisory_lock` กันสอง worker ยิงพร้อมกัน —
+**try ไม่ wait** ตัวที่สองจึงเสิร์ฟ cache แทนที่จะต่อคิวอยู่หลัง network call ·
+backoff คูณสองต่อความล้มเหลวติดกัน และ `Retry-After` ที่นานกว่าจากผู้ให้บริการชนะ
+เพราะถูกขอให้รอแล้วยิงเร็วกว่าที่ขอ คือวิธีทำให้ soft limit กลายเป็น hard block ·
+นี่คือสิ่งที่ Codex ขอมาหลังเจอ 429
+
+### `app/throttle.py` — จำกัด login ในฐานข้อมูล
+
+limit อยู่รอด restart และมีผลข้าม replica ไม่ใช่แจก allowance ใหม่ต่อ instance ·
+**address ที่ไม่รู้จักถูกนับเหมือนกันทุกตัว** — ถ้า throttle แต่บัญชีจริง lockout
+จะกลายเป็น oracle บอกว่าอีเมลไหนมีอยู่ · ตารางเก็บ hash ที่ pepper แล้ว
+**ไม่เคยเก็บ address ที่ถูกลอง** · รหัสถูกต้องล้างตัวนับ
+
+### 🐛 สามบั๊กที่เจอตอน verify — ของผมทั้งหมด
+
+| บั๊ก | การแก้ |
+| --- | --- |
+| Postgres infer type ของ branch `NULL` เปล่าใน `CASE` ไม่ได้ แล้วอ่าน expression ทั้งก้อนเป็น text | cast ให้ชัด |
+| asyncpg validate parameter เทียบ column type **ก่อน** cast ฝั่ง SQL จะทำงาน | แปลงวันที่ id และจำนวนเงินเป็น object ของ Python ก่อนใส่ parameter dict |
+| แถว project เดโมซ่อมไม่ได้เลย เพราะ seed ใช้ `ON CONFLICT DO NOTHING` | เปลี่ยนเป็น `DO UPDATE` |
+
+### test ที่แก้เพราะพฤติกรรมเปลี่ยน
+
+forecast 2 ตัวยืนยันตัวเลขที่ route ทำซ้ำไม่ได้แล้ว เพราะ route เก็บ projection
+และชุดที่เก็บไว้โตขึ้นได้อย่างถูกต้อง · เคสที่เป็นเอกสารถูก pin ไว้ที่ระดับฟังก์ชัน
+แทน เทียบ event ที่ seed ไว้เจ็ดรายการด้วย id · ส่วน route ยืนยันที่ **invariant**:
+การเพิ่มบิลจริงทำให้เงินสดที่ project ไว้ลดลงได้เท่านั้น
+
+### สถานะหลังรอบนี้
+
+- **393 ผ่าน** (มี Postgres) · **324 ผ่าน + 71 skip** (ไม่มี DB)
+- **26 ตาราง** · schema และ seed ทั้งสองไฟล์ idempotent · frontend bundle ไม่ขยับ
+
+---
+
+## รอบ 2026-10-15 (ช่วงบ่ายปลาย) — ตอบ call จริงของ frontend ด้วยข้อมูลที่ seed ไว้ `505d63b`
+
+เรียกทั้งสิบหก contract **แบบที่ `src/api/client.ts` เรียกจริง คือไม่ส่ง query
+parameter เลย** แล้วเจอสามอย่างที่ทีม frontend จะชนบ่ายนี้
+
+### 🐛 สามบั๊ก
+
+| บั๊ก | อาการ | การแก้ |
+| --- | --- | --- |
+| seed ซ่อมแถว project ไม่ได้ | `POST /api/swarm` สร้าง project ด้วยฟิลด์เท่าที่ตัวเองต้องใช้ · seed ใช้ `ON CONFLICT (id) DO NOTHING` metadata เดโมจึงไม่ถูกเติมภายหลัง → `/api/v1/order` ตอบกลับมาโดยไม่มี title, code, standard, delivery location | เปลี่ยนแถวนั้นเป็น `DO UPDATE` · **การ seed เดโมต้องลู่เข้าสู่สถานะที่ตั้งใจ ไม่ใช่แค่เลี่ยงข้อมูลซ้ำ** |
+| "โครงการที่ active" = อะไรก็ตามที่เขียนล่าสุด | รวมออเดอร์ที่ test run สร้างบน DB เดียวกัน → ได้ `PO-PERSIST-TEST` | project ที่มี `start_date` ประกาศไว้คือ engagement ที่ผูกพันแล้ว ส่วนที่สร้างผ่าน API โดยไม่มีคือ draft · เรียง `start_date` ก่อน · `/order`, `/projects`, `/swarm/proposal` ตอบด้วยออเดอร์เดโมแล้ว |
+| `/shops/{id}/finance` ตอบ **422** เมื่อ id ไม่ใช่ UUID | contract อื่นตอบเป็น envelope ทั้งหมด และ UI render empty state ของตัวเองจาก envelope · หน้าจอที่ยังถือ mock id อย่าง `"shop-1"` จะโผล่ error แทน panel ว่าง | คืน `insufficient_data` พร้อมประกาศ `unknown_shop_id` |
+
+### นอกจากบั๊ก: client ไม่ส่ง parameter เลย
+
+หน้า dashboard จึง fall back ไปที่ example JSON ที่ bundle มา และโชว์ชื่อร้าน
+placeholder ขณะที่ SME ที่ seed ไว้นั่งว่าง · ตอนนี้**งบที่เก็บไว้ชนะ example**
+เลือกแบบ deterministic และ `source` ยังบอกว่าใครตอบ
+
+หน้า funding resolve ต่างออกไป **โดยเจตนา** — มันเป็นเรื่องความต้องการเงินทุน
+เมื่อไม่ระบุ SME จึงตอบด้วย SME ที่มีส่วนขาดที่เก็บไว้สูงสุด **และมีงบให้ให้คะแนนด้วย** ·
+งบกับส่วนขาดมาจาก SME เดียวกันเสมอ **ไม่ปนกัน** · นั่นเปลี่ยนรายการที่ไม่ได้จัดอันดับ
+ให้เป็นคำตอบจริงของ Rung Charoen: **45,000 บน borrower เกรด D**
+ที่เงินให้เปล่าต่ำกว่าขั้นต่ำของตัวเอง และสินเชื่อทุกตัวไม่ผ่าน coverage test
+
+### test ที่แก้เพราะพฤติกรรมเปลี่ยน
+
+4 ตัวยืนยันพฤติกรรมเดิมและถูกเขียนใหม่พร้อมบันทึกเหตุผล: 422, source
+`demo_dataset`, และรายการ funding ที่ไม่ได้จัดอันดับ · **เป็นการเปลี่ยนที่ตั้งใจ
+ไม่ใช่ test เสีย**
+
+### `DEPLOY.md` ได้ pre-test checklist
+
+วิธีชี้ frontend ในเครื่องไปที่ backend ในเครื่องโดยไม่ต้อง deploy · curl 3 ข้อ ·
+แต่ละหน้าจอจะโชว์อะไร · และห้าเรื่องที่ควรบอกทีม frontend ก่อน —
+สำคัญสุดคือ **`insufficient_data` เป็นสถานะที่มีข้อมูลและประกาศช่องว่างไว้ ไม่ใช่ error**
+
+### สถานะหลังรอบนี้
+
+- **371 ผ่าน** (มี Postgres) · **322 ผ่าน + 51 skip** (ไม่มี DB)
+- 16/16 contract ตอบ 200 จากข้อมูลที่เก็บไว้ · frontend bundle ไม่ขยับ
+
+---
+
+## รอบ 2026-10-15 (ช่วงบ่าย) — เตรียม deploy และ Authentication `da29c6f`..`80f619a`
 
 ### เตรียม Deploy ขึ้น Railway
 
@@ -409,19 +550,27 @@ working_capital = share/day × cost/unit × (duration_days + payment_terms_days)
 
 ## งานที่เหลือของ Role 2
 
+> อัปเดต ณ `4d7b4da` · รายการแบบจัดลำดับผลกระทบอยู่ที่ §4 ของ
+> `AI_DEVELOPMENT_GUIDELINES.md` ซึ่งเป็นแหล่งความจริง · ตารางนี้คือมุมฝั่ง Role 2
+
 | งาน | สถานะ |
 | --- | --- |
-| `/api/match-funding` | route เป็นของผม แต่ **algorithm เป็น Module 4 ของ Codex** · `swarm.py` ชี้ `actionTarget` ไปที่ endpoint นี้อยู่แล้วทั้งที่ยังไม่มี · `/funding/options` ทำเกณฑ์วงเงิน/DSCR ไว้แล้ว เหลือส่วนให้คะแนนและเหตุผลความเสี่ยง |
-| Deploy backend | **ยังไม่ทำ** ต้องใช้บัญชี/credential ของทีม · เว็บบน Vercel ยังไม่มี backend ให้คุย ต้อง host แล้วตั้ง `VITE_BACKEND_URL` และ `VITE_USE_MOCK=false` |
-| Auth จริง | RBAC มี role model แล้ว แต่ยังไม่มี credential ที่ตรวจได้ (ดูหัวข้อ RBAC) |
-| `/cashflow/timeline` 30/60/90 วัน | ตอนนี้สร้างจาก `cash_events` ที่มีอยู่ · การพยากรณ์ล่วงหน้าเป็น Module 3 ของ Codex |
+| Deploy backend | **ยังไม่ทำ · เจ้าของ: ทีม** ต้องใช้บัญชี Railway · config ครบและทดสอบด้วย container จริงแล้ว · ตามด้วยตั้ง `VITE_API_BASE_URL` + `VITE_USE_MOCK=false` บน Vercel |
+| เพิกถอน token | **ยังไม่มี** จึง clamp อายุ token ไว้ไม่เกิน 7 วัน (`security.py:79`) · เรื่องเดียวที่ค้างอยู่ฝั่งผมล้วน ๆ |
+| ต่อ route ให้ข้อ 3 และ 4 ของ §4 | **รอ Codex** · `load_expense_history` และ `load_shop_resources` พร้อมและมีเทสต์ แต่ยังไม่มี caller · ผมต่อ route ได้ทันทีที่ Codex ส่งฝั่งตัวเองมา |
+| ~~`/api/match-funding`~~ | ✅ `ee320dd` · เรียก `match_funding` + `match_investors` ของ Codex แยกหนี้กับทุน |
+| ~~Auth จริง~~ | ✅ `d18c841` · token HMAC-SHA256 + รหัสผ่าน scrypt · **DB เป็นผู้ตัดสิน role ไม่ใช่ token** |
+| ~~`/cashflow/timeline` 30/60/90 วัน~~ | ✅ `3f3417a` · `/api/forecast` สร้าง projected event จาก `receivables`/`payables` ผ่าน `project_cash_events()` ของ Codex |
 
 ### เรื่องที่ควรรู้ก่อนเดโม
 
 1. **`actionableItems` เป็นภาษาอังกฤษ** เพราะ text มาจาก `findings` ของ Codex ตรง ๆ ขณะที่ UI เป็นไทย
    การแปลเป็นงาน Module 3 ไม่ใช่สิ่งที่ผมควรแต่งเอง
+   · **อัปเดต `6614562`:** finding/action และ summary เป็นไทยแล้ว ข้อนี้จึงไม่เป็นจริงอีก
 2. **"โครงการล่าสุด" คือสิ่งที่ถูกเขียนล่าสุด** รวมถึง order ที่ test สร้าง (`PO-PERSIST-TEST`, `PO-LIVE-001`)
    ตอนเดโมให้ส่ง `?order_ref=PO-STP-2026-091` หรือรัน order จริงเป็นตัวสุดท้าย
+   · **บรรเทาแล้วใน `505d63b`:** เรียงตาม `start_date` ก่อน ออเดอร์เดโมจึงชนะ order ที่ test สร้าง
+   แต่ยังส่ง `order_ref` ให้ชัดเจนตอนเดโมอยู่ดี
 3. **เว็บจริงกับ repo ไม่ตรงกัน** bundle บน Vercel ใหญ่กว่าที่ repo build ได้ (JS +48.6 kB, CSS +21.6 kB)
    และ UI นั้นไม่มีอยู่ใน git ยังไม่ได้แก้ รอการตัดสินใจของทีม
 
@@ -433,6 +582,7 @@ working_capital = share/day × cost/unit × (duration_days + payment_terms_days)
 docker compose -f backend/docker-compose.yml up -d
 docker exec -i sme_swarm_db psql -U postgres -d sme_swarm -v ON_ERROR_STOP=1 < backend/db/schema.sql
 docker exec -i sme_swarm_db psql -U postgres -d sme_swarm -v ON_ERROR_STOP=1 < backend/db/seed.sql
+docker exec -i sme_swarm_db psql -U postgres -d sme_swarm -v ON_ERROR_STOP=1 < backend/db/seed_obligations.sql
 backend\run.cmd
 & backend/.venv/Scripts/python.exe -m pytest -c backend/pytest.ini -q
 ```
