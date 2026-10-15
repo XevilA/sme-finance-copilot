@@ -135,7 +135,7 @@ def _build_analysis(data: FinancialInput) -> dict:
     unknowns = [f"Missing input: {field}" for field in missing]
     unknowns += [f"{name}: {item['reason']}" for name, item in metrics.items() if item["status"] == "undefined"]
     unknowns += [f"Grading {name}: {item['reason']}" for name, item in grading["components"].items() if item["status"] == "undefined"]
-    unknowns += ["No dated future cash schedule: a 30-90 day forecast is not produced in this milestone.",
+    unknowns += ["No dated cash events supplied to build_analysis: use forecast_cashflow with a dated cash snapshot and complete schedule for 30/60/90-day projections.",
                  "No expense transaction history or comparable prior period: unusual expenses cannot be confirmed."]
     status = "ok" if not missing and grading["status"] == "ok" and all(item["status"] == "ok" for item in metrics.values()) else "insufficient_data"
     input_json = data.model_dump(mode="json")
