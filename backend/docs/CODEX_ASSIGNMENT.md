@@ -105,12 +105,17 @@ correctly, because it was never given enough to compute. A form that collects
 only a few fields will therefore render a dashboard full of blanks, exactly as
 the user describes.
 
-### ⚠️ This cannot be fixed without editing files under `src/`
+### ⚠️ This cannot be fixed without editing files under `src/` — and that is approved
 
-The user's instruction was "don't touch anything about UI". The missing piece is
-nonetheless inside `src/`. Claude's reading of the intent — **confirm with the
-user before relying on it** — is "do not redesign my interface", not "never edit
-a file in that folder". So:
+The missing piece is inside `src/`, which the standing rule puts off limits. The
+user was asked directly and **granted a narrow exception in chat on 2026-10-15**,
+in these words:
+
+> อนุมัติให้ Codex แก้ src/api/client.ts กับ src/features/import/ImportPage.tsx
+> ได้เท่าที่เป็นการ wiring ห้ามแตะดีไซน์
+
+So this is settled: wiring those two files is authorised, redesigning anything is
+not. You do not need to ask again, and you must not widen it.
 
 **You may edit exactly these two files, and only for wiring:**
 
@@ -132,9 +137,10 @@ that pair has been the project's tripwire for accidental UI edits. Wiring
 module count and both hashes in your commit message**, and confirm the CSS hash
 is unchanged — if the CSS hash moves, you touched styling and must undo it.
 
-If you would rather not take that interpretation, do section 5 and 6 instead, and
-leave a note saying the wiring is waiting on the user's explicit yes. Do not
-silently skip it without saying so.
+The exception covers those two paths and nothing else. If you find that the fix
+genuinely needs a third file under `src/`, **stop and say which file and why**
+rather than editing it — the permission above was given for two files on the
+strength of this diagnosis, and a third would mean the diagnosis was incomplete.
 
 ---
 
