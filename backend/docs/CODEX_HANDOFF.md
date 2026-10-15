@@ -163,3 +163,62 @@ are required. Never assert completeness while source categories are unknown.
 No DB reads/writes or route changes were added by CODEX. `build_analysis()`
 keeps its signature and result shapes; its unknowns now direct callers to this
 forecast function rather than claiming the module does not exist.
+
+## Block 4: industry news and deterministic signals
+
+```python
+from app.industry import fetch_industry_trends, analyze_industry_articles
+
+async def fetch_industry_trends(sector: str, *, as_of: datetime,
+                                 cached_articles: list[dict] | None = None,
+                                 client: httpx.AsyncClient | None = None,
+                                 force_refresh: bool = False) -> dict: ...
+```
+
+Uses the public GDELT DOC 2.0 ArticleList API with configured sector queries,
+no API key, a seven-day search window, and bounded response/record sizes.
+Supported sectors: food_processing, food, packaging, manufacturing, agriculture,
+retail, logistics, services. No financial data or SME identity is sent to GDELT.
+Provider documentation: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
+
+Output has sector, as_of, status, source_status, source_error,
+retry_after_seconds, articles, findings, missing, notice, assumptions.
+Status is ok, empty, stale, or unavailable. Recent cached articles are reused
+for five minutes. Source dates older than 72 hours or fetches older than one
+hour are stale; cached records older than seven days are not returned.
+Provider failures with a valid cache return stale; failures without data return
+unavailable, empty articles/findings, and missing=industry_news. There are no
+automatic retries. HTTP 429 exposes a bounded retry hint, with a five-second minimum.
+
+Article fields: id (SHA-256 of sector/canonical URL), provider, source (URL host),
+sector, url, title, published_at, observed_at, fetched_at, date_source, status.
+Headlines and links come from source rows only. GDELT `seendate` is stored as
+observed_at with date_source=gdelt_first_seen. The API does not establish the
+actual publication timestamp; published_at remains null and publication dates
+are listed in missing rather than invented. Tracking links, repeated URLs, and
+identical syndicated titles are deduplicated deterministically.
+
+Signals are disclosed headline-keyword screening, not full article interpretation
+or claims about an SME. Risk/opportunity findings contain article_id,
+evidence_url, matched_terms, freshness status and a notice. The current rules
+path requires no LLM credits. Historical or simulated test headlines are never
+inserted as live news. News is not added to financial findings/grades automatically.
+
+### Storage requested from CLAUDE
+
+- `industry_news`: id TEXT primary key (64 hex chars), provider TEXT, source TEXT,
+  sector TEXT, url TEXT, title TEXT, published_at TIMESTAMPTZ nullable,
+  observed_at TIMESTAMPTZ, fetched_at TIMESTAMPTZ, date_source TEXT;
+  unique(provider, sector, url). Optional raw JSONB for provider metadata only.
+- `industry_news_fetch_state`: provider primary key, last_attempt_at,
+  last_success_at, next_allowed_at TIMESTAMPTZ, last_error TEXT. Coordinate a
+  provider-wide lock/rate limit across workers and sectors; do not poll per page render.
+- Cache metadata is stored as actual observations. Freshness is recalculated
+  at response time and must not be persisted as a permanent fresh flag.
+- Persist derived findings only if needed, linking to article ids and a policy
+  version. No full article text, fabricated summary, or sentiment confidence
+  is generated. The original proposed summary/sentiment fields are not required.
+
+No table or API route was created by CODEX. An actual GDELT smoke request during
+implementation returned HTTP 429; outage handling is a verified runtime path,
+not evidence that live headlines were successfully fetched.
