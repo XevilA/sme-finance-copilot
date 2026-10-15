@@ -245,6 +245,18 @@ curl https://<service>/health
   แปลว่า `AUTH_DEV_HEADER=true` ซึ่งยอมรับ header `X-User-Email` เป็นตัวตน
   โดยไม่มีการยืนยัน ใครก็อ้างเป็น role ไหนก็ได้ · ใช้เฉพาะในเครื่องตัวเองกับ DB ทิ้งขว้าง
 
+### รันเทสต์ส่วน auth
+
+เทสต์ 2 ตัวที่ต้องล็อกอินจริงจะ **skip** โดยค่าเริ่มต้น เพราะไม่มีรหัสผ่านอยู่ใน repo
+ถ้าจะรันให้ครบ ตั้งรหัสให้ผู้ใช้เดโมก่อน แล้วส่งผ่าน env:
+
+```bash
+python backend/scripts/set_password.py fund@example.test
+DEMO_LOGIN_PASSWORD='<รหัสที่ตั้ง>' python -m pytest -c backend/pytest.ini -q
+```
+
+372 ผ่านเมื่อมีรหัส · 370 ผ่าน + 2 skip เมื่อไม่มี
+
 ### สิ่งที่ auth นี้ทำและไม่ทำ
 
 **ทำ:** token เซ็นด้วย HMAC-SHA256 ตรวจด้วย `compare_digest` · มีวันหมดอายุบังคับ ·

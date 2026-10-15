@@ -32,6 +32,14 @@ client = TestClient(app)
 BACKEND = Path(__file__).resolve().parents[1]
 SECRET = "t" * 40
 
+# The password for the demo login user is read from the environment and never
+# written into the repository, so no credential string ships with the code.
+# Set it alongside the account:
+#   python backend/scripts/set_password.py fund@example.test
+#   DEMO_LOGIN_PASSWORD=... pytest
+DEMO_EMAIL = os.getenv("DEMO_LOGIN_EMAIL", "fund@example.test")
+DEMO_PASSWORD = os.getenv("DEMO_LOGIN_PASSWORD", "")
+
 
 # --- passwords ---------------------------------------------------------------
 
@@ -218,7 +226,7 @@ out = {}
 with TestClient(app) as c:
     out["auth"] = c.get("/health").json()["auth"]
     login = c.post("/api/auth/login",
-                   json={"email": "fund@example.test", "password": "%(password)s"})
+                   json={"email": "%(email)s", "password": "%(password)s"})
     out["login"] = login.status_code
     if login.status_code != 200:
         print(json.dumps(out)); raise SystemExit(0)
@@ -229,7 +237,7 @@ with TestClient(app) as c:
 
     out["no_header"] = code({})
     out["bearer"] = code({"Authorization": "Bearer " + token})
-    out["email_header_only"] = code({"X-User-Email": "fund@example.test"})
+    out["email_header_only"] = code({"X-User-Email": "%(email)s"})
     out["tampered"] = code({"Authorization": "Bearer " + token[:-6] + "AAAAAA"})
     out["no_signature"] = code({"Authorization": "Bearer " + token.split(".")[0]})
     out["wrong_scheme"] = code({"Authorization": token})
@@ -239,7 +247,7 @@ with TestClient(app) as c:
     out["method"] = ok["method"]
 
     # A token that claims a role the database does not grant.
-    escalated, _ = issue_token(user_id="x", email="fund@example.test", role="admin")
+    escalated, _ = issue_token(user_id="x", email="%(email)s", role="admin")
     out["escalated_role"] = c.get(
         "/api/auth/me", headers={"Authorization": "Bearer " + escalated}
     ).json()["data"]["role"]
@@ -252,7 +260,7 @@ print(json.dumps(out))
 """
 
 
-def run_enforced(password: str, extra_env: dict | None = None) -> dict:
+def run_enforced(extra_env: dict | None = None) -> dict:
     env = {
         "RBAC_ENFORCED": "true",
         "AUTH_SECRET": SECRET,
@@ -260,19 +268,25 @@ def run_enforced(password: str, extra_env: dict | None = None) -> dict:
         "SYSTEMROOT": "C:\\Windows",
     }
     env.update(extra_env or {})
+    script = ENFORCED_SCRIPT % {"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
     completed = subprocess.run(
-        [sys.executable, "-c", ENFORCED_SCRIPT % {"password": password}],
+        [sys.executable, "-c", script],
         cwd=BACKEND, capture_output=True, text=True, env=env, timeout=180,
     )
     assert completed.returncode == 0, completed.stderr[-2000:]
     return json.loads(completed.stdout.strip().splitlines()[-1])
 
 
-@pytest.mark.skipif(not DB_ENABLED, reason="enforced identity resolves against the users table")
+needs_demo_login = pytest.mark.skipif(
+    not DB_ENABLED or not DEMO_PASSWORD,
+    reason="set DEMO_LOGIN_PASSWORD and run scripts/set_password.py for the demo user",
+)
+
+
+@needs_demo_login
 def test_enforced_identity_requires_a_signed_token():
-    result = run_enforced("demo-pw-fund-2026")
-    if result["login"] != 200:
-        pytest.skip("demo password not set; run scripts/set_password.py")
+    result = run_enforced()
+    assert result["login"] == 200, "DEMO_LOGIN_PASSWORD does not match the stored password"
 
     assert result["auth"] == {"enforced": True, "secretConfigured": True, "devHeaderAccepted": False}
     assert result["no_header"] == 401
@@ -292,12 +306,11 @@ def test_enforced_identity_requires_a_signed_token():
     assert result["funder_as_investor"] is True
 
 
-@pytest.mark.skipif(not DB_ENABLED, reason="enforced identity resolves against the users table")
+@needs_demo_login
 def test_dev_header_is_opt_in_and_declared():
     """The escape hatch works, and an instance using it cannot look secure."""
-    result = run_enforced("demo-pw-fund-2026", {"AUTH_DEV_HEADER": "true"})
-    if result["login"] != 200:
-        pytest.skip("demo password not set; run scripts/set_password.py")
+    result = run_enforced({"AUTH_DEV_HEADER": "true"})
+    assert result["login"] == 200
     assert result["auth"]["devHeaderAccepted"] is True
     assert result["email_header_only"] == 200
     assert result["no_header"] == 401
