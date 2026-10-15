@@ -418,6 +418,131 @@ CREATE TABLE IF NOT EXISTS industry_news (
 );
 CREATE INDEX IF NOT EXISTS industry_news_sector_idx ON industry_news (sector, fetched_at DESC);
 
+-- 18. Dated obligations ------------------------------------------------------
+-- Source rows for the 30/60/90-day forecast. app/forecasting.py turns these
+-- into projected cash_events; it never reads the database itself, so these are
+-- the inputs CLAUDE hands it.
+--
+-- Receivables and payables are separate tables because an inflow carries an
+-- invoice and a collection, while an outflow covers suppliers, operating costs
+-- and debt installments. The `kind` column on payables maps onto the three
+-- outflow categories the forecaster takes.
+--
+-- `status` separates an obligation that is still outstanding from one that has
+-- settled. Only outstanding rows are forecast: a settled one already shows in
+-- the cash balance, so forecasting it again would double count.
+CREATE TABLE IF NOT EXISTS receivables (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sme_id          UUID        NOT NULL REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    project_id      UUID        REFERENCES swarm_projects (id) ON DELETE SET NULL,
+    invoice_ref     TEXT        NOT NULL,
+    counterparty    TEXT        NOT NULL,
+    amount          NUMERIC(20,2) NOT NULL CHECK (amount > 0),
+    issued_date     DATE        NOT NULL,
+    due_date        DATE        NOT NULL,
+    status          TEXT        NOT NULL DEFAULT 'outstanding'
+                    CHECK (status IN ('outstanding', 'collected', 'written_off')),
+    collected_date  DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT receivable_due_after_issue CHECK (due_date >= issued_date),
+    -- A collected row must say when; an outstanding one must not pretend to.
+    CONSTRAINT receivable_collected_date CHECK (
+        (status = 'collected' AND collected_date IS NOT NULL)
+        OR (status <> 'collected' AND collected_date IS NULL)
+    ),
+    CONSTRAINT one_receivable_per_invoice UNIQUE (sme_id, invoice_ref)
+);
+CREATE INDEX IF NOT EXISTS receivables_due_idx
+    ON receivables (sme_id, due_date) WHERE status = 'outstanding';
+
+CREATE TABLE IF NOT EXISTS payables (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sme_id          UUID        NOT NULL REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    project_id      UUID        REFERENCES swarm_projects (id) ON DELETE SET NULL,
+    bill_ref        TEXT        NOT NULL,
+    counterparty    TEXT,
+    kind            TEXT        NOT NULL
+                    CHECK (kind IN ('supplier', 'operating_cost', 'debt_installment')),
+    category        TEXT,
+    amount          NUMERIC(20,2) NOT NULL CHECK (amount > 0),
+    issued_date     DATE,
+    due_date        DATE        NOT NULL,
+    status          TEXT        NOT NULL DEFAULT 'outstanding'
+                    CHECK (status IN ('outstanding', 'paid', 'cancelled')),
+    paid_date       DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT payable_paid_date CHECK (
+        (status = 'paid' AND paid_date IS NOT NULL)
+        OR (status <> 'paid' AND paid_date IS NULL)
+    ),
+    CONSTRAINT one_payable_per_bill UNIQUE (sme_id, bill_ref)
+);
+CREATE INDEX IF NOT EXISTS payables_due_idx
+    ON payables (sme_id, due_date) WHERE status = 'outstanding';
+
+-- 19. Expense history --------------------------------------------------------
+-- Individual dated expenses, so an unusual one can be compared against a real
+-- baseline. analysis.py declares this gap in its unknowns today: without
+-- transactions there is nothing to call unusual.
+CREATE TABLE IF NOT EXISTS expense_transactions (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sme_id              UUID        NOT NULL REFERENCES sme_profiles (id) ON DELETE CASCADE,
+    transaction_date    DATE        NOT NULL,
+    category            TEXT        NOT NULL,
+    description         TEXT        NOT NULL,
+    amount              NUMERIC(20,2) NOT NULL CHECK (amount > 0),
+    counterparty        TEXT,
+    source              TEXT        NOT NULL DEFAULT 'manual'
+                        CHECK (source IN ('manual', 'excel', 'api')),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS expense_transactions_history_idx
+    ON expense_transactions (sme_id, category, transaction_date DESC);
+
+-- 20. Which resources a shop needs for its share -----------------------------
+-- shared_resources records what is on offer; this records what a given
+-- allocation depends on, which is what resource eligibility in the SWARM
+-- allocator needs. `required` separates a hard dependency from a preference.
+CREATE TABLE IF NOT EXISTS allocation_resources (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    allocation_id   UUID        NOT NULL REFERENCES swarm_allocations (id) ON DELETE CASCADE,
+    resource_id     UUID        NOT NULL REFERENCES shared_resources (id) ON DELETE CASCADE,
+    required        BOOLEAN     NOT NULL DEFAULT TRUE,
+    note            TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT one_link_per_resource UNIQUE (allocation_id, resource_id)
+);
+CREATE INDEX IF NOT EXISTS allocation_resources_resource_idx
+    ON allocation_resources (resource_id);
+
+-- 21. Provider fetch state ---------------------------------------------------
+-- One row per external provider, shared by every worker. The news fetcher must
+-- not be called once per page render, and several replicas hitting it at once
+-- is what produced HTTP 429. next_allowed_at is the gate; the work is taken
+-- under pg_try_advisory_lock so a second worker skips rather than queues.
+CREATE TABLE IF NOT EXISTS provider_fetch_state (
+    provider                TEXT        PRIMARY KEY,
+    last_attempt_at         TIMESTAMPTZ,
+    last_success_at         TIMESTAMPTZ,
+    next_allowed_at         TIMESTAMPTZ,
+    consecutive_failures    INTEGER     NOT NULL DEFAULT 0 CHECK (consecutive_failures >= 0),
+    last_error              TEXT,
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 22. Login throttle ---------------------------------------------------------
+-- Rate limit for POST /api/auth/login, held in the database so it applies
+-- across replicas rather than per process. Keyed by a hash of the identifier,
+-- so the table never stores the addresses that were tried.
+CREATE TABLE IF NOT EXISTS auth_throttle (
+    key_hash        CHAR(64)    PRIMARY KEY,
+    window_start    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    attempts        INTEGER     NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    blocked_until   TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS auth_throttle_blocked_idx ON auth_throttle (blocked_until);
+
 -- updated_at triggers --------------------------------------------------------
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
 BEGIN

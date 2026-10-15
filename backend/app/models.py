@@ -422,3 +422,108 @@ class IndustryNews(Base):
     status: Mapped[str | None] = mapped_column(Text)
     raw: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Receivable(Base):
+    """Money owed to the SME. Feeds the forecast while status is outstanding."""
+
+    __tablename__ = "receivables"
+
+    id: Mapped[uuid.UUID] = pk()
+    sme_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"), nullable=False)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("swarm_projects.id", ondelete="SET NULL"))
+    invoice_ref: Mapped[str] = mapped_column(Text, nullable=False)
+    counterparty: Mapped[str] = mapped_column(Text, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    issued_date: Mapped[date] = mapped_column(Date, nullable=False)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="outstanding")
+    collected_date: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("sme_id", "invoice_ref", name="one_receivable_per_invoice"),)
+
+
+class Payable(Base):
+    """Money the SME owes. `kind` maps onto the forecaster outflow categories."""
+
+    __tablename__ = "payables"
+
+    id: Mapped[uuid.UUID] = pk()
+    sme_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"), nullable=False)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("swarm_projects.id", ondelete="SET NULL"))
+    bill_ref: Mapped[str] = mapped_column(Text, nullable=False)
+    counterparty: Mapped[str | None] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str | None] = mapped_column(Text)
+    amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    issued_date: Mapped[date | None] = mapped_column(Date)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="outstanding")
+    paid_date: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("sme_id", "bill_ref", name="one_payable_per_bill"),)
+
+
+class ExpenseTransaction(Base):
+    """One dated expense, so an unusual one has a baseline to stand against."""
+
+    __tablename__ = "expense_transactions"
+
+    id: Mapped[uuid.UUID] = pk()
+    sme_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"), nullable=False)
+    transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    counterparty: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AllocationResource(Base):
+    """A resource one allocation depends on."""
+
+    __tablename__ = "allocation_resources"
+
+    id: Mapped[uuid.UUID] = pk()
+    allocation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("swarm_allocations.id", ondelete="CASCADE"), nullable=False
+    )
+    resource_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("shared_resources.id", ondelete="CASCADE"), nullable=False
+    )
+    required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    resource: Mapped["SharedResource"] = relationship()
+
+    __table_args__ = (UniqueConstraint("allocation_id", "resource_id", name="one_link_per_resource"),)
+
+
+class ProviderFetchState(Base):
+    """Shared rate-limit gate for an external provider, one row per provider."""
+
+    __tablename__ = "provider_fetch_state"
+
+    provider: Mapped[str] = mapped_column(Text, primary_key=True)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_allowed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuthThrottle(Base):
+    """Login attempt counter, keyed by a hash so no address is stored."""
+
+    __tablename__ = "auth_throttle"
+
+    key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

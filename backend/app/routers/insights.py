@@ -13,18 +13,30 @@ from starlette.concurrency import run_in_threadpool
 
 from .. import catalog
 from ..db import DB_ENABLED, session_scope
-from ..forecasting import forecast_cashflow
+from ..forecasting import forecast_cashflow, project_cash_events
+from .. import fetch_state
+from ..fetch_state import Gate
 from ..industry import fetch_industry_trends
 from ..news_cache import load_cached_articles, upsert_articles
+from ..obligations import load_obligations, upsert_projected_events
 from ..repository import parse_uuid
 
 router = APIRouter(tags=["insights"])
+
+# The only external provider today; the gate is keyed per provider.
+PROVIDER = "gdelt"
 
 
 @router.get("/forecast")
 async def forecast(
     sme_id: str,
     as_of: date | None = Query(default=None),
+    project_obligations: bool = Query(
+        default=True,
+        description="Generate and store projected events from dated receivables "
+                    "and payables before forecasting. Turn off to forecast only "
+                    "events already stored.",
+    ),
     schedule_complete_through: date | None = Query(
         default=None,
         description="Confirm how far the supplied schedule is complete. Without "
@@ -44,13 +56,33 @@ async def forecast(
     if not DB_ENABLED:
         raise HTTPException(status_code=503, detail="The forecast reads cash_events, so DATABASE_URL is required")
 
+    generated = {"events": 0, "overdue": [], "missing": []}
     async with session_scope() as session:
-        events = await catalog.load_cash_events(session, owner)
         shops = await catalog.load_shops(session)
+        profile = next((shop for shop in shops if shop["id"] == str(owner)), None)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Unknown sme_id")
 
-    profile = next((shop for shop in shops if shop["id"] == str(owner)), None)
-    if profile is None:
-        raise HTTPException(status_code=404, detail="Unknown sme_id")
+        if project_obligations:
+            # Turn the dated receivables and payables into projected events and
+            # store them, so the forecast runs over one set of cash_events
+            # rather than a second parallel view of the same obligations.
+            obligations = await load_obligations(session, owner)
+            produced = await run_in_threadpool(
+                lambda: project_cash_events(
+                    as_of=as_of or date.today(), sme_id=str(owner), **obligations
+                )
+            )
+            written = await upsert_projected_events(session, produced["events"])
+            generated = {
+                "events": written,
+                # An obligation past due with no rescheduled date is reported,
+                # never moved to an invented future day.
+                "overdue": produced.get("overdue", []),
+                "missing": produced.get("missing", []),
+            }
+
+        events = await catalog.load_cash_events(session, owner)
 
     result = await run_in_threadpool(
         lambda: forecast_cashflow(
@@ -71,6 +103,7 @@ async def forecast(
         "unit": "THB",
         "source": "stored_record",
         "scheduleCompleteThrough": schedule_complete_through.isoformat() if schedule_complete_through else None,
+        "projectedFromObligations": generated,
     }
 
 
@@ -81,24 +114,79 @@ async def industry_trends(
 ) -> dict:
     """Industry news and deterministic signals for one sector.
 
-    Cached rows are read from industry_news and handed to the fetcher, which
-    decides whether they are fresh, stale or unusable. Whatever comes back is
-    upserted by the fetcher's own id, so re-ingesting an article updates it
-    instead of duplicating it. No SME data is sent to the provider.
+    Calls to the provider are gated by `provider_fetch_state`, shared across
+    workers: a worker that is rate limited or that cannot take the lock serves
+    the cache instead of making the call. Without that, several replicas hitting
+    the provider together is what produced HTTP 429.
+
+    Whatever comes back is upserted by the fetcher's own id, so re-ingesting an
+    article updates it instead of duplicating it. No SME data is sent.
     """
+    as_of = datetime.now(timezone.utc)
     cached: list[dict] = []
+    gate = Gate(allowed=True, reason="no_coordination")
+
     if DB_ENABLED:
         async with session_scope() as session:
             cached = await load_cached_articles(session, sector)
+            gate = await fetch_state.acquire(session, PROVIDER, force=force_refresh)
 
-    as_of = datetime.now(timezone.utc)
-    result = await fetch_industry_trends(sector, as_of=as_of, cached_articles=cached, force_refresh=force_refresh)
+    if not gate.allowed:
+        # Not an error: the cache is the answer while the gate is shut.
+        result = await fetch_industry_trends(
+            sector, as_of=as_of, cached_articles=cached, force_refresh=False
+        )
+        async with session_scope() as session:
+            provider_status = await fetch_state.status(session, PROVIDER)
+        return _trends_response(
+            sector, result, as_of, cached, 0, provider_status,
+            gate_reason=gate.reason, retry_after=gate.retry_after_seconds,
+        )
+
+    try:
+        result = await fetch_industry_trends(
+            sector, as_of=as_of, cached_articles=cached, force_refresh=force_refresh
+        )
+    finally:
+        if DB_ENABLED:
+            async with session_scope() as session:
+                await fetch_state.release(session, PROVIDER)
 
     stored = 0
-    if DB_ENABLED and result.get("articles"):
+    if DB_ENABLED:
         async with session_scope() as session:
-            stored = await upsert_articles(session, result["articles"])
+            if result.get("articles"):
+                stored = await upsert_articles(session, result["articles"])
+            # The fetcher reports its own outcome; the gate records it so the
+            # next call is spaced accordingly.
+            if result.get("source_status") in {"unavailable", "error"}:
+                await fetch_state.record_failure(
+                    session, PROVIDER,
+                    str(result.get("source_error") or "unavailable"),
+                    result.get("retry_after_seconds"),
+                )
+            else:
+                await fetch_state.record_success(session, PROVIDER)
+            provider_status = await fetch_state.status(session, PROVIDER)
+    else:
+        provider_status = {"provider": PROVIDER, "coordinated": False}
 
+    return _trends_response(sector, result, as_of, cached, stored, provider_status)
+
+
+def _trends_response(
+    sector: str,
+    result: dict,
+    as_of,
+    cached: list[dict],
+    stored: int,
+    provider_status: dict,
+    gate_reason: str | None = None,
+    retry_after: int | None = None,
+) -> dict:
+    missing = list(result.get("missing", []))
+    if gate_reason and gate_reason != "no_coordination":
+        missing = [*missing, f"provider_gate:{gate_reason}"]
     return {
         "data": {
             "sector": result.get("sector", sector),
@@ -106,16 +194,16 @@ async def industry_trends(
             "findings": result.get("findings", []),
             "sourceStatus": result.get("source_status"),
             "sourceError": result.get("source_error"),
-            "retryAfterSeconds": result.get("retry_after_seconds"),
+            "retryAfterSeconds": retry_after or result.get("retry_after_seconds"),
             "notice": result.get("notice"),
             "assumptions": result.get("assumptions", []),
         },
         "kind": "actual",
-        # ok | empty | stale | unavailable, straight from the fetcher.
         "status": result.get("status", "unavailable"),
-        "missing": result.get("missing", []),
+        "missing": missing,
         "asOf": result.get("as_of") or as_of.isoformat(),
         "cachedRowsSupplied": len(cached),
         "rowsStored": stored,
         "source": "stored_record" if cached else "provider",
+        "providerGate": provider_status,
     }

@@ -36,14 +36,15 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 · commit `5d583dd` · **372 tests ผ่าน** (มี PostgreSQL) ·
-> **31 API routes** · **20 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
+> อัปเดต 2026-10-15 · **393 tests ผ่าน** (มี PostgreSQL) ·
+> **31 API routes** · **26 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
 
 ```bash
 docker compose -f backend/docker-compose.yml up -d   # ฐานข้อมูล + schema + ข้อมูลเดโม
-backendun.cmd                                      # เซิร์ฟเวอร์ที่ 127.0.0.1:8000
+backend
+un.cmd                                      # เซิร์ฟเวอร์ที่ 127.0.0.1:8000
 ```
 
 เปิด `http://127.0.0.1:8000/docs` แล้วลองยิง API ได้เลย · UUID เดโมคงที่:
@@ -99,6 +100,8 @@ python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip �
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
 | Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 + `src/services/api.ts` · เว็บยังเป็น mock จนกว่า backend จะขึ้น host |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
+| ตารางภาระแบบระบุวันที่ | ✅ | `receivables`, `payables`, `expense_transactions`, `allocation_resources` · ต่อ `project_cash_events()` ของ CODEX เข้า `/api/forecast` แล้ว |
+| จำกัดอัตราคำขอ | ✅ | `provider_fetch_state` ล็อกข้าม worker + backoff · `auth_throttle` จำกัด login ข้าม replica |
 
 ---
 
@@ -122,18 +125,7 @@ python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip �
 
 ### 🟡 ทำได้แต่ยังไม่จำเป็นต่อการเดโม
 
-**3. ตาราง `industry_news_fetch_state`** — เจ้าของ: **CLAUDE**
-
-- ยังไม่มีการล็อก/จำกัดอัตราคำขอข้าม worker จึงตั้ง `numReplicas: 1`
-  ใน `railway.json` ไว้
-- **ขั้นถัดไป:** ทำก่อนเพิ่ม replica ไม่งั้นหลาย instance จะยิง GDELT พร้อมกันแล้วโดน 429
-
-**4. ต่อ `project_cash_events()` เข้า route** — เจ้าของ: **CLAUDE**
-
-- ฟังก์ชันของ CODEX พร้อมใช้ แต่ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ
-- **ขั้นถัดไป:** ออกแบบตาราง receivables/payables ก่อน แล้วจึงต่อ route
-
-**5. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
+**3. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
 
 - เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้สำเร็จ
 - อาการ: DNS และ TCP ต่อได้ แต่ **HTTPS TLS handshake หมดเวลารอ** ·
@@ -141,7 +133,7 @@ python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip �
 - **ขั้นถัดไป:** ลองยิงจากโฮสต์ที่ deploy (egress ต่างกัน อาจผ่าน) ·
   รายละเอียดใน `LIVE_PROVIDER_VERIFICATION.md`
 
-**6. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
+**4. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
 
 - คอลัมน์ `latitude`/`longitude` ใน `sme_profiles` พร้อมแล้วแต่ยังว่าง
 - ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี **โดยเจตนา**
@@ -152,7 +144,6 @@ python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip �
 
 ยังไม่จำเป็นต่อเดโม แต่**อย่าข้าม**ถ้าจะใช้กับข้อมูลลูกค้าจริง
 
-- **ไม่มี rate limit ที่หน้า login** — เปิด public แล้วจะถูก brute force
 - **ไม่มีการเพิกถอน token** ก่อนหมดอายุ จึง clamp อายุไว้ไม่เกิน 7 วัน
 - **`AUTH_DEV_HEADER` ต้องเป็น `false`** บนทุกเครื่องที่เข้าถึงได้จากภายนอก ·
   ตรวจที่ `/health` → `auth.devHeaderAccepted`

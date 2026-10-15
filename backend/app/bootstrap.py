@@ -25,6 +25,9 @@ from .db import CONNECT_ARGS, DATABASE_URL, DB_ENABLED
 DB_DIR = Path(__file__).resolve().parents[1] / "db"
 SCHEMA = DB_DIR / "schema.sql"
 SEED = DB_DIR / "seed.sql"
+# Obligations, expense history and resource links, kept separate so the core
+# seed stays readable. Applied after seed.sql because it references its rows.
+SEED_OBLIGATIONS = DB_DIR / "seed_obligations.sql"
 
 # Any distinct constant works; it only has to be the same across instances.
 ADVISORY_LOCK_KEY = 728_193_455
@@ -48,7 +51,7 @@ async def run() -> dict:
 
     files = [SCHEMA]
     if chosen == "schema+seed":
-        files.append(SEED)
+        files.extend([SEED, SEED_OBLIGATIONS])
 
     missing = [path.name for path in files if not path.is_file()]
     if missing:
