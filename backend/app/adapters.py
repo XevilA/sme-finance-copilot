@@ -71,6 +71,46 @@ def envelope(data, kind: str, missing: list[str], as_of: str, **extra) -> dict:
     }
 
 
+def context_gaps(analysis: dict, forecast: dict | None) -> list[str]:
+    """Names the context build_analysis could not use, for the envelope's `missing`.
+
+    build_analysis keeps its own `missing` to the statement's own fields, and
+    reports the state of the two optional inputs inside `data` instead:
+    `data.expenseComparison.status` can say insufficient_data while `missing` is
+    empty. Here status follows missing, so a response would otherwise read `ok`
+    while the comparison inside it says the data is not there.
+
+    The forecast's own `missing` list is lifted under one prefix rather than
+    reworded, so `schedule_complete_through` stays the forecaster's own term.
+    An absent `expenseComparison` means the history was never queried, which is
+    a different fact from a history that was queried and came back empty.
+    """
+    gaps: list[str] = []
+    if forecast is None:
+        gaps.append("cash_forecast")
+    else:
+        gaps += [f"forecast_{name}" for name in forecast.get("missing", [])]
+    comparison = analysis.get("data", {}).get("expenseComparison")
+    if comparison is None:
+        gaps.append("expense_history")
+    elif comparison.get("status") != "ok":
+        gaps.append(f"expense_comparison_{comparison['status']}")
+    return gaps
+
+
+def with_context_gaps(analysis: dict, forecast: dict | None) -> dict:
+    """The analysis envelope with its sub-statuses lifted into `missing`.
+
+    Only ever downgrades `status`: build_analysis can report insufficient_data
+    with an empty `missing` when a metric is undefined, and lifting a gap must
+    not undo that.
+    """
+    gaps = [gap for gap in context_gaps(analysis, forecast) if gap not in analysis["missing"]]
+    if not gaps:
+        return analysis
+    return {**analysis, "missing": [*analysis["missing"], *gaps], "status": "insufficient_data"}
+
+
 def business_overview(
     payload: dict,
     metrics: dict,

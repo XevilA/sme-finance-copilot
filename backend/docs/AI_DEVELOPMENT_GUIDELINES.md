@@ -36,7 +36,7 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 (ต่อจาก `d13bac5`) · **454 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
+> อัปเดต 2026-10-15 (ต่อจาก `c07405b`) · **472 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
 > **34 API routes** · **27 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
@@ -56,7 +56,7 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 454 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
+python -m pytest -c backend/pytest.ini -q    # 472 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -104,6 +104,8 @@ python -m pytest -c backend/pytest.ini -q    # 454 ผ่าน + 3 skip (ยั
 | Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 + `src/services/api.ts` · เว็บยังเป็น mock จนกว่า backend จะขึ้น host |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
 | ตารางภาระแบบระบุวันที่ | ✅ | `receivables`, `payables`, `expense_transactions`, `allocation_resources` · ต่อ `project_cash_events()` ของ CODEX เข้า `/api/forecast` แล้ว |
+| ข้อมูลเสริมเข้าการวิเคราะห์ | ✅ | ส่ง `forecast` + `expense_history` ของ SME เดียวกันเข้า `build_analysis` ทั้งสี่จุด · ความครบของตารางมาจาก `schedule_complete_through` ของผู้เรียก · sub-status ถูกยกขึ้น `missing` ของ envelope |
+| ทรัพยากรใน SWARM | ✅ | `ShopCapacity.resources` จาก `load_shop_resources()` เส้นทาง `sme_ids` · ไม่มีบันทึก = `None` ไม่ใช่ `[]` · loader กรองตาม `project_id` ของออเดอร์ที่กำลังจัดทีม |
 | จำกัดอัตราคำขอ | ✅ | `provider_fetch_state` ล็อกข้าม worker + backoff · `auth_throttle` จำกัด login ข้าม replica |
 
 ---
@@ -128,37 +130,20 @@ python -m pytest -c backend/pytest.ini -q    # 454 ผ่าน + 3 skip (ยั
 
 ### 🟡 ทำได้แต่ยังไม่จำเป็นต่อการเดโม
 
-**3. ส่ง forecast และประวัติค่าใช้จ่ายเข้าการวิเคราะห์ผ่าน API** — เจ้าของ: **CLAUDE**
-
-- Core ของ CODEX พร้อมและทดสอบกับข้อมูลจริงแล้ว · ให้ส่งผลของ `forecast_cashflow()`
-  เข้าค่า `forecast` และผล `load_expense_history()` เข้าค่า `expense_history`
-- Caller เดิมที่เรียก `build_analysis(data)` ยังคงทำงานเหมือนเดิมและแจ้ง unknowns
-  เพราะยังไม่ได้รับข้อมูลเสริม · ห้ามสรุปว่า overview แสดง finding ใหม่แล้ว
-- ใช้ SME เดียวกันสำหรับทุก loader และยืนยันวันของยอดเงินสดกับความครบของตาราง
-  ก่อนส่ง forecast · อย่าถือว่าวันที่มีรายการสุดท้ายคือหลักฐานว่าตารางครบ
-
-**4. ส่งทรัพยากรจาก loader เข้า SWARM สำหรับ `sme_ids`** — เจ้าของ: **CLAUDE**
-
-- ฟิลด์คือ `ShopCapacity.resources` · ส่ง `resource_map.get(shop_id)` เพื่อคง
-  `None` เมื่อไม่มีข้อมูลการพึ่งพา · อย่าแทนด้วย `[]` โดยอัตโนมัติ
-- `POST /api/swarm` แบบส่ง `shops` inline ใช้ฟิลด์ใหม่ได้แล้วและตรวจผ่าน HTTP จริง ·
-  เส้นทางที่โหลดจาก `sme_ids` ยังต้องต่อ `load_shop_resources()` เพิ่ม
-- ใช้ dependency ของออเดอร์ที่กำลังจัดทีม · loader ปัจจุบันยังรวมการจัดสรรทุกโครงการ
-  ของร้าน จึงควรกำหนดขอบเขตโครงการก่อนใช้งานหลายออเดอร์
-
-**5. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
+**3. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
 
 - เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้สำเร็จ
 - อาการ: DNS และ TCP ต่อได้ แต่ **HTTPS TLS handshake หมดเวลารอ** ·
   ทดสอบแยกผ่าน HTTP ได้ 429 · ลดความซับซ้อนของคำค้นแล้วไม่ช่วย
 - รอบล่าสุดเรียกผ่าน route เมื่อ gate เปิดแล้ว ยังได้ `timeout` และบทความ 0 รายการ ·
   ทดสอบ TLS แยกยังหมดเวลารอประมาณ 5.28 วินาที · ยังไม่ได้ยืนยันข่าวจริงหรือการตัดซ้ำจากข่าวจริง
-- **พบงานของ CLAUDE เพิ่ม:** เมื่อ gate ปิดและแคชว่าง route ยังเรียก fetcher ซึ่ง
-  พยายามออกไปยัง provider · ยืนยันด้วย HTTP transport จำลองหนึ่งคำขอ โดยไม่ยิงข่าวจริงซ้ำ
-- **ขั้นถัดไป:** CLAUDE แก้เส้นทาง gate ปิดให้ตอบจากแคชโดยไม่เรียกเครือข่าย ·
-  ทีมลองจากโฮสต์ที่ deploy ซึ่ง egress ต่างกันและอาจผ่าน TLS · รายละเอียดใน `CODEX_HANDOFF.md`
+- บั๊กที่ CODEX พบ (gate ปิดแล้ว route ยังเรียก fetcher) **แก้แล้วใน `c07405b`** ·
+  `routers/insights.py` วิเคราะห์แคชตรง ๆ ด้วย `source_status="unavailable"`,
+  `source_error="provider_gate_closed"` และเทสต์นับจำนวนการเปิด connection
+- **ขั้นถัดไป:** ทีมลองจากโฮสต์ที่ deploy ซึ่ง egress ต่างกันและอาจผ่าน TLS ·
+  รายละเอียดใน `CODEX_HANDOFF.md`
 
-**6. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
+**4. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
 
 - คอลัมน์ `latitude`/`longitude` ใน `sme_profiles` พร้อมแล้วแต่ยังว่างทั้ง 3 ร้าน
 - ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี **โดยเจตนา**

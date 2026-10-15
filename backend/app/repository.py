@@ -104,6 +104,20 @@ async def save_swarm_proposal(
     return project.id
 
 
+async def load_project_id(session: AsyncSession | None, order_ref: str) -> uuid.UUID | None:
+    """The stored project for one buyer order, or None when the order is new.
+
+    Resource dependencies are recorded per allocation, so loading them needs the
+    project being allocated. A new order has none recorded, which stays unknown
+    rather than becoming "depends on nothing".
+    """
+    if session is None:
+        return None
+    return await session.scalar(
+        select(SwarmProject.id).where(SwarmProject.order_ref == order_ref)
+    )
+
+
 async def load_swarm_project(session: AsyncSession | None, order_ref: str) -> dict | None:
     if session is None:
         return None

@@ -11,11 +11,11 @@
 
 ## 📌 สถานะปัจจุบัน
 
-> 2026-10-15 · ต่อจาก commit `f54ec8f`
+> 2026-10-15 · ต่อจาก commit `c07405b`
 
 | ตัวชี้วัด | ค่า |
 | --- | --- |
-| Backend tests | **419 ผ่าน + 3 skip** (มี PostgreSQL) · skip = ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` 2 + เคสที่ยืนยันพฤติกรรมตอนไม่มี DB 1 · **334 ผ่าน + 88 skip** ถ้าไม่มี DB |
+| Backend tests | **472 ผ่าน + 3 skip** (มี PostgreSQL) · skip = ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` 2 + เคสที่ยืนยันพฤติกรรมตอนไม่มี DB 1 · **373 ผ่าน + 102 skip** ถ้าไม่มี DB |
 | API routes | **34** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` (+ 4 เส้นเฉพาะ `/api/v1/*` และ `/health`) |
 | ตารางฐานข้อมูล | **27** · `schema.sql`, `seed.sql`, `seed_obligations.sql` รันซ้ำได้ทั้งสามไฟล์ |
 | Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) · ทุกเส้นมี `source` และ `status` ตาม `missing` |
@@ -24,6 +24,116 @@
 | Deploy | config ครบและทดสอบด้วย container จริง · รอกดสร้าง service บนบัญชีทีม |
 
 **บันทึกเรียงจากใหม่ไปเก่า** — รอบล่าสุดอยู่ด้านบน
+
+---
+
+## รอบ 2026-10-15 (ดึก) — ต่อ forecast ประวัติค่าใช้จ่าย และทรัพยากรเข้าเอนจิน
+
+ตรรกะของ CODEX ใน `14c981b` พร้อมและทดสอบแล้ว แต่ยังไม่มีเส้นทาง API ไหนส่งข้อมูล
+ให้มัน · รอบนี้ต่อสี่จุดและเพิ่ม **17 เทสต์** (`tests/test_context_wiring.py`)
+รวมเป็น **472 ผ่าน + 3 skip** กับ PostgreSQL · **373 ผ่าน + 102 skip** เมื่อไม่มี DB
+
+### 1. ส่ง `forecast` และ `expense_history` เข้า `build_analysis` ทั้งสี่จุดที่เรียก
+
+`/overview`, `/health/indicators`, `/ai/explain` (`routers/frontend.py`) และ
+`POST /api/analyze` · ทั้งสี่จุดโหลดข้อมูลของ **SME เดียวกันกับงบที่ตอบ** —
+`Resolved` เก็บ `sme_id` ของแถวที่เลือกมาด้วย จึงไม่มีทางหยิบประวัติของร้านอื่น
+
+| การตัดสินใจ | เหตุผล |
+| --- | --- |
+| `as_of` ของ forecast คือ `period_end` ของงบ และเงินตั้งต้นคือ `cash_balance` ของงบนั้น | เป็นภาพเดียวที่มีวันกำกับ · `sme_profiles.cash_balance` ไม่มีวันที่ จึงเอามาต่อวันกับงบไม่ได้ |
+| ความครบของตารางมาจากผู้เรียก (`schedule_complete_through`) เท่านั้น | ตารางที่หยุดเฉย ๆ แยกจากตารางที่ครบไม่ได้ · เพิ่มเป็น query param ของสามเส้นทาง GET และเป็นฟิลด์ใน body ของ `/api/analyze` |
+| ไม่ส่ง forecast เลยเมื่องบไม่มี `cash_balance` | ไม่มียอดตั้งต้นที่มีวันกำกับ ก็ไม่มี forecast ที่อ้างอิงได้ |
+| GET อ่าน `cash_events` ที่เก็บไว้เท่านั้น ไม่เรียก `project_cash_events()` | คำขออ่านไม่ควรเขียนแถวใหม่ · `/api/forecast` ยังเป็นเส้นทางที่สร้าง projection |
+| `None` คือยังไม่ได้สอบถาม `[]` คือสอบถามแล้วไม่พบ | ไม่มี DB หรือไม่มี `sme_id` → `None` ทั้งคู่ · ไม่แปลงเป็น `[]` เพื่อความสะดวก |
+
+### 2. ยก sub-status ขึ้น envelope — status ต้องตาม missing เสมอ
+
+`build_analysis()["missing"]` เก็บเฉพาะฟิลด์ของงบ จึงเป็น `[]` แม้
+`data.expenseComparison.status` จะเป็น `insufficient_data` · ถ้าต่อสายตรง ๆ
+`/ai/explain` ของ Rung Charoen จะตอบ `status: ok` ขณะที่ข้างในบอกว่าข้อมูลไม่พอ
+ซึ่งขัดกฎของโปรเจกต์นี้ · `adapters.context_gaps()` / `with_context_gaps()` จึงยก
+สถานะข้างในขึ้นมาในชั้น adapter (envelope เป็นฝั่ง CLAUDE ไม่ใช่ของ CODEX)
+
+| token ใน `missing` | เกิดเมื่อ |
+| --- | --- |
+| `cash_forecast` | ไม่ได้ส่ง forecast เข้าไปเลย (ไม่มี DB / ไม่มี `sme_id`) |
+| `forecast_<ชื่อ>` | ทุกรายการใน `forecast["missing"]` ของ forecaster เอง เช่น `forecast_schedule_complete_through`, `forecast_cash_events` |
+| `expense_history` | ไม่ได้สอบถามประวัติค่าใช้จ่าย |
+| `expense_comparison_insufficient_data` / `expense_comparison_known_empty` | `data.expenseComparison.status` ไม่ใช่ `ok` |
+
+`with_context_gaps()` **ลดสถานะได้อย่างเดียว** · `build_analysis` ตอบ
+`insufficient_data` พร้อม `missing` ว่างได้เมื่อมีตัวชี้วัด undefined และการยก
+sub-status ต้องไม่ไปลบล้างข้อนั้น · ใช้ชื่อของ forecaster ตามเดิมแทนการเรียบเรียงใหม่
+
+### 3. ส่ง resource map เข้า `POST /api/swarm` เส้นทาง `sme_ids`
+
+`ShopCapacity.resources` รับค่าจาก `resource_map.get(shop_id)` · **ไม่ใช่**
+`.get(shop_id, [])` เพราะ `[]` คือ "ไม่ต้องพึ่งทรัพยากรอะไร" ซึ่งเป็นคำกล่าวอ้าง
+ที่เรายังไม่มีสิทธิ์พูด ขณะที่ `None` คือ "ไม่มีบันทึก" และเอนจินแยกสองค่านี้โดยเจตนา ·
+เส้นทางที่ส่ง `shops` inline ไม่ถูกแตะ: ร้านพามาเองเหมือนเดิม
+
+### 4. กรอง dependency ตามโครงการที่กำลังจัดทีม
+
+`load_shop_resources()` join `swarm_allocations` ของ SME และ SME หนึ่งรายมี
+allocation หนึ่งแถวต่อโครงการ · จึงคืน resource id เดิมซ้ำหนึ่งครั้งต่อโครงการ และ
+`ShopCapacity` ปฏิเสธ id ซ้ำต่อร้าน · เพิ่มพารามิเตอร์ `project_id` เป็น keyword-only
+**ไม่มีค่าเริ่มต้น** ให้ผู้เรียกต้องระบุออเดอร์ที่ถืออยู่ (`repository.load_project_id()`
+แปลง `order_ref` → UUID) · `project_id=None` คือไม่ได้ระบุโครงการ จึงไม่อ้างอะไรเลย
+
+ฐานข้อมูลเดโมมีโครงการเดียว ปัญหานี้จึงแฝงอยู่ ไม่ใช่ทำซ้ำได้จาก seed · เทสต์จึง
+seed allocation ที่สองของ Baan Suan ที่พึ่งทรัพยากรเดิม แล้วยืนยันว่าแถวซ้ำมีจริงใน
+ตาราง (นับได้ 2) ขณะที่ loader แบบระบุโครงการคืนมาแถวเดียว และลบของที่ seed ทิ้งใน
+`finally` · ตรวจย้ำนอกเทสต์ด้วยคิวรีแบบเดิมที่ไม่กรองโครงการ: คืน 3 แถวและ
+`ShopCapacity` โยน `Duplicate resource ids are not allowed for one shop` จริง
+
+### ตัวเลขที่ยืนยันกับเซิร์ฟเวอร์จริงและแถวในฐานข้อมูล
+
+ยิง HTTP จริงที่ `127.0.0.1:8011` แล้วอ่านแถวกลับมาเทียบ ไม่ใช่เชื่อเพราะเขียนโค้ดเอง
+
+- `/api/v1/ai/explain?sme_id=<Rung>` → `status: insufficient_data`,
+  `missing: ['forecast_schedule_complete_through', 'expense_comparison_insufficient_data']` ·
+  ก่อนรอบนี้เส้นทางเดียวกันตอบ `ok` ขณะที่การเทียบค่าใช้จ่ายข้างในบอกว่าข้อมูลไม่พอ
+- `/api/v1/overview?sme_id=<Rung>&schedule_complete_through=2026-12-29` → finding
+  `forecast_cash_shortfall` (2026-10-18), `forecast_minimum_cash` (29,700.00 THB),
+  `forecast_horizon_balances` และ `unusual_expense_086fadaa1bfd438fc67b8798`
+- ที่มาของตัวเลขจาก `cash_events` 4 แถว: 180,000 − 105,000 = 75,000 (10-18 ต่ำกว่า
+  เงินสำรอง 150,000) − 18,500 = 56,500 (10-22) − 26,800 = **29,700 (10-28)**
+  + 150,000 = **179,700 (11-30)** ตรงกับยอด 90 วันที่เสิร์ฟ
+- ค่าใช้จ่าย: วัตถุดิบตุลาคม **168,000** เทียบฐานกรกฎาคม–กันยายน
+  (96,000 + 102,000 + 99,500) ÷ 3 = **99,166.67** → **+69.41%** ·
+  หมวดสาธารณูปโภคไม่มีแถวตุลาคม จึงเป็นเหตุที่ `expenseComparison.status` ยัง
+  `insufficient_data` แม้มี finding แล้วหนึ่งรายการ
+- Baan Suan: ทั้งสามหมวดปกติ จึง**ไม่มี** indicator `health-expense_*` เลย ซึ่งเป็น
+  หลักฐานว่าไม่ได้หยิบประวัติของร้านอื่นมาเติม
+- `POST /api/swarm` ออเดอร์เดโมพร้อม `sme_ids` และ `persist=false` →
+  Baan Suan และ Rung Charoen `resource_status: checked` และ **ไม่ผ่าน** เพราะรถห้องเย็น
+  `a1000000-...-0002` เป็น required แต่สถานะยัง offered · Sahai ผ่านโดยรายงาน
+  เครื่องซีลเป็น preference ที่ยังไม่พร้อม
+- `POST /api/swarm` ออเดอร์ที่ไม่มีบันทึก → ทั้งสามร้าน `resource_status: unknown`
+  และ `resource_unknowns: ['resource_dependencies']` ไม่ใช่ `known_empty`
+- 16/16 contract ของ frontend ยังตอบ 200 จากข้อมูลที่เก็บไว้ ทุกเส้นมี `source` ·
+  build frontend ยัง `1955 modules`, `index-DEindwiw.css` / `index-DrkwTzbk.js`
+
+### เทสต์หนึ่งตัวถูกเขียนใหม่เพราะพฤติกรรมเปลี่ยนโดยเจตนา
+
+`test_analysis.py::test_complete_analysis_has_auditable_metrics_grade_and_evidence`
+เคยยืนยัน `status == "ok"` ของ `POST /api/analyze` · คำขอที่ไม่ระบุ SME ไม่มีประวัติ
+ค่าใช้จ่ายและไม่มี cash event ให้อ่าน จึงยืนยันค่าใช้จ่ายผิดปกติหรือวันขาดเงินสดไม่ได้
+และตอนนี้ envelope บอกตรง ๆ ด้วย `missing == ["cash_forecast", "expense_history"]` ·
+เขียนใหม่ให้ยืนยันทั้ง token และสถานะ **ไม่ได้ลดความเข้มของ assertion**
+
+### สิ่งที่รอบนี้ไม่ได้อ้าง
+
+- การตรวจทรัพยากรคือความพร้อมตามสถานะ **ไม่ใช่การจอง** และไม่แบ่งกำลังของทรัพยากร
+  ที่ใช้ร่วมกัน เพราะยังไม่มีข้อมูลจำนวนและช่วงเวลาการใช้งาน
+- `/api/analyze/excel` ไม่รับ `sme_id` · workbook ที่อัปโหลดมาไม่ได้ระบุว่าเป็นของร้านใด
+  จึงประกาศว่าไม่ได้สอบถามข้อมูลเสริมทั้งสองอย่าง
+- ยังไม่มีการแคชผลวิเคราะห์ (`ai_analyses` ยังไม่มีโค้ดใดอ่านหรือเขียน) · คำเตือนของ
+  CODEX เรื่องห้ามใช้ `inputHash` ของงบเพียงอย่างเดียวเป็น cache key จึงยังไม่มีผล
+  **แต่ต้องถือตามนั้นเมื่อเริ่มแคช** เพราะผลวิเคราะห์ตอนนี้ขึ้นกับ forecast และ
+  ประวัติค่าใช้จ่ายที่มีช่วงเวลาของตัวเอง
+- เว็บยังเป็น mock จนกว่า backend จะขึ้น host · ไม่ได้อ้างว่า finding ใหม่แสดงบนหน้าเว็บจริงแล้ว
 
 ---
 

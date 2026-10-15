@@ -24,6 +24,7 @@ client = TestClient(app)
 
 BAAN_SUAN = uuid.UUID("11111111-1111-4111-8111-111111111111")
 RUNG_CHAROEN = uuid.UUID("22222222-2222-4222-8222-222222222222")
+DEMO_PROJECT = uuid.UUID("bbbbbbbb-0000-4000-8000-000000000001")
 AS_OF = date(2026, 9, 30)
 
 
@@ -342,11 +343,18 @@ def test_expired_throttle_rows_are_purgeable():
 
 # --- shop resource dependencies ---------------------------------------------
 
-def test_no_session_means_no_resource_claims():
+def test_no_session_or_no_project_means_no_resource_claims():
+    """Rewritten: the loader now has to be told which project it is reading for.
+
+    A dependency hangs off an allocation and an SME holds one per project, so an
+    unscoped read returned the same resource once per project. With no project
+    named there is nothing to claim, exactly as with no session.
+    """
     from app.obligations import load_shop_resources
 
-    assert asyncio.run(load_shop_resources(None, [BAAN_SUAN])) == {}
-    assert asyncio.run(load_shop_resources(None, [])) == {}
+    assert asyncio.run(load_shop_resources(None, [BAAN_SUAN], project_id=DEMO_PROJECT)) == {}
+    assert asyncio.run(load_shop_resources(None, [], project_id=DEMO_PROJECT)) == {}
+    assert asyncio.run(load_shop_resources(None, [BAAN_SUAN], project_id=None)) == {}
 
 
 @needs_db
@@ -354,7 +362,7 @@ def test_shop_resources_separate_required_from_preference():
     """A required resource is a constraint; a preference is not."""
     from app.obligations import load_shop_resources
 
-    grouped = run(lambda session: load_shop_resources(session, [BAAN_SUAN, RUNG_CHAROEN]))
+    grouped = run(lambda session: load_shop_resources(session, [BAAN_SUAN, RUNG_CHAROEN], project_id=DEMO_PROJECT))
     assert str(BAAN_SUAN) in grouped
     for rows in grouped.values():
         for row in rows:
@@ -372,7 +380,7 @@ def test_a_shop_with_no_recorded_dependency_is_omitted():
     from app.obligations import load_shop_resources
 
     unknown = uuid.UUID("99999999-9999-4999-8999-999999999999")
-    grouped = run(lambda session: load_shop_resources(session, [unknown]))
+    grouped = run(lambda session: load_shop_resources(session, [unknown], project_id=DEMO_PROJECT))
     assert str(unknown) not in grouped
 
 

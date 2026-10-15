@@ -11,7 +11,14 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from ..db import DB_ENABLED, session_scope
-from ..repository import load_shop_capacities, load_swarm_project, parse_uuid, save_swarm_proposal
+from ..obligations import load_shop_resources
+from ..repository import (
+    load_project_id,
+    load_shop_capacities,
+    load_swarm_project,
+    parse_uuid,
+    save_swarm_proposal,
+)
 from ..schemas import StrictModel
 from ..swarm import BuyerCollection, Coordinates, ShopCapacity, SwarmRequest, allocate
 
@@ -51,9 +58,19 @@ async def build_swarm(body: SwarmBody) -> dict:
             raise HTTPException(status_code=503, detail="sme_ids require DATABASE_URL; send shops inline instead")
         async with session_scope() as session:
             rows = await load_shop_capacities(session, ids)
+            # Dependencies belong to an allocation, so they are read for the
+            # project this order_ref already has. A new order has none recorded.
+            project_id = await load_project_id(session, body.order_ref)
+            resources = await load_shop_resources(session, ids, project_id=project_id)
         if not rows:
             raise HTTPException(status_code=404, detail="No matching sme_profiles")
-        shops = [ShopCapacity.model_validate(row) for row in rows]
+        # A shop absent from the map gets None, not []: the engine treats
+        # "nothing recorded" and "depends on nothing" as different answers, and
+        # only the second one is a claim we are entitled to make.
+        shops = [
+            ShopCapacity.model_validate({**row, "resources": resources.get(row["shop_id"])})
+            for row in rows
+        ]
 
     # The engine owns the cross-field rules (duplicate shop ids, capacity used
     # above total, a collection schedule that does not sum to one). Those fire

@@ -176,8 +176,10 @@ async def upsert_projected_events(session: AsyncSession | None, events: list[dic
     return stored
 
 
-async def load_shop_resources(session: AsyncSession | None, sme_ids: list[uuid.UUID]) -> dict:
-    """Resources each shop depends on, keyed by shop id as a string.
+async def load_shop_resources(
+    session: AsyncSession | None, sme_ids: list[uuid.UUID], *, project_id: uuid.UUID | None
+) -> dict:
+    """Resources each shop depends on for one project, keyed by shop id as a string.
 
     Returns `{}` when nothing was queried, and omits a shop with no recorded
     dependency, so the allocator can tell "needs nothing recorded" apart from
@@ -185,8 +187,15 @@ async def load_shop_resources(session: AsyncSession | None, sme_ids: list[uuid.U
 
     `available` reflects the resource status: a resource still only offered is
     not yet secured, which is what makes a required one a real constraint.
+
+    **One project at a time.** A dependency hangs off an allocation, and an SME
+    allocated to several projects holds one allocation in each, so without this
+    filter the same resource id comes back once per project - which ShopCapacity
+    rejects - and dependencies of another order leak into this one. `project_id`
+    is keyword-only and has no default so a caller has to say which order it is
+    allocating; `None` means no project was named, and then nothing is claimed.
     """
-    if session is None or not sme_ids:
+    if session is None or not sme_ids or project_id is None:
         return {}
 
     rows = (
@@ -198,11 +207,11 @@ async def load_shop_resources(session: AsyncSession | None, sme_ids: list[uuid.U
                 FROM allocation_resources ar
                 JOIN swarm_allocations a ON a.id = ar.allocation_id
                 JOIN shared_resources r ON r.id = ar.resource_id
-                WHERE a.sme_id = ANY(:ids)
+                WHERE a.sme_id = ANY(:ids) AND a.project_id = :project_id
                 ORDER BY a.sme_id, ar.required DESC, r.title
                 """
             ),
-            {"ids": [str(value) for value in sme_ids]},
+            {"ids": [str(value) for value in sme_ids], "project_id": project_id},
         )
     ).all()
 

@@ -42,7 +42,14 @@ def test_complete_analysis_has_auditable_metrics_grade_and_evidence():
     response = analyze()
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "ok"
+    # Behaviour changed: the envelope now declares the two analysis context
+    # inputs it never queried. A request naming no stored SME has no expense
+    # history and no cash events to read, so it cannot confirm an unusual
+    # expense or a dated shortfall, and status follows missing as everywhere
+    # else. The statement's own fields are all present, which is why nothing
+    # else appears in the list.
+    assert body["missing"] == ["cash_forecast", "expense_history"]
+    assert body["status"] == "insufficient_data"
     assert body["kind"] == "simulated"
     assert body["data"]["grading"]["score"] == "75.00"
     assert body["data"]["grading"]["grade"] == "B"
