@@ -71,7 +71,7 @@
 | Module | สถานะ | หมายเหตุ |
 | --- | --- | --- |
 | 8 · Database schema | ✅ | 20 ตาราง · Users, SME Profiles, Investors, Projects, Analysis Results ครบ · `schema.sql` รันซ้ำได้ |
-| 8 · RBAC | ⚠️ ครึ่งทาง | role model + จุดตัดสินใจทำแล้ว ปิดเป็นค่าเริ่มต้น · **ยังไม่ใช่ authentication จริง** |
+| 8 · RBAC + Authentication | ✅ | token เซ็นด้วย HMAC-SHA256 + `POST /api/auth/login` เทียบรหัสผ่านที่ hash ด้วย scrypt · `X-User-Email` ไม่ถือเป็นตัวตนอีกแล้ว · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้นเพื่อไม่ให้ frontend ที่ใช้งานอยู่พัง |
 | 8 · FastAPI + RESTful endpoints | ✅ | 29 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
 | Frontend Integration | ⚠️ ครึ่งทาง | 16/16 contract ตอบ 200 + `src/services/api.ts` · **แต่เว็บยังเป็น mock เพราะ backend ยังไม่ได้ deploy** |
@@ -84,7 +84,7 @@
 | --- | --- | --- |
 | **Deploy backend ขึ้น host** | ทีม | **เตรียมครบและทดสอบจริงแล้ว** — `Dockerfile`, `railway.json`, bootstrap schema/seed ตอน startup, รองรับ `DATABASE_URL` ของ Railway · build image แล้วรัน container เทียบ Postgres จริงผ่าน · เหลือแค่สร้าง service บนบัญชี Railway ตาม `DEPLOY.md` |
 | **ปลด frontend จากโหมด mock** | ทีม | ติด deploy · ขั้นตอนอยู่ใน `DEPLOY.md` ข้อ 5 (ตั้ง 2 ตัวแปรบน Vercel แล้ว redeploy) |
-| **Authentication จริง** | CLAUDE | ตอนนี้ใช้ header `X-User-Email` ซึ่งใครก็ตั้งได้ · ต้องมี token ที่เซ็น/ตรวจได้ |
+
 | ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ | CODEX / ทีมดูแลโฮสต์ | ยังไม่สำเร็จ: DNS และ TCP เชื่อมต่อได้ แต่ HTTPS TLS handshake หมดเวลารอ · การวินิจฉัยแยกผ่าน HTTP ตอบ 429 · ลดความซับซ้อนของคำค้นแล้วไม่แก้ TLS · ต้องตรวจ TLS จากโฮสต์ที่จะ deploy และประสานจำกัดอัตราคำขอผู้ให้บริการ · ดู `LIVE_PROVIDER_VERIFICATION.md` |
 | พิกัดร้านค้าจริง | ทีม | คอลัมน์ `latitude`/`longitude` พร้อมแล้วแต่ยังไม่มีข้อมูล · ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
 | `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker · `railway.json` ตั้ง `numReplicas: 1` ไว้ด้วยเหตุนี้ ต้องทำก่อนเพิ่ม replica |

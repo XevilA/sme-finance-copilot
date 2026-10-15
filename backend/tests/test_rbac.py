@@ -70,15 +70,26 @@ def test_funder_access_is_permissive_only_while_unenforced():
     assert "sme_owner" not in FUNDER_ROLES
 
 
-def run_enforced(script: str) -> dict:
-    """Runs a snippet against the app with RBAC_ENFORCED=true."""
+def run_enforced(script: str, dev_header: str = "true") -> dict:
+    """Runs a snippet against the app with RBAC_ENFORCED=true.
+
+    `dev_header` decides whether the unauthenticated X-User-Email hatch is open,
+    so the same script can prove both that roles resolve and that the hatch is
+    shut by default.
+    """
     completed = subprocess.run(
         [sys.executable, "-c", script],
         cwd=BACKEND,
         capture_output=True,
         text=True,
-        env={"RBAC_ENFORCED": "true", "PATH": "", "SYSTEMROOT": "C:\\Windows"},
-        timeout=120,
+        env={
+            "RBAC_ENFORCED": "true",
+            "AUTH_DEV_HEADER": dev_header,
+            "AUTH_SECRET": "r" * 40,
+            "PATH": "",
+            "SYSTEMROOT": "C:\\Windows",
+        },
+        timeout=180,
     )
     assert completed.returncode == 0, completed.stderr[-2000:]
     return json.loads(completed.stdout.strip().splitlines()[-1])
@@ -118,8 +129,14 @@ print(json.dumps(out))
 
 
 @pytest.mark.skipif(not DB_ENABLED, reason="enforced RBAC resolves roles from the database")
-def test_enforced_rbac_rejects_and_resolves_correctly():
-    result = run_enforced(ENFORCED_SCRIPT)
+def test_enforced_rbac_resolves_roles_from_the_database():
+    """Role resolution and scoping, exercised through the development header.
+
+    Identity itself is a signed token now - see test_security.py. This runs with
+    AUTH_DEV_HEADER=true so the role mapping can be checked without minting a
+    token per user, and the next test proves that hatch is shut by default.
+    """
+    result = run_enforced(ENFORCED_SCRIPT, dev_header="true")
     assert result["enforced"] is True
     # No identity at all -> 401, not a silent pass.
     assert result["no_header"] == 401
@@ -133,3 +150,19 @@ def test_enforced_rbac_rejects_and_resolves_correctly():
     # An SME owner resolves but is not a funder, so detail is withheld.
     assert result["sme_owner"] == 200
     assert result["owner_access"] is False
+
+
+@pytest.mark.skipif(not DB_ENABLED, reason="enforced RBAC resolves roles from the database")
+def test_an_unauthenticated_header_is_no_longer_an_identity():
+    """Behaviour changed deliberately: X-User-Email carried no proof.
+
+    It used to be accepted as identity while enforcement was on, which meant
+    anyone could claim any role by setting a header. With AUTH_DEV_HEADER off -
+    the default - every header-only request is refused and a signed token is
+    required instead.
+    """
+    result = run_enforced(ENFORCED_SCRIPT, dev_header="false")
+    assert result["enforced"] is True
+    assert result["no_header"] == 401
+    for key in ("unknown_user", "investor", "sme_owner"):
+        assert result[key] == 401, f"{key} was accepted on a header alone"

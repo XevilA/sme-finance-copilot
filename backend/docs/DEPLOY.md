@@ -175,3 +175,84 @@ credential ที่ตรวจได้** · `CORS_ORIGINS` ไม่ใช่
 **ยังไม่มีการจำกัดอัตราคำขอข้าม instance** `railway.json` ตั้ง `numReplicas: 1`
 ไว้ด้วยเหตุนี้ · ถ้าจะเพิ่ม replica ต้องทำตาราง `industry_news_fetch_state` ก่อน
 ไม่งั้นหลาย instance จะยิง GDELT พร้อมกันแล้วโดน 429
+
+---
+
+## เปิด Authentication
+
+ค่าเริ่มต้นคือ **ปิด** เพื่อให้ frontend ที่ใช้งานอยู่ไม่พัง · ลำดับการเปิด:
+
+### 1. สร้าง secret สำหรับเซ็น token
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+ใส่เป็น `AUTH_SECRET` บน Railway · **ต้องยาวอย่างน้อย 32 ตัวอักษร**
+ถ้าไม่ตั้ง ระบบจะออกและรับ token ไม่ได้เลย (ไม่มีค่า default เพราะ secret ที่เดาได้
+เท่ากับไม่มีลายเซ็น)
+
+### 2. ตั้งรหัสผ่านให้ผู้ใช้
+
+รหัสผ่าน**ไม่ได้ถูก seed** จึงไม่มี credential ใดอยู่ใน repo · ตั้งด้วยสคริปต์:
+
+```bash
+python backend/scripts/set_password.py owner@baansuan.test
+python backend/scripts/set_password.py fund@example.test --generate
+```
+
+`--generate` สร้างรหัสที่แข็งแรงและพิมพ์ให้ครั้งเดียว · รหัสผ่านไม่รับผ่าน
+argument เพราะจะติดอยู่ใน shell history และ process list
+
+ผู้ใช้ที่ `password_hash` ว่าง **ล็อกอินไม่ได้เลย** ไม่ใช่ล็อกอินได้ด้วยรหัสว่าง
+
+### 3. ขอ token
+
+```bash
+curl -X POST https://<service>/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"fund@example.test","password":"<รหัสผ่าน>"}'
+```
+
+ได้ `accessToken` มาแล้วส่งเป็น `Authorization: Bearer <token>`
+
+```bash
+curl https://<service>/api/auth/me -H "Authorization: Bearer <token>"
+```
+
+### 4. เปิด enforcement
+
+ตั้ง `RBAC_ENFORCED=true` บน Railway
+
+⚠️ **หลังเปิดแล้ว endpoint ที่ตรวจสิทธิ์จะต้องมี token** · ถ้า frontend ยังไม่ส่ง
+`Authorization` header จะได้ 401 · **ต่อฝั่ง frontend ให้เสร็จก่อนเปิด**
+
+### ตรวจว่าตั้งค่าถูก
+
+```bash
+curl https://<service>/health
+```
+
+ดูที่ `auth`:
+
+```json
+{"enforced": true, "secretConfigured": true, "devHeaderAccepted": false}
+```
+
+- `secretConfigured: false` ขณะ `enforced: true` → ยังไม่ตั้ง `AUTH_SECRET`
+  ระบบจะตอบ 503 ไม่ใช่ปล่อยผ่าน
+- **`devHeaderAccepted: true` บนเครื่องที่เข้าถึงได้จากภายนอก = ช่องโหว่**
+  แปลว่า `AUTH_DEV_HEADER=true` ซึ่งยอมรับ header `X-User-Email` เป็นตัวตน
+  โดยไม่มีการยืนยัน ใครก็อ้างเป็น role ไหนก็ได้ · ใช้เฉพาะในเครื่องตัวเองกับ DB ทิ้งขว้าง
+
+### สิ่งที่ auth นี้ทำและไม่ทำ
+
+**ทำ:** token เซ็นด้วย HMAC-SHA256 ตรวจด้วย `compare_digest` · มีวันหมดอายุบังคับ ·
+รหัสผ่าน hash ด้วย scrypt (memory-hard) ต่างเกลือทุกครั้ง · ทุกการ login ที่ล้มเหลว
+ตอบข้อความเดียวกันหมด (ไม่บอกว่าอีเมลมีอยู่ไหม) · **role มาจากฐานข้อมูลตอนตรวจ
+ไม่ใช่จาก token** จึงปิดบัญชีหรือเปลี่ยน role แล้วมีผลทันที และ token ที่อ้างว่าเป็น
+`admin` ก็ยกระดับตัวเองไม่ได้
+
+**ยังไม่ทำ:** ไม่มี refresh token · ไม่มี blacklist เพิกถอน token ก่อนหมดอายุ
+(จึง clamp อายุไว้ไม่เกิน 7 วัน) · ไม่มี rate limit ที่หน้า login
+(ควรเพิ่มก่อนเปิด public) · ไม่มีการจำกัดจำนวนครั้งที่ลองผิด
