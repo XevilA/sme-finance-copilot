@@ -1,48 +1,54 @@
-# CODEX implementation handoff
+# การส่งมอบงานของ CODEX
 
-## Block 1: finite-order SWARM cash exposure
+> แปลจากต้นฉบับภาษาอังกฤษของ CODEX · signature ของฟังก์ชัน ชื่อฟิลด์ ชื่อ key ตัวเลข
+> และ code block ทั้งหมดคงเดิม · หัวข้อที่ CLAUDE ดำเนินการแล้วหรือยังค้าง มีหมายเหตุกำกับ
 
-The business assumption changed from continuous production through credit days
-to a finite order. Production costs occur only on days 1..duration_days. The
-initial deposit is received on day 0; the remaining invoice is collected on
-delivery day plus payment terms, unless explicit collection fractions are supplied.
-Costs precede buyer collections on the same day. Working capital is the peak
-cumulative deficit excluding the initial deposit; funding gap includes the
-deposit once and subtracts usable cash above the reserve.
+## ส่วนที่ 1: cash exposure ของ SWARM แบบออเดอร์จบชิ้น
 
-The 40 units/day, 10-day, THB 70/unit, 30-day-credit example now needs THB 28,000,
-not THB 112,000. The two existing formula-specific tests were updated because
-the business assumption changed. All 241 tests passed with Postgres at this block.
-The `allocate()` envelope, shop rows, and audit keys are unchanged; engine and
-proposal version values are now `v2`.
+สมมติฐานทางธุรกิจเปลี่ยนจาก "ผลิตต่อเนื่องตลอดช่วงเครดิต" เป็น **"ออเดอร์จบชิ้น"** ·
+ต้นทุนการผลิตเกิดเฉพาะวันที่ 1 ถึง `duration_days` · รับมัดจำวันที่ 0 ·
+ยอดคงเหลือตามใบแจ้งหนี้เก็บได้ในวันส่งมอบบวกเครดิตเทอม เว้นแต่มีการระบุสัดส่วน
+การรับชำระมาอย่างชัดเจน · **ต้นทุนเกิดก่อนการรับชำระของผู้ซื้อในวันเดียวกัน**
 
-### CLAUDE actions
+เงินทุนหมุนเวียน = **peak cumulative deficit โดยไม่นับมัดจำตั้งต้น** ·
+ส่วนขาดเงินทุน = นับมัดจำหนึ่งครั้ง แล้วหักเงินสดที่ใช้ได้ส่วนที่เกินเงินสำรองออก
 
-- Recalculate and update `db/seed.sql` allocation amounts, then reseed using the
-  team's approved process. Existing stored allocations still contain old values.
-  No database reset or seed-file modification was performed by CODEX.
-- Forward optional `SwarmRequest` inputs through `SwarmBody` and simulator inputs:
-  `production_start` (ISO date), `collection_schedule` (day_index/fraction pairs
-  summing to 1 of the invoice balance after deposit), `required_business_types`,
-  `buyer_coordinates` (latitude/longitude), and `max_distance_km`.
-- Forward `ShopCapacity.business_type` and `.coordinates`. Existing `sector` can
-  supply business_type. Add nullable numeric latitude/longitude columns to
-  `sme_profiles`; validate latitude -90..90 and longitude -180..180. No DB schema
-  changes were made by CODEX. No coordinates are invented from province text.
-- Catch `ValidationError` when constructing `SwarmRequest` inside the route and
-  return HTTP 422, or duplicate its shop-id uniqueness validator on `SwarmBody`.
-  Core duplicate-id validation currently occurs after `SwarmBody` validation.
-- `shop_eligibility(shop, request)` returns eligible, distance_km, and reasons.
-  Distance is Haversine straight-line km, not driving distance. A required radius
-  excludes shops without coordinates. Business type is an exact case-insensitive
-  match. Eligible candidates rank by cost, distance, available capacity, then id.
-- `app/order_cash.py::finite_order_schedule()` exposes dated movements if a
-  production_start is supplied; otherwise day_index is relative and date is null.
+ตัวอย่าง 40 ชิ้น/วัน 10 วัน 70 บาท/ชิ้น เครดิต 30 วัน ตอนนี้ต้องใช้ **28,000 บาท
+ไม่ใช่ 112,000 บาท** · เทสต์สองตัวที่ผูกกับสูตรเดิมถูกแก้เพราะ**สมมติฐานทางธุรกิจเปลี่ยน** ·
+ทุกเทสต์ 241 รายการผ่านกับ Postgres ณ ส่วนนี้ · envelope ของ `allocate()` แถวข้อมูลร้าน
+และ key ของ audit ไม่เปลี่ยน · ค่า version ของ engine และข้อเสนอเป็น `v2` แล้ว
 
-Frontend files, adapters, catalog, repository, models, routers, RBAC, and SQL files
-were not edited.
+### สิ่งที่ CLAUDE ต้องทำ
 
-## Block 2: funding and investor ranking
+- คำนวณและอัปเดตยอด allocation ใน `db/seed.sql` แล้ว reseed ตามกระบวนการที่ทีมอนุมัติ ·
+  ข้อมูลที่เก็บอยู่ยังมีค่าเดิม · **CODEX ไม่ได้รีเซ็ตฐานข้อมูลหรือแก้ไฟล์ seed**
+- ส่งต่อ input ที่เป็น optional ของ `SwarmRequest` ผ่าน `SwarmBody` และ input ของ simulator:
+  `production_start` (วันที่แบบ ISO), `collection_schedule` (คู่ day_index/fraction
+  ที่รวมกันได้ 1 ของยอดใบแจ้งหนี้หลังหักมัดจำ), `required_business_types`,
+  `buyer_coordinates` (latitude/longitude) และ `max_distance_km`
+- ส่งต่อ `ShopCapacity.business_type` และ `.coordinates` · `sector` ที่มีอยู่ใช้เป็น
+  business_type ได้ · เพิ่มคอลัมน์ latitude/longitude แบบ nullable ใน `sme_profiles`
+  และตรวจช่วง latitude -90..90 กับ longitude -180..180 · **CODEX ไม่ได้แก้ schema
+  และไม่สร้างพิกัดขึ้นเองจากชื่อจังหวัด**
+- ดัก `ValidationError` ตอนสร้าง `SwarmRequest` ใน route แล้วคืน HTTP 422 หรือทำ
+  validator เรื่อง shop id ซ้ำบน `SwarmBody` ด้วย · **การตรวจ id ซ้ำของ core
+  เกิดหลัง `SwarmBody` ตรวจผ่านไปแล้ว**
+- `shop_eligibility(shop, request)` คืน eligible, distance_km และ reasons ·
+  ระยะทางเป็น Haversine แบบเส้นตรง **ไม่ใช่ระยะทางขับรถ** · ถ้าบังคับรัศมี
+  ร้านที่ไม่มีพิกัดจะถูกตัดออก · ประเภทธุรกิจเทียบแบบตรงตัวโดยไม่สนตัวพิมพ์ ·
+  ผู้สมัครที่ผ่านเกณฑ์เรียงตามต้นทุน ระยะทาง กำลังผลิตที่ว่าง แล้วจึง id
+- `app/order_cash.py::finite_order_schedule()` เปิดความเคลื่อนไหวแบบระบุวันที่ให้
+  ถ้าส่ง production_start มา · ถ้าไม่ส่ง day_index จะเป็นค่าสัมพัทธ์และ date เป็น null
+
+ไฟล์ frontend, adapters, catalog, repository, models, routers, RBAC และไฟล์ SQL
+ไม่ถูกแก้
+
+> **หมายเหตุ (อัปเดต 2026-10-15):** CLAUDE ทำครบทุกข้อแล้ว — reseed จาก
+> `SWARM_RESEED_VALUES.json`, ส่งต่อ input ใหม่ทั้งหมด, เพิ่ม latitude/longitude/business_type
+> ใน `sme_profiles` และแปลง `ValidationError` เป็น 422 · ส่วนขาดรวมของออเดอร์เดโม
+> ลดจาก 465,000 เป็น 45,000
+
+## ส่วนที่ 2: การจัดอันดับสินเชื่อและนักลงทุน
 
 ```python
 from app.matching import match_funding, match_investors
@@ -55,12 +61,12 @@ def match_investors(data: FinancialInput, grade: dict, requested_amount: Decimal
                     investment_horizon_months: int | None = None) -> list[dict]: ...
 ```
 
-`products` accepts the exact camelCase rows from `load_funding_products()`.
-Investor rows support database snake_case and camelCase. Both functions are pure,
-validate candidates, reject duplicate IDs, and sort deterministically by status,
-descending score, then ID. Positive requested amounts are required.
+`products` รับแถวแบบ camelCase จาก `load_funding_products()` ได้ตรง ๆ ·
+แถวนักลงทุนรองรับทั้ง snake_case ของฐานข้อมูลและ camelCase · ทั้งสองฟังก์ชันเป็น pure
+ตรวจผู้สมัคร ปฏิเสธ ID ซ้ำ และเรียงผลแบบคงที่ตามสถานะ คะแนนจากมากไปน้อย แล้วจึง ID ·
+**ต้องส่งวงเงินที่เป็นบวก**
 
-Funding result shape (all money and ratios are decimal strings):
+รูปผลลัพธ์ของสินเชื่อ (เงินและอัตราส่วนทุกตัวเป็นสตริงทศนิยม):
 
 ```json
 {
@@ -79,31 +85,39 @@ Funding result shape (all money and ratios are decimal strings):
 }
 ```
 
-The dictionary also documents the complete assumptions at runtime. The post-loan
-DSCR stress test uses monthly PMT multiplied by calendar-month equivalents of
-the same input reporting period, capped at loan tenor. A whole calendar year
-has 12 installments, a whole month has one, and partial months are proportional.
-This is a stress model, not an inferred first-payment date or lender schedule.
-New coverage must meet the higher of product min_dscr and demo floor 1.0.
-Scores weight coverage 45%, grade 25%, financing cost 20%, disbursement speed 10%.
+dict ที่คืนมามีสมมติฐานครบถ้วนระบุไว้ตอน runtime ·
+การทดสอบความทนทาน DSCR หลังรับสินเชื่อ ใช้ค่างวดรายเดือนคูณจำนวนเดือนตามปฏิทิน
+ที่เทียบเท่างวดบัญชีเดียวกัน โดยจำกัดไม่เกินอายุสัญญา · หนึ่งปีปฏิทินเต็มคือ 12 งวด
+หนึ่งเดือนเต็มคือ 1 งวด และเดือนไม่เต็มคิดตามสัดส่วน ·
+**นี่คือแบบจำลองความทนทาน ไม่ใช่การอนุมานวันชำระงวดแรกหรือตารางชำระของผู้ให้กู้**
 
-Grant products have zero repayment and add no debt service. In particular,
-CLAUDE should use the matcher's zero grant payment instead of treating a 0%-rate
-grant as an amortizing loan. Existing adapters were not changed. Existing hard
-amount eligibility is preserved, with the additional post-funding coverage test.
+ความสามารถชำระหนี้ใหม่ต้องผ่านค่าที่สูงกว่าระหว่าง `min_dscr` ของผลิตภัณฑ์
+กับพื้นเดโมที่ 1.0 · คะแนนถ่วงน้ำหนัก: ความสามารถชำระหนี้ 45% เกรด 25%
+ต้นทุนทางการเงิน 20% ความเร็วในการได้รับเงิน 10%
 
-Investor results use `investor_id` instead of `product_id`, with match_score,
-match_reason, status, missing, notice, policy_version, and assumptions. They have
-no monthly_payment or proposed debt-service fields. Ticket, target sector,
-minimum grade, optional existing DSCR, and declared demo risk appetite are
-screened separately from debt. Missing sector, grade, or horizon produces
-requires_info; valuation, dilution, and investment approval are not inferred.
+ผลิตภัณฑ์ประเภทเงินให้เปล่าไม่มีการชำระคืนและไม่เพิ่มภาระหนี้ ·
+**CLAUDE ควรใช้ค่างวดศูนย์จาก matcher แทนการคิดเงินให้เปล่าอัตรา 0%
+เป็นสินเชื่อแบบผ่อนคืน** · adapter เดิมไม่ถูกแก้ · เกณฑ์วงเงินแบบ hard ที่มีอยู่ยังคงอยู่
+และเพิ่มการทดสอบความสามารถชำระหนี้หลังรับทุนเข้ามา
 
-CLAUDE can wire POST /api/match-funding, map snake_case results into the existing
-frontend matchScore/matchReason fields, use the returned status, and persist
-to funding_matches/investor_matches. No ranking route or DB access was added.
+ผลลัพธ์ของนักลงทุนใช้ `investor_id` แทน `product_id` พร้อม match_score, match_reason,
+status, missing, notice, policy_version และ assumptions · **ไม่มี** ฟิลด์ monthly_payment
+หรือภาระหนี้ที่เสนอ · ขนาดการลงทุน sector เป้าหมาย เกรดขั้นต่ำ DSCR ที่มีอยู่ (ถ้ามี)
+และระดับความเสี่ยงที่ยอมรับตามนโยบายเดโม ถูกคัดกรองแยกจากฝั่งหนี้ ·
+ถ้าขาด sector เกรด หรือ horizon จะได้สถานะ requires_info ·
+**ไม่มีการอนุมานมูลค่ากิจการ สัดส่วนที่ถูกลดทอน หรือการอนุมัติการลงทุน**
 
-## Block 3: dated 30/60/90-day forecasts
+CLAUDE ต่อ `POST /api/match-funding` ได้ โดย map ผล snake_case เข้าฟิลด์
+matchScore/matchReason ที่ frontend มีอยู่ ใช้ status ที่คืนมา และบันทึกลง
+`funding_matches`/`investor_matches` · **CODEX ไม่ได้เพิ่ม route หรือการเข้าถึงฐานข้อมูล**
+
+> **หมายเหตุ (อัปเดต 2026-10-15):** CLAUDE ต่อแล้ว · `POST /api/match-funding` คืนหนี้
+> และทุนแยกกันพร้อมบันทึกผล และ `/api/v1/funding/options` ใช้คะแนนจาก matcher แล้ว ·
+> พบว่าตอนแรกผม map `period_installments` ไปเป็น `totalRepayment` ซึ่งผิดความหมาย
+> (เป็นจำนวนงวดใน**งวดบัญชี** สำหรับ stress test ไม่ใช่อายุสัญญา) แก้เป็น `term_months` แล้ว ·
+> ส่วน `Investor` model ใช้ key `id` ไม่ใช่ `investor_id` ซึ่งเป็น key ของผลลัพธ์
+
+## ส่วนที่ 3: การพยากรณ์ 30/60/90 วันแบบระบุวันที่
 
 ```python
 from app.forecasting import forecast_cashflow, project_cash_events
@@ -120,51 +134,57 @@ def project_cash_events(*, as_of: date, sme_id: str, project_id: str | None = No
                         installments: list[dict] | None = None) -> dict: ...
 ```
 
-Forecast input accepts exact camelCase `load_cash_events()` rows or snake_case
-cash_events dictionaries. Always call the catalog with a specific SME ID;
-catalog dictionaries omit tenant IDs, so scope cannot be verified after mapping.
-The opening cash snapshot includes movements through as_of; past/as-of rows
-are not applied again. Calculations use end-of-day net cash, not inferred
-intraday order. No synthetic daily movements are inserted between event dates.
+input ของการพยากรณ์รับแถว camelCase จาก `load_cash_events()` หรือ dict แบบ snake_case
+ของ cash_events ได้ · **ต้องเรียก catalog ด้วย SME ID ที่ระบุเสมอ** เพราะ dict ของ catalog
+ไม่มี tenant ID จึงตรวจขอบเขตย้อนหลังหลัง map ไม่ได้ ·
+เงินสดต้นงวดนับความเคลื่อนไหวถึงวัน as_of แล้ว แถวที่เป็นอดีตหรือตรงวัน as_of
+จะไม่ถูกนับซ้ำ · การคำนวณใช้เงินสดสุทธิปลายวัน **ไม่อนุมานลำดับภายในวัน** ·
+**ไม่มีการแทรกความเคลื่อนไหวรายวันที่สร้างขึ้นเองระหว่างวันที่มี event**
 
-Result keys include `minimum_cash`, `minimum_cash_date`, `first_shortfall_date`,
-`first_negative_date`, `first_reserve_breach_date`, `period_end_balances` keyed
-by `"30"`, `"60"`, `"90"`, `timeline`, `missing`, `status`, and `assumptions`.
-Money is serialized as decimal strings. Shortfall is below the specified cash
-reserve, or negative bank cash when no reserve is supplied. Unknown reserves
-remain null and are never silently asserted to be zero.
+key ของผลลัพธ์: `minimum_cash`, `minimum_cash_date`, `first_shortfall_date`,
+`first_negative_date`, `first_reserve_breach_date`, `period_end_balances`
+(key เป็น `"30"`, `"60"`, `"90"`), `timeline`, `missing`, `status` และ `assumptions` ·
+เงินถูก serialize เป็นสตริงทศนิยม · การขาดมือหมายถึงต่ำกว่าเงินสำรองที่ระบุ
+หรือเงินสดในธนาคารติดลบเมื่อไม่ได้ระบุเงินสำรอง ·
+**เงินสำรองที่ไม่รู้ค่าจะเป็น null และไม่มีการยืนยันแบบเงียบ ๆ ว่าเป็นศูนย์**
 
-`schedule_complete_through` must be explicitly confirmed by the caller. Without
-complete coverage, main forecast fields for those horizons remain null and
-status is insufficient_data. `conditional_minimum_cash`,
-`conditional_first_shortfall_date`, and `conditional_period_end_balances` show
-only what the supplied schedule implies. They must not be displayed as a full
-forecast. A missing or unconfirmed empty schedule is declared in missing;
-it never becomes a zero forecast. An explicitly complete empty schedule may
-legitimately preserve a known cash snapshot without future movements.
+`schedule_complete_through` **ต้องยืนยันโดยผู้เรียกอย่างชัดเจน** ·
+ถ้าไม่ได้ยืนยันความครบ ฟิลด์พยากรณ์หลักของ horizon นั้นจะเป็น null และสถานะเป็น
+insufficient_data · `conditional_minimum_cash`, `conditional_first_shortfall_date`
+และ `conditional_period_end_balances` แสดงเฉพาะสิ่งที่ตารางที่ส่งมาบอกได้
+**ห้ามนำไปแสดงเป็นการพยากรณ์ที่ครบถ้วน** · ตารางที่ขาดหรือว่างโดยไม่ได้ยืนยัน
+จะถูกประกาศใน missing **ไม่กลายเป็นการพยากรณ์ที่เป็นศูนย์** ·
+ตารางว่างที่ยืนยันว่าครบแล้วอย่างชัดเจน สามารถรักษาภาพเงินสดที่รู้ค่าไว้
+โดยไม่มีความเคลื่อนไหวในอนาคตได้อย่างถูกต้อง
 
-The seven demo events, replayed as of 2026-09-30 with THB 5,000,000 opening cash
-and explicit coverage through 2026-12-29, yield minimum cash THB 3,370,000 on
-2026-10-25 and 30/60/90-day endings THB 3,370,000 / 3,370,000 / 5,770,000.
-The 2026-11-30 buyer collection is day 61 and is not counted in day 60.
+event เดโม 7 รายการ เล่นซ้ำ ณ วันที่ 2026-09-30 ด้วยเงินสดต้นงวด 5,000,000 บาท
+และยืนยันความครบถึง 2026-12-29 ให้ผล: เงินสดต่ำสุด **3,370,000 บาท วันที่ 2026-10-25**
+และยอดปลายงวด 30/60/90 = **3,370,000 / 3,370,000 / 5,770,000** ·
+การรับชำระวันที่ 2026-11-30 เป็นวันที่ 61 จึง**ไม่ถูกนับในวันที่ 60**
 
-Projected obligation DTO: `{id, due_date, amount, title, partner?}`. Supply only
-outstanding source obligations. Unknown category (`None`) differs from a known
-empty category (`[]`). Overdue rows require a real rescheduled date; they are
-reported in overdue/missing instead of moved to an invented future day.
-The generator returns `{events, missing, overdue, status}`. Each event has a
-stable UUID, sme_id, project_id, event_date, day_index, type, title, amount,
-is_inflow, partner, status=projected, impact_reason. Day indices are relative to
-the supplied as_of. IDs remain stable when amounts or due dates are corrected.
+DTO ของภาระที่คาดการณ์: `{id, due_date, amount, title, partner?}` ·
+ส่งเฉพาะภาระต้นทางที่ยังค้างอยู่ · **หมวดที่ไม่รู้ค่า (`None`) ต่างจากหมวดที่รู้ว่าว่าง (`[]`)** ·
+แถวที่เลยกำหนดต้องมีวันที่เลื่อนนัดจริง และจะถูกรายงานใน overdue/missing
+**ไม่ถูกย้ายไปวันในอนาคตที่สร้างขึ้นเอง** · generator คืน
+`{events, missing, overdue, status}` · แต่ละ event มี UUID ที่คงที่, sme_id, project_id,
+event_date, day_index, type, title, amount, is_inflow, partner, status=projected,
+impact_reason · day index สัมพัทธ์กับ as_of ที่ส่งมา ·
+**ID คงเดิมเมื่อมีการแก้ยอดหรือวันครบกำหนด**
 
-CLAUDE should upsert generated rows by id, convert ISO event_date to a DATE as
-needed, and preserve the tenant/project association. No additional DB columns
-are required. Never assert completeness while source categories are unknown.
-No DB reads/writes or route changes were added by CODEX. `build_analysis()`
-keeps its signature and result shapes; its unknowns now direct callers to this
-forecast function rather than claiming the module does not exist.
+CLAUDE ควร upsert แถวที่สร้างขึ้นด้วย id แปลง event_date แบบ ISO เป็น DATE ตามต้องการ
+และรักษาความสัมพันธ์กับ tenant/project · ไม่ต้องเพิ่มคอลัมน์ใด ·
+**อย่ายืนยันว่าข้อมูลครบขณะที่หมวดต้นทางยังไม่รู้ค่า** · CODEX ไม่ได้อ่าน/เขียนฐานข้อมูล
+หรือแก้ route · `build_analysis()` คง signature และรูปผลลัพธ์เดิม ·
+ส่วน unknowns ของมันเปลี่ยนไปชี้ให้ผู้เรียกไปใช้ฟังก์ชันพยากรณ์นี้
+แทนการบอกว่าโมดูลไม่มีอยู่
 
-## Block 4: industry news and deterministic signals
+> **หมายเหตุ (อัปเดต 2026-10-15):** CLAUDE เปิด `GET /api/forecast` แล้ว
+> ให้ผลตรงกับค่าที่ระบุไว้ข้างบนทุกตัว และหากไม่ส่ง `schedule_complete_through`
+> ค่าหลักจะเป็น null พร้อมสถานะ insufficient_data ตามที่ออกแบบ ·
+> ส่วน `project_cash_events()` ยังไม่ถูกต่อเข้า route (ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้
+> แบบระบุวันที่ในระบบ)
+
+## ส่วนที่ 4: ข่าวอุตสาหกรรมและสัญญาณแบบคงที่
 
 ```python
 from app.industry import fetch_industry_trends, analyze_industry_articles
@@ -175,85 +195,96 @@ async def fetch_industry_trends(sector: str, *, as_of: datetime,
                                  force_refresh: bool = False) -> dict: ...
 ```
 
-Uses the public GDELT DOC 2.0 ArticleList API with configured sector queries,
-no API key, a seven-day search window, and bounded response/record sizes.
-Supported sectors: food_processing, food, packaging, manufacturing, agriculture,
-retail, logistics, services. No financial data or SME identity is sent to GDELT.
-Provider documentation: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
+ใช้ GDELT DOC 2.0 ArticleList API แบบสาธารณะ ด้วย query ที่กำหนดต่อ sector
+ไม่ต้องใช้ API key ค้นย้อนหลัง 7 วัน และจำกัดขนาด response/จำนวนรายการ ·
+sector ที่รองรับ: food_processing, food, packaging, manufacturing, agriculture,
+retail, logistics, services · **ไม่มีการส่งข้อมูลการเงินหรือตัวตนของ SME ไปยัง GDELT** ·
+เอกสารผู้ให้บริการ: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
 
-Output has sector, as_of, status, source_status, source_error,
-retry_after_seconds, articles, findings, missing, notice, assumptions.
-Status is ok, empty, stale, or unavailable. Recent cached articles are reused
-for five minutes. Source dates older than 72 hours or fetches older than one
-hour are stale; cached records older than seven days are not returned.
-Provider failures with a valid cache return stale; failures without data return
-unavailable, empty articles/findings, and missing=industry_news. There are no
-automatic retries. HTTP 429 exposes a bounded retry hint, with a five-second minimum.
+ผลลัพธ์มี sector, as_of, status, source_status, source_error, retry_after_seconds,
+articles, findings, missing, notice, assumptions · สถานะเป็น ok, empty, stale
+หรือ unavailable · ข่าวใน cache ที่เพิ่งดึงถูกนำมาใช้ซ้ำได้ 5 นาที ·
+วันที่ของแหล่งที่เก่ากว่า 72 ชั่วโมง หรือการดึงที่เก่ากว่า 1 ชั่วโมง ถือเป็น stale ·
+ข้อมูลใน cache ที่เก่ากว่า 7 วันจะไม่ถูกคืน · ผู้ให้บริการล้มเหลวแต่มี cache ที่ใช้ได้
+จะคืน stale · ล้มเหลวโดยไม่มีข้อมูลจะคืน unavailable พร้อม articles/findings ว่าง
+และ missing=industry_news · **ไม่มีการ retry อัตโนมัติ** ·
+HTTP 429 จะเปิดคำใบ้ retry ที่มีขอบเขต โดยมีค่าต่ำสุด 5 วินาที
 
-Article fields: id (SHA-256 of sector/canonical URL), provider, source (URL host),
-sector, url, title, published_at, observed_at, fetched_at, date_source, status.
-Headlines and links come from source rows only. GDELT `seendate` is stored as
-observed_at with date_source=gdelt_first_seen. The API does not establish the
-actual publication timestamp; published_at remains null and publication dates
-are listed in missing rather than invented. Tracking links, repeated URLs, and
-identical syndicated titles are deduplicated deterministically.
+ฟิลด์ของบทความ: id (SHA-256 ของ sector กับ URL แบบ canonical), provider,
+source (host ของ URL), sector, url, title, published_at, observed_at, fetched_at,
+date_source, status · **หัวข้อและลิงก์มาจากแถวของแหล่งข่าวเท่านั้น** ·
+`seendate` ของ GDELT เก็บเป็น observed_at พร้อม date_source=gdelt_first_seen ·
+**API ไม่ได้ระบุเวลาเผยแพร่จริง จึงให้ published_at เป็น null และใส่เรื่องวันที่เผยแพร่
+ไว้ใน missing แทนการสร้างขึ้นเอง** · ลิงก์ติดตาม URL ซ้ำ และหัวข้อที่เผยแพร่ซ้ำแบบเดียวกัน
+ถูกตัดออกอย่างคงที่
 
-Signals are disclosed headline-keyword screening, not full article interpretation
-or claims about an SME. Risk/opportunity findings contain article_id,
-evidence_url, matched_terms, freshness status and a notice. The current rules
-path requires no LLM credits. Historical or simulated test headlines are never
-inserted as live news. News is not added to financial findings/grades automatically.
+สัญญาณที่ได้เป็นการคัดกรองด้วยคำสำคัญในหัวข้อซึ่งประกาศไว้ชัดเจน
+**ไม่ใช่การตีความบทความทั้งฉบับ และไม่ใช่การกล่าวอ้างเกี่ยวกับ SME รายใด** ·
+finding เรื่องความเสี่ยง/โอกาสมี article_id, evidence_url, matched_terms,
+สถานะความสดของข้อมูล และ notice · เส้นทาง rules ปัจจุบันไม่ต้องใช้เครดิต LLM ·
+**หัวข้อข่าวย้อนหลังหรือที่ใช้ทดสอบ จะไม่ถูกใส่เป็นข่าวสด** ·
+ข่าวไม่ถูกเพิ่มเข้า finding/เกรดทางการเงินโดยอัตโนมัติ
 
-### Storage requested from CLAUDE
+### ที่จัดเก็บที่ขอจาก CLAUDE
 
-- `industry_news`: id TEXT primary key (64 hex chars), provider TEXT, source TEXT,
+- `industry_news`: id TEXT primary key (64 ตัวอักษร hex), provider TEXT, source TEXT,
   sector TEXT, url TEXT, title TEXT, published_at TIMESTAMPTZ nullable,
   observed_at TIMESTAMPTZ, fetched_at TIMESTAMPTZ, date_source TEXT;
-  unique(provider, sector, url). Optional raw JSONB for provider metadata only.
-- `industry_news_fetch_state`: provider primary key, last_attempt_at,
-  last_success_at, next_allowed_at TIMESTAMPTZ, last_error TEXT. Coordinate a
-  provider-wide lock/rate limit across workers and sectors; do not poll per page render.
-- Cache metadata is stored as actual observations. Freshness is recalculated
-  at response time and must not be persisted as a permanent fresh flag.
-- Persist derived findings only if needed, linking to article ids and a policy
-  version. No full article text, fabricated summary, or sentiment confidence
-  is generated. The original proposed summary/sentiment fields are not required.
+  unique(provider, sector, url) · raw JSONB เป็น optional สำหรับ metadata
+  ของผู้ให้บริการเท่านั้น
+- `industry_news_fetch_state`: provider เป็น primary key, last_attempt_at,
+  last_success_at, next_allowed_at TIMESTAMPTZ, last_error TEXT ·
+  ประสานการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker และ sector ·
+  **อย่าดึงข้อมูลทุกครั้งที่ render หน้า**
+- metadata ของ cache เก็บเป็นการสังเกตจริง · ความสดคำนวณใหม่ตอนตอบคำขอ
+  และ**ห้ามเก็บเป็น flag ว่าสดถาวร**
+- เก็บ finding ที่สรุปได้เฉพาะเมื่อจำเป็น โดยอ้าง article id และเวอร์ชันนโยบาย ·
+  **ไม่มีการสร้างเนื้อหาบทความเต็ม บทสรุปที่แต่งขึ้น หรือค่าความเชื่อมั่นของ sentiment** ·
+  ฟิลด์ summary/sentiment ที่เคยเสนอไว้ไม่จำเป็น
 
-No table or API route was created by CODEX. An actual GDELT smoke request during
-implementation returned HTTP 429; outage handling is a verified runtime path,
-not evidence that live headlines were successfully fetched.
+CODEX ไม่ได้สร้างตารางหรือ API route · การยิง GDELT จริงตอนพัฒนาได้ HTTP 429 ·
+**การจัดการเมื่อแหล่งข่าวล่มเป็นเส้นทางที่ทดสอบแล้วว่าทำงาน ไม่ใช่หลักฐานว่าดึงหัวข้อข่าวสด
+ได้สำเร็จ**
 
-## Final verification and remaining integration
+> **หมายเหตุ (อัปเดต 2026-10-15):** CLAUDE สร้างตาราง `industry_news` และเปิด
+> `GET /api/industry/trends` แล้ว โดย upsert ด้วย id ของ fetcher ·
+> **ยังไม่ได้ทำ 2 ข้อ:** (1) unique(provider, sector, url) — ปัจจุบันบังคับความไม่ซ้ำ
+> ด้วย id ซึ่งเป็น hash ของ sector กับ URL อยู่แล้ว (2) ตาราง
+> `industry_news_fetch_state` และการประสานจำกัดอัตราระดับผู้ให้บริการ —
+> route ปัจจุบันจึงยังไม่มีการล็อกข้าม worker ควรเพิ่มก่อนใช้งานจริงหลายเครื่อง
 
-- The final full suite passed 308 tests with Postgres. The original 225 baseline
-  tests still pass, with formula-specific expectations deliberately changed for
-  the finite-order business assumption. One existing Starlette/httpx deprecation
-  warning remains; no unrelated dependency upgrade was performed.
-- Docker Compose was started without deleting volumes. `backend/run.cmd` starts
-  the API on 127.0.0.1:8000. Real HTTP checks returned 200 for health, docs, and
-  the P0 finite-order example, which returned THB 28,000 working capital/gap.
-- Pure matcher and forecaster were also exercised against all four catalog
-  funding rows and seven dated cash_events from Postgres, without database writes.
-- `SWARM_RESEED_VALUES.json` contains exact v2 allocation values for
-  PO-STP-2026-091, computed from the current demo profiles. Rung Charoen's new
-  allocation working capital is THB 105,000 and gap THB 45,000. Stored seed/DB
-  allocations were not updated; CLAUDE must update the seed and reseed.
-- OPENAI_API_KEY and OPENAI_MODEL remain unset. The user has no OpenAI credits,
-  so no paid/live LLM request was attempted or represented as tested. Nine new
-  HTTP-transport mock cases cover valid structured JSON, malformed JSON/model
-  output, refusal, timeout, 401/403 credential failures, 429 credit/rate failure,
-  and 500 server failure. Financial metrics/grades/findings remain unchanged and
-  rules mode remains available. Official Structured Outputs reference:
+## การตรวจสอบรอบสุดท้ายและงานต่อระบบที่เหลือ
+
+- ชุดเทสต์เต็มรอบสุดท้ายผ่าน **308 tests** กับ Postgres · เทสต์ baseline 225 รายการเดิม
+  ยังผ่าน โดยค่าที่คาดหวังซึ่งผูกกับสูตรถูกเปลี่ยนอย่างตั้งใจตามสมมติฐานออเดอร์จบชิ้น ·
+  ยังมี deprecation warning ของ Starlette/httpx หนึ่งรายการ และ
+  **ไม่ได้อัปเกรด dependency ที่ไม่เกี่ยวข้อง**
+- เริ่ม Docker Compose โดยไม่ลบ volume · `backend/run.cmd` เปิด API ที่
+  127.0.0.1:8000 · การตรวจผ่าน HTTP จริงได้ 200 ทั้ง health, docs และตัวอย่าง P0
+  แบบออเดอร์จบชิ้น ซึ่งให้เงินทุนหมุนเวียน/ส่วนขาด **28,000 บาท**
+- ทดสอบ matcher และ forecaster แบบ pure กับแถวสินเชื่อใน catalog ทั้ง 4 รายการ
+  และ cash_events แบบระบุวันที่ 7 รายการจาก Postgres **โดยไม่เขียนฐานข้อมูล**
+- `SWARM_RESEED_VALUES.json` มีค่า allocation v2 ที่แม่นยำสำหรับ PO-STP-2026-091
+  คำนวณจากโปรไฟล์เดโมปัจจุบัน · ค่า allocation ใหม่ของ Rung Charoen คือ
+  เงินทุนหมุนเวียน 105,000 บาท และส่วนขาด 45,000 บาท ·
+  **ข้อมูล seed/DB ยังไม่ถูกอัปเดต CLAUDE ต้องแก้ seed แล้ว reseed**
+- `OPENAI_API_KEY` และ `OPENAI_MODEL` ยังไม่ได้ตั้ง · ผู้ใช้ไม่มีเครดิต OpenAI
+  จึง**ไม่มีการยิงคำขอ LLM จริงและไม่ได้อ้างว่าทดสอบแล้ว** ·
+  มีเทสต์ mock ระดับ HTTP transport ใหม่ 9 กรณี ครอบคลุม JSON ที่ถูกโครงสร้าง,
+  JSON/ผลลัพธ์โมเดลที่ผิดรูป, การปฏิเสธ, timeout, credential ล้มเหลว 401/403,
+  429 เครดิต/จำกัดอัตรา และ 500 ฝั่งเซิร์ฟเวอร์ ·
+  ตัวชี้วัด/เกรด/finding ทางการเงินไม่เปลี่ยน และโหมด rules ยังใช้ได้ ·
+  อ้างอิง Structured Outputs:
   https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses
-- Real news API probes returned HTTP 429, then timeout. The last smoke response
-  was unavailable with zero articles, recorded locally in uploads. No live
-  headline retrieval or publication-date verification is claimed.
-- Post-funding eligibility comparisons use unrounded ratios. A displayed 1.5000
-  can still be below a 1.5 threshold before rounding; the rejection reason states
-  that distinction rather than presenting a contradictory rounded comparison.
-- New logic is not automatically wired into CLAUDE's endpoints. Required work:
-  forward SWARM inputs/catch validation errors; reseed; wire ranking and persist
-  matches; scope/project cash events and confirm horizon completeness; add news
-  storage/rate coordination and route integration.
-- No changes were made to src/, adapters, catalog, repository, models, routers,
-  RBAC, schema.sql, or seed.sql relative to implementation baseline 94ad7ab.
+- การยิง news API จริงได้ HTTP 429 แล้วตามด้วย timeout · คำตอบรอบสุดท้ายเป็น
+  unavailable โดยมีบทความ 0 รายการ บันทึกไว้ใน uploads ในเครื่อง ·
+  **ไม่มีการอ้างว่าดึงหัวข้อข่าวสดหรือยืนยันวันเผยแพร่ได้**
+- การเทียบคุณสมบัติหลังรับทุนใช้อัตราส่วนที่ยังไม่ปัดเศษ ·
+  ค่าที่แสดงเป็น 1.5000 อาจยังต่ำกว่าเกณฑ์ 1.5 ก่อนปัดเศษได้ ·
+  เหตุผลการปฏิเสธจะระบุความต่างนี้ แทนการแสดงการเปรียบเทียบที่ปัดเศษแล้วดูขัดแย้งกัน
+- **ตรรกะใหม่ไม่ได้ถูกต่อเข้า endpoint ของ CLAUDE โดยอัตโนมัติ** · งานที่ต้องทำ:
+  ส่งต่อ input ของ SWARM และดัก validation error; reseed; ต่อการจัดอันดับและบันทึกผล
+  การจับคู่; กำหนดขอบเขต tenant/project ของ cash events และยืนยันความครบของ horizon;
+  เพิ่มการเก็บข่าวและการประสานจำกัดอัตรา พร้อมต่อเข้า route
+- ไม่มีการแก้ `src/`, adapters, catalog, repository, models, routers, RBAC,
+  `schema.sql` หรือ `seed.sql` เทียบกับ baseline `94ad7ab`

@@ -1,150 +1,160 @@
-# CODEX remaining work and demo readiness
+# งานค้างของ CODEX และความพร้อมสำหรับเดโม
 
-## Update: 2026-10-15
+> แปลจากต้นฉบับภาษาอังกฤษของ CODEX สูตร ชื่อฟิลด์ ชื่อ endpoint ตัวเลข และ commit hash คงเดิม
 
-The historical audit below described commit 87c8d64. CLAUDE subsequently completed
-the Role 2 frontend contracts, RBAC demo layer, simulator infrastructure, and
-catalog data at 99c2aab, with a 225-test baseline. Its old 404 and missing-Role-2
-findings below are historical, not the current API state.
+## อัปเดต: 2026-10-15
 
-CODEX has now implemented finite-order SWARM exposure and business/distance
-eligibility, pure debt/equity ranking, dated 30/60/90-day forecasts and projected
-obligations, and news ingestion with stale/unavailable states. See
-`CODEX_HANDOFF.md` for exact function signatures, result shapes, schema requests,
-and the protected-file boundary. Final regression coverage is 308 passing tests
-with Postgres, including the original baseline and the updated finite-order expectations.
+ผลตรวจย้อนหลังด้านล่างเป็นสถานะของ commit `87c8d64` · หลังจากนั้น CLAUDE ทำ contract
+ฝั่ง frontend ของบทบาทที่ 2, ชั้น RBAC สำหรับเดโม, โครงสร้าง simulator และข้อมูล catalog
+เสร็จที่ `99c2aab` โดยมี baseline 225 tests · **ข้อค้นพบเรื่อง 404 และงานบทบาทที่ 2 ที่ขาด
+ซึ่งอยู่ด้านล่าง เป็นข้อมูลย้อนหลัง ไม่ใช่สถานะปัจจุบันของ API**
 
-Current integration gates:
+ปัจจุบัน CODEX ทำเสร็จแล้ว: cash exposure แบบออเดอร์จบชิ้นของ SWARM และเกณฑ์
+ประเภทธุรกิจ/ระยะทาง, การจัดอันดับหนี้และทุนแบบ pure function, การพยากรณ์ 30/60/90 วัน
+แบบระบุวันที่พร้อมภาระที่คาดการณ์ และการดึงข่าวที่มีสถานะ stale/unavailable ·
+ดู `CODEX_HANDOFF.md` สำหรับ signature ของฟังก์ชัน รูปของผลลัพธ์ สิ่งที่ขอให้เพิ่มใน schema
+และขอบเขตไฟล์ที่ห้ามแตะ · ผลทดสอบถดถอยรอบสุดท้าย **308 tests ผ่าน** กับ Postgres
+รวมทั้ง baseline เดิมและค่าที่คาดหวังใหม่ของสูตรออเดอร์จบชิ้น
 
-- CLAUDE must update allocation seed values and reseed. Reference values are in
-  `SWARM_RESEED_VALUES.json`; existing stored allocations still use the old formula.
-- Forward new SWARM eligibility/schedule inputs and map core validation errors to 422.
-- Wire funding/investor ranking and persistence, forecast inputs/coverage, and news
-  storage/fetch coordination into the already established API contracts.
-- Keep rules mode disclosed: there are no OpenAI credits; live LLM is unverified.
-  Valid JSON and failure recovery were tested through mock HTTP transport only.
-- Live news probes returned 429 and timeout. Unavailable state is working;
-  successful fresh headline retrieval is not claimed.
-- The API is running locally on port 8000, with real HTTP health/docs/P0 checks.
-  Hosted deployment and a fully integrated website rehearsal remain team work.
+### ด่านที่ต้องผ่านสำหรับการต่อระบบ
 
-## Historical audit: 2026-10-14
+- CLAUDE ต้องอัปเดตค่า allocation ใน seed แล้ว reseed · ค่าอ้างอิงอยู่ใน
+  `SWARM_RESEED_VALUES.json` · ข้อมูลที่เก็บอยู่เดิมยังใช้สูตรเก่า
+- ส่งต่อ input ใหม่ของ SWARM เรื่องเกณฑ์คุณสมบัติและตารางเวลา และแปลง validation error
+  ของ core ให้เป็น 422
+- ต่อการจัดอันดับและการบันทึกผลของสินเชื่อ/นักลงทุน, input และการยืนยันความครบของ
+  ตารางพยากรณ์ และการประสานงานเก็บ/ดึงข่าว เข้ากับสัญญา API ที่วางไว้แล้ว
+- คงการประกาศโหมด rules ไว้: **ไม่มีเครดิต OpenAI และยังไม่ได้ทดสอบ LLM จริง** ·
+  การตรวจ JSON ที่ถูกต้องและการกู้คืนเมื่อล้มเหลว ทดสอบผ่าน mock HTTP transport เท่านั้น
+- การยิงข่าวจริงได้ 429 และ timeout · **สถานะ unavailable ทำงานถูกต้อง
+  แต่ยังไม่ยืนยันว่าดึงหัวข้อข่าวสด ๆ ได้สำเร็จ**
+- API รันอยู่บนเครื่อง port 8000 และผ่านการตรวจ health/docs/P0 ผ่าน HTTP จริง ·
+  **การ deploy ขึ้น host และการซ้อมเว็บทั้งระบบยังเป็นงานของทีม**
 
-Reviewed on 2026-10-14 (Asia/Bangkok) against implementation commit `87c8d64`.
-Role source: `AI_DEVELOPMENT_GUIDELINES.md`. All implementation work stays in
-`backend/`; existing frontend styling, components, and layouts remain unchanged.
-The demo date has not been provided. Priorities below are dependency order, not deadlines.
+---
 
-## Verified baseline
+## ผลตรวจย้อนหลัง: 2026-10-14
 
-- Latest full backend suite: 148 passed, with one Starlette/httpx deprecation warning.
-- In-process API smoke check: `/api/analyze` returns HTTP 200 and synthetic grade B / 75.00.
-- Unbalanced financial input returns HTTP 422.
-- Supplied workbook extraction produces 12 statement-period records with cell provenance.
-  It contains placeholder balance tables and separate THB income / USD-million cash flow
-  sections. It is not one validated SME dataset and produces no combined grade.
-- Original workbook and extraction report remain local and excluded from Git.
-- `OPENAI_API_KEY` and `OPENAI_MODEL` were both unconfigured during this review.
-  Model output validation/fallback has mocked tests; live provider behavior is unverified.
-- Source frontend client defaults to mock mode. Public deployment configuration and
-  deployed backend availability were not verified in this review.
+ตรวจเมื่อ 2026-10-14 (Asia/Bangkok) เทียบกับ commit `87c8d64` ·
+ที่มาของบทบาท: `AI_DEVELOPMENT_GUIDELINES.md` · งานพัฒนาทั้งหมดอยู่ใน `backend/`
+และสไตล์ component และ layout ของ frontend เดิมไม่ถูกเปลี่ยน ·
+ยังไม่ได้รับวันเดโม ลำดับความสำคัญด้านล่างเรียงตาม dependency ไม่ใช่กำหนดส่ง
 
-## CODEX module status
+### Baseline ที่ตรวจแล้ว
 
-| Module | Status | Remaining work |
+- ชุดเทสต์ backend ล่าสุด: 148 ผ่าน พร้อม deprecation warning ของ Starlette/httpx หนึ่งรายการ
+- ตรวจ API แบบ in-process: `/api/analyze` คืน HTTP 200 และได้เกรดสังเคราะห์ B / 75.00
+- ข้อมูลการเงินที่ไม่สมดุลคืน HTTP 422
+- การสกัดข้อมูลจาก workbook ที่ส่งมาได้ 12 รายการตามงวดบัญชี พร้อมที่มาระดับเซลล์ ·
+  ไฟล์นั้นมีตารางงบดุลที่เป็น placeholder และมีส่วนรายได้สกุล THB แยกจากส่วนกระแสเงินสด
+  หน่วยล้าน USD · **ไม่ใช่ชุดข้อมูล SME ที่ผ่านการตรวจชุดเดียว และให้เกรดรวมไม่ได้**
+- Workbook ต้นฉบับและรายงานการสกัดยังอยู่ในเครื่องและถูกกันออกจาก Git
+- `OPENAI_API_KEY` และ `OPENAI_MODEL` ไม่ได้ตั้งค่าทั้งคู่ตอนที่ตรวจรอบนี้ ·
+  การตรวจสอบและการถอยกลับของผลลัพธ์โมเดลมีเทสต์แบบ mock แต่**พฤติกรรมผู้ให้บริการจริง
+  ยังไม่ได้ยืนยัน**
+- Client ของ frontend ตั้งต้นเป็นโหมด mock · ยังไม่ได้ตรวจการตั้งค่า deployment สาธารณะ
+  และความพร้อมของ backend ที่ deploy แล้ว
+
+### สถานะโมดูลของ CODEX
+
+| โมดูล | สถานะ | งานที่เหลือ |
 | --- | --- | --- |
-| 1: extraction and validation | Core implemented | Select/normalize a consistent business, reporting period, and currency for real workbook analysis; supply missing debt/reserve inputs. |
-| 2: financial math and A-D grade | Implemented, demo policy | Keep same-period CFADS/debt inputs, average asset/equity balances, and disclosed normalized grading targets. Prepare validated demo datasets. |
-| 3: business analysis | Partial | Add dated 30/60/90-day cash forecasts and expense-history comparisons. Expand evidence-backed explanations. Current LLM only prioritizes existing findings. |
-| 4: funding matcher | Not implemented | Build debt/investor matching, eligibility filters, risk reasons, and post-loan repayment checks. Funding database tables are not a matching engine. |
-| 5: SWARM | Partial | Correct/confirm order cash-exposure assumptions; add business-type, resource, and distance eligibility/ranking; strengthen shop validation. Capacity, cost/profit, deposits, and per-shop funding gaps exist. |
-| 7: industry trends | Not implemented | Fetch news from configured sources, preserve dates/links, deduplicate, and produce relevant opportunity/risk findings with stale/unavailable states. |
+| 1: สกัดและตรวจข้อมูล | core ทำแล้ว | เลือกและปรับให้ได้ธุรกิจ งวดบัญชี และสกุลเงินที่สอดคล้องกันชุดเดียว สำหรับวิเคราะห์ workbook จริง · เติมข้อมูลหนี้และเงินสำรองที่ขาด |
+| 2: คณิตศาสตร์การเงินและเกรด A-D | ทำแล้ว เป็นนโยบายเดโม | คง CFADS และข้อมูลหนี้ให้อยู่งวดเดียวกัน ใช้ค่าเฉลี่ยยอดสินทรัพย์/ส่วนของเจ้าของ และประกาศเกณฑ์การแปลงค่า · เตรียมชุดข้อมูลเดโมที่ผ่านการตรวจ |
+| 3: วิเคราะห์ธุรกิจ | บางส่วน | เพิ่มการพยากรณ์เงินสด 30/60/90 วันแบบระบุวันที่ และเทียบประวัติค่าใช้จ่าย · ขยายคำอธิบายที่อิงหลักฐาน · ปัจจุบัน LLM แค่จัดลำดับ finding ที่มีอยู่ |
+| 4: จับคู่แหล่งทุน | ยังไม่ทำ | สร้างการจับคู่หนี้/นักลงทุน ตัวกรองคุณสมบัติ เหตุผลความเสี่ยง และการตรวจความสามารถชำระหนี้หลังรับทุน · **ตารางฐานข้อมูลเรื่องทุนไม่ใช่ engine จับคู่** |
+| 5: SWARM | บางส่วน | แก้/ยืนยันสมมติฐาน cash exposure ของออเดอร์ · เพิ่มเกณฑ์และการจัดอันดับตามประเภทธุรกิจ ทรัพยากร และระยะทาง · เพิ่มความเข้มของการตรวจข้อมูลร้าน · ส่วนกำลังผลิต ต้นทุน/กำไร มัดจำ และส่วนขาดต่อร้าน มีอยู่แล้ว |
+| 7: แนวโน้มอุตสาหกรรม | ยังไม่ทำ | ดึงข่าวจากแหล่งที่กำหนด เก็บวันที่และลิงก์ ตัดข่าวซ้ำ และสร้าง finding เรื่องโอกาส/ความเสี่ยงที่เกี่ยวข้อง พร้อมสถานะ stale/unavailable |
 
-## P0: correct SWARM exposure before using funding recommendations
+### P0: แก้ cash exposure ของ SWARM ก่อนนำไปใช้แนะนำแหล่งทุน
 
-`app/swarm.py` currently uses:
+`app/swarm.py` ตอนนั้นใช้:
 
 ```text
 working_capital = assigned_units_per_day * unit_cost * (production_days + payment_terms_days)
 ```
 
-For a single finite order of 40 units/day, 10 production days, cost THB 70/unit,
-and 30 payment-term days, the smoke check produced:
+สำหรับออเดอร์จบชิ้นหนึ่งรายการ 40 ชิ้น/วัน ผลิต 10 วัน ต้นทุน 70 บาท/ชิ้น
+และเครดิต 30 วัน ผลตรวจได้:
 
 ```json
 {"totalOrderCost": 28000, "workingCapitalNeeded": 112000, "fundingGap": 112000}
 ```
 
-The formula adds production cost during payment-wait days after the stated order
-production period. Confirm whether the intended product is a finite order or a
-continuously producing business. For the existing single-order request, model
-dated production costs, deposits, buyer collections, and committed funding;
-calculate the peak cumulative cash deficit. Do not add unstated future production.
-If other obligations are included, require them as explicit dated inputs.
-Existing tests establish consistency with the current formula, not this business assumption.
+สูตรนี้บวกต้นทุนการผลิตเข้าไปในช่วงวันที่รอรับชำระ ซึ่งอยู่หลังระยะเวลาผลิตที่ระบุไว้ ·
+ต้องยืนยันว่าโปรดักต์ที่ต้องการคือออเดอร์จบชิ้นหรือธุรกิจที่ผลิตต่อเนื่อง ·
+สำหรับคำขอออเดอร์เดียวที่มีอยู่ ให้สร้างแบบจำลองต้นทุนการผลิต มัดจำ การรับชำระจากผู้ซื้อ
+และเงินทุนที่ผูกพันไว้ **แบบระบุวันที่** แล้วหา **peak cumulative cash deficit** ·
+ห้ามเพิ่มการผลิตในอนาคตที่ไม่ได้ระบุ · หากจะรวมภาระอื่น ต้องให้ส่งเข้ามาเป็น input
+ที่ระบุวันที่อย่างชัดเจน
 
-Acceptance: test zero/long payment terms, staged collections, deposits, partial
-orders, and cash reserves against an independently computed cash schedule.
-Reject duplicate shop IDs and capacity usage above total capacity. Preserve
-deterministic tie-breaking and disclose unallocated capacity.
+⚠️ **เทสต์ที่มีอยู่ยืนยันเพียงว่าโค้ดสอดคล้องกับสูตรเดิม ไม่ได้ยืนยันสมมติฐานทางธุรกิจนี้**
 
-## P1: complete the demo pipeline
+**เกณฑ์การยอมรับ:** ทดสอบเครดิตเทอมเป็นศูนย์และยาวมาก การรับชำระเป็นงวด มัดจำ
+ออเดอร์บางส่วน และเงินสำรอง เทียบกับตารางกระแสเงินสดที่คำนวณขึ้นอย่างเป็นอิสระ ·
+ปฏิเสธ shop ID ที่ซ้ำกันและกำลังผลิตที่ใช้เกินเพดาน · รักษาการตัดสินเสมอแบบคงที่
+และเปิดเผยกำลังผลิตที่ยังไม่ถูกจัดสรร
 
-1. Finish SWARM distance and eligibility: shop/buyer coordinates, maximum radius,
-   business/resource compatibility, declared distance method, and explicit exclusions.
-   Return assigned quantity, distance, cost, profit, and funding gap per shop.
-2. Build 30/60/90-day forecasts from dated receivables, payables, operating costs,
-   installments, and opening cash. Return minimum cash, first shortfall date,
-   period-end balances, and assumptions. Missing schedules must not become zero.
-3. Build funding matching using requested amount, grade, sector, tenor, product
-   constraints, and explicit provider data. Compare loans and equity separately.
-   Recompute proposed installments and DSCR for the same reporting period;
-   return rejection reasons and avoid treating a match as financing approval.
-4. Expand analysis from computed evidence and dated expense baselines. Configure
-   the chosen provider/model locally, then verify valid JSON, timeout, invalid
-   output, and credential failure. Calculations and grades stay deterministic.
-5. Implement news/trend ingestion and analysis with source attribution. Demonstrate
-   unavailable/stale source behavior without inventing live headlines.
+### P1: ทำ pipeline เดโมให้ครบ
 
-## CLAUDE handoff: required for a real website demo
+1. ทำเรื่องระยะทางและคุณสมบัติของ SWARM ให้เสร็จ: พิกัดร้าน/ผู้ซื้อ รัศมีสูงสุด
+   ความเข้ากันของธุรกิจ/ทรัพยากร วิธีวัดระยะทางที่ประกาศไว้ และรายการที่ถูกตัดออกอย่างชัดเจน ·
+   คืนปริมาณที่จัดสรร ระยะทาง ต้นทุน กำไร และส่วนขาดของแต่ละร้าน
+2. สร้างการพยากรณ์ 30/60/90 วัน จากลูกหนี้ เจ้าหนี้ ค่าใช้จ่ายดำเนินงาน ค่างวด
+   และเงินสดต้นงวด แบบระบุวันที่ · คืนเงินสดต่ำสุด วันแรกที่ขาดมือ ยอดคงเหลือปลายงวด
+   และสมมติฐาน · **ตารางที่ขาดไปต้องไม่กลายเป็นศูนย์**
+3. สร้างการจับคู่แหล่งทุนจากวงเงินที่ขอ เกรด sector อายุสัญญา ข้อจำกัดของผลิตภัณฑ์
+   และข้อมูลผู้ให้ทุนที่ระบุชัด · เทียบสินเชื่อกับทุนแยกกัน · คำนวณค่างวดที่เสนอ
+   และ DSCR ใหม่ในงวดบัญชีเดียวกัน · คืนเหตุผลที่ปฏิเสธ และ
+   **หลีกเลี่ยงการทำให้การจับคู่ดูเหมือนการอนุมัติสินเชื่อ**
+4. ขยายการวิเคราะห์จากหลักฐานที่คำนวณได้และฐานเปรียบเทียบค่าใช้จ่ายแบบระบุวันที่ ·
+   ตั้งค่าผู้ให้บริการ/โมเดลที่เลือกในเครื่อง แล้วตรวจ JSON ที่ถูกต้อง timeout
+   ผลลัพธ์ที่ผิดรูป และ credential ที่ใช้ไม่ได้ · **การคำนวณและเกรดต้องคงที่เสมอ**
+5. ทำระบบดึงและวิเคราะห์ข่าว/แนวโน้มพร้อมระบุที่มา · แสดงพฤติกรรมเมื่อแหล่งข่าว
+   unavailable/stale ได้ **โดยไม่แต่งหัวข้อข่าวขึ้นมาเอง**
 
-CLAUDE owns module 6 (simulator), module 8 (database/API/access control), backend
-hosting, and integration through existing hooks/props or backend adapters.
-Coordinate contracts without editing original visual UI code.
+### ส่งต่อให้ CLAUDE: สิ่งที่จำเป็นต่อการเดโมเว็บจริง
 
-The current local frontend GET contracts returned HTTP 404 in the smoke check:
+CLAUDE ดูแล Module 6 (simulator), Module 8 (ฐานข้อมูล/API/การควบคุมสิทธิ์),
+การ host backend และการต่อระบบผ่าน hooks/props ที่มีอยู่หรือผ่าน backend adapter ·
+ประสานเรื่องสัญญาข้อมูลโดยไม่แก้โค้ด UI เดิม
 
-| Frontend contract | Handoff |
+ตอนตรวจ contract ฝั่ง frontend ที่เป็น GET ในเครื่อง ได้ HTTP 404:
+
+| Contract ของ frontend | สิ่งที่ต้องทำ |
 | --- | --- |
-| `/api/v1/health/indicators` | Adapt validated analysis indicators to the existing envelope. |
-| `/api/v1/ai/explain?page=health` | Adapt evidence-backed explanation and disclose rules/model mode. |
-| `/api/v1/funding/options` | Expose computed funding matches. |
-| `/api/v1/swarm/proposal` | Serve the active computed proposal; the existing stored-order lookup is not an active-proposal contract. |
-| `/api/v1/cashflow/timeline` | Expose the dated forecast timeline. |
+| `/api/v1/health/indicators` | ปรับ indicator ที่ผ่านการตรวจแล้วให้เข้ากับ envelope เดิม |
+| `/api/v1/ai/explain?page=health` | ปรับคำอธิบายที่อิงหลักฐาน และเปิดเผยว่าใช้โหมด rules หรือ model |
+| `/api/v1/funding/options` | เปิดผลการจับคู่แหล่งทุนที่คำนวณแล้ว |
+| `/api/v1/swarm/proposal` | เสิร์ฟข้อเสนอที่คำนวณและใช้งานอยู่ · การค้นหาออเดอร์ที่เก็บไว้เดิมไม่ใช่สัญญาของ active proposal |
+| `/api/v1/cashflow/timeline` | เปิดไทม์ไลน์พยากรณ์แบบระบุวันที่ |
 
-Other original frontend contracts also require reconciliation; the five above
-are the minimum pipeline handoff, not a claim that the rest already work.
-Basic financial/SWARM persistence exists. API authentication/RBAC enforcement,
-simulation execution, and these adapters are not established by the current code.
-Do not switch mock mode off until the required adapters and hosted base URL work.
+Contract เดิมของ frontend รายการอื่นก็ต้องปรับให้ตรงกันด้วย · ห้ารายการข้างบนเป็น
+**ขั้นต่ำ** ของการส่งต่อ pipeline **ไม่ได้หมายความว่ารายการที่เหลือทำงานอยู่แล้ว** ·
+การบันทึกข้อมูลการเงิน/SWARM พื้นฐานมีอยู่ · การยืนยันตัวตน/บังคับ RBAC ของ API
+การรัน simulation และ adapter เหล่านี้ยังไม่ได้ทำในโค้ดตอนนั้น ·
+**อย่าปิดโหมด mock จนกว่า adapter ที่จำเป็นและ base URL ที่ host แล้วจะทำงานได้**
 
-## Demo acceptance checklist
+> **หมายเหตุ (อัปเดต 2026-10-15):** ข้อค้นพบในหัวข้อนี้ได้ดำเนินการแล้ว
+> ปัจจุบัน contract ทั้ง 16 เส้นทางตอบ 200 ครบ และมีการบันทึกผลการจับคู่แหล่งทุนแล้ว
+> สิ่งที่ยังจริงอยู่คือ **อย่าปิดโหมด mock จนกว่าจะ deploy backend เสร็จ** (ดู `progress.md`)
 
-- Use clearly labelled synthetic, consistent THB data for one SME and period;
-  supply opening balances, debt service, revenue/expenses, operating cash outflow,
-  and dated project cash movements. Include one healthy and one distressed case.
-- Show input validation, deterministic metrics, A-D grade, supported findings,
-  cash shortfall, eligible funding, and per-shop SWARM allocation in sequence.
-- Prepare an insufficient-capacity case, a distant/ineligible shop, and a duplicate-shop rejection.
-- Show a simulator A/B change in sales, costs, collection delay, or team membership
-  and verify the recalculated forecast, grade, repayment coverage, and funding gap.
-- Exercise missing inputs, mixed currencies, an unbalanced worksheet, provider
-  failure, and unavailable news. Keep a disclosed rules mode for provider outages.
-- Verify persistence if demonstrated, role access controls, deployed API health,
-  frontend response contracts, and original visual layout before the final rehearsal.
-- Run meaningful regression tests after implementation changes. Rehearse the
-  entire website flow against the hosted backend; passing isolated unit tests
-  does not establish end-to-end demo readiness.
+## เช็กลิสต์การยอมรับสำหรับเดโม
 
-Readiness at the original audit: deterministic backend analysis could be demonstrated through
-API docs. The requested full AI/funding/SWARM/forecast website demo is not ready yet.
+- ใช้ข้อมูลสังเคราะห์สกุล THB ที่ติดป้ายชัดเจนและสอดคล้องกัน สำหรับ SME หนึ่งรายหนึ่งงวด ·
+  ให้ยอดต้นงวด ภาระชำระหนี้ รายได้/ค่าใช้จ่าย เงินสดไหลออกจากการดำเนินงาน
+  และความเคลื่อนไหวเงินสดของโครงการแบบระบุวันที่ · **ต้องมีทั้งกรณีสุขภาพดีและกรณีวิกฤต**
+- แสดงลำดับ: การตรวจข้อมูลเข้า → ตัวชี้วัดที่คงที่ → เกรด A-D → finding ที่มีหลักฐาน →
+  ช่วงเงินสดขาดมือ → แหล่งทุนที่เข้าเกณฑ์ → การจัดสรร SWARM ต่อร้าน
+- เตรียมกรณีกำลังผลิตไม่พอ กรณีร้านอยู่ไกล/ไม่เข้าเกณฑ์ และกรณีปฏิเสธร้านซ้ำ
+- แสดง simulator เปรียบเทียบ A/B เมื่อเปลี่ยนยอดขาย ต้นทุน ความล่าช้าในการเก็บเงิน
+  หรือสมาชิกทีม แล้วตรวจว่าการพยากรณ์ เกรด ความสามารถชำระหนี้ และส่วนขาด ถูกคำนวณใหม่
+- ทดลองกรณีข้อมูลขาด สกุลเงินผสม worksheet ที่ไม่สมดุล ผู้ให้บริการล้มเหลว และข่าวใช้ไม่ได้ ·
+  คงโหมด rules ที่ประกาศไว้สำหรับตอนผู้ให้บริการล่ม
+- ตรวจการบันทึกข้อมูล (ถ้าจะสาธิต) การควบคุมสิทธิ์ตามบทบาท ความพร้อมของ API ที่ deploy แล้ว
+  สัญญาคำตอบที่ frontend ต้องใช้ และ layout เดิมของหน้าจอ ก่อนซ้อมรอบสุดท้าย
+- รันเทสต์ถดถอยที่มีความหมายหลังแก้โค้ด · ซ้อม flow ทั้งเว็บกับ backend ที่ host แล้ว ·
+  **การที่ unit test ผ่านแยกกัน ไม่ได้แสดงว่าพร้อมเดโมแบบ end-to-end**
+
+ความพร้อมตอนตรวจรอบแรก: สาธิตการวิเคราะห์ backend ที่คงที่ได้ผ่าน API docs
+แต่เดโมเว็บเต็มรูปแบบที่ครบทั้ง AI/แหล่งทุน/SWARM/พยากรณ์ ยังไม่พร้อม

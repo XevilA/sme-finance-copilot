@@ -1,59 +1,71 @@
-# Financial Analysis v1
+# สัญญาการวิเคราะห์การเงิน v1
 
-The original eight metrics in `calculate_financials` stay compatible. The
-`/api/calculate` and `/api/v1/calculate` routes add `businessMetrics` and `grading`.
-The existing top-level calculation status describes the original eight metrics;
-each additional metric and the grading object carry their own status.
+> แปลจากต้นฉบับภาษาอังกฤษของ CODEX สูตร ชื่อฟิลด์ ชื่อ endpoint และเกณฑ์ตัวเลขทั้งหมดคงเดิม
+> หัวข้อที่เนื้อหาเดิมล้าสมัยไปแล้วมีหมายเหตุกำกับไว้ ไม่ได้แก้ข้อความเดิมทิ้ง
 
-Additional inputs are optional: revenue, cost_of_goods_sold, operating_expenses,
+ตัวชี้วัด 8 ตัวเดิมใน `calculate_financials` ยังใช้ร่วมกันได้เหมือนเดิม
+เส้นทาง `/api/calculate` และ `/api/v1/calculate` เพิ่ม `businessMetrics` และ `grading` เข้ามา
+สถานะการคำนวณระดับบนสุดที่มีอยู่ อธิบายเฉพาะตัวชี้วัด 8 ตัวเดิม
+ส่วนตัวชี้วัดที่เพิ่มมาและ object `grading` มีสถานะของตัวเองแยกกัน
+
+ข้อมูลที่เพิ่มเข้ามาเป็น optional ทั้งหมด: revenue, cost_of_goods_sold, operating_expenses,
 interest_expense, tax_expense, operating_cash_outflow, units_sold, unit_price,
-variable_cost_per_unit, fixed_costs, initial_investment and investment_net_gain.
-Missing expenses are not zero. When all income-statement fields and net_income
-are supplied, they must reconcile within THB 0.01. Units sold must be a
-nonnegative integer. Excel uses the same field names and validation contract.
+variable_cost_per_unit, fixed_costs, initial_investment และ investment_net_gain
 
-## Business metrics
+**ค่าใช้จ่ายที่ขาดไปไม่ใช่ศูนย์** เมื่อส่งฟิลด์งบกำไรขาดทุนมาครบพร้อม net_income
+ทั้งหมดต้องกระทบยอดกันได้ภายใน 0.01 บาท · units_sold ต้องเป็นจำนวนเต็มไม่ติดลบ
+Excel ใช้ชื่อฟิลด์และสัญญาการตรวจสอบชุดเดียวกัน
 
-Gross profit is revenue minus cost of goods sold. Operating profit additionally
-subtracts operating expenses. Net profit additionally subtracts interest expense
-and tax expense. Total cost includes all four expense categories.
-Cost per unit is (cost of goods sold + operating expenses) / units sold;
-it excludes interest and tax. Contribution per unit is selling price minus
-variable cost per unit. Break-even units round fixed costs / contribution
-up to the next whole unit. A nonpositive contribution has no finite break-even.
-Simple ROI is investment net gain / initial investment * 100, for the supplied
-period. It is not annualized and does not imply an NPV or IRR calculation.
-Debt ratio is liabilities / assets. Reserve months use a normalized 30-day
-cash operating outflow, not accrual operating expenses or principal repayments.
+## ตัวชี้วัดเชิงธุรกิจ
 
-## Grading policy: demo-v1
+กำไรขั้นต้น = รายได้ − ต้นทุนขาย · กำไรจากการดำเนินงาน หักค่าใช้จ่ายดำเนินงานเพิ่ม ·
+กำไรสุทธิ หักดอกเบี้ยจ่ายและภาษีเพิ่ม · ต้นทุนรวมนับค่าใช้จ่ายทั้ง 4 ประเภท
 
-All component scores are clamped to 0..100:
+ต้นทุนต่อหน่วย = (ต้นทุนขาย + ค่าใช้จ่ายดำเนินงาน) / จำนวนหน่วยที่ขาย
+**ไม่รวมดอกเบี้ยและภาษี**
 
-| Component | Weight | Normalization |
+กำไรส่วนเกินต่อหน่วย = ราคาขาย − ต้นทุนผันแปรต่อหน่วย · จุดคุ้มทุนปัดเศษ
+ต้นทุนคงที่ / กำไรส่วนเกิน ขึ้นเป็นจำนวนหน่วยเต็มถัดไป · ถ้ากำไรส่วนเกินไม่เป็นบวก
+จะ**ไม่มีจุดคุ้มทุนที่เป็นค่าจำกัด**
+
+ROI แบบง่าย = กำไรสุทธิจากการลงทุน / เงินลงทุนเริ่มต้น × 100 สำหรับงวดที่ส่งมา
+**ไม่แปลงเป็นอัตราต่อปี และไม่ได้หมายถึงการคำนวณ NPV หรือ IRR**
+
+อัตราส่วนหนี้ = หนี้สิน / สินทรัพย์ · จำนวนเดือนของเงินสำรองใช้เงินสดไหลออกจากการดำเนินงาน
+ที่ปรับเป็นฐาน 30 วัน **ไม่ใช่ค่าใช้จ่ายดำเนินงานตามเกณฑ์คงค้างหรือการชำระเงินต้น**
+
+## นโยบายการให้เกรด: demo-v1
+
+คะแนนทุกองค์ประกอบถูกบีบให้อยู่ในช่วง 0..100:
+
+| องค์ประกอบ | น้ำหนัก | การแปลงค่า |
 | --- | --- | --- |
 | DSCR | 0.35 | 100 * DSCR / 1.5 |
-| Cash flow | 0.30 | 100 * (operating cash flow / revenue) / 0.20 |
-| Debt burden | 0.20 | 100 * (1 - liabilities / assets) |
-| Cash reserve | 0.15 | 100 * reserve months / 3 |
+| กระแสเงินสด | 0.30 | 100 * (operating cash flow / revenue) / 0.20 |
+| ภาระหนี้ | 0.20 | 100 * (1 - liabilities / assets) |
+| เงินสำรอง | 0.15 | 100 * reserve months / 3 |
 
-Period days include both endpoints. Monthly outflow is operating_cash_outflow
-* 30 / period_days. Explicit zero principal and interest due with nonnegative
-cash available score 100 for debt service; raw DSCR remains undefined, never
-infinity. Negative cash available with no debt service is undefined.
+จำนวนวันของงวดนับปลายทั้งสองข้าง · เงินไหลออกรายเดือน = operating_cash_outflow × 30 / period_days
 
-The weighted score is rounded half up to two places, then graded: A >=80,
-B >=65, C >=50, D <50. Missing or undefined components produce a null grade
-and null score; weights are never redistributed. Component formulas, raw
-values, scores and policy version are returned for audit. This is a hackathon
-policy, not lender approval, an industry benchmark, or a calibrated default
-probability. Financial distress is also reported independently of the score.
+กรณีเงินต้นและดอกเบี้ยครบกำหนดเป็นศูนย์อย่างชัดเจน และเงินสดที่ใช้ชำระหนี้ได้ไม่ติดลบ
+องค์ประกอบภาระชำระหนี้จะได้ 100 คะแนน · ค่า DSCR ดิบยังเป็น `undefined` **ไม่ใช่อนันต์** ·
+ถ้าเงินสดที่ใช้ชำระหนี้ติดลบขณะไม่มีภาระหนี้ ถือเป็น `undefined`
 
-`examples/analysis_input.json` is synthetic and has grade B, score 75.00.
+คะแนนถ่วงน้ำหนักปัดแบบ half up เป็นทศนิยม 2 ตำแหน่ง แล้วให้เกรด A >= 80, B >= 65,
+C >= 50, D < 50 · องค์ประกอบที่ขาดหรือคำนวณไม่ได้จะทำให้ **เกรดและคะแนนเป็น null
+และไม่มีการกระจายน้ำหนักไปให้ตัวอื่น**
+
+ระบบคืนสูตร ค่าดิบ คะแนน และเวอร์ชันนโยบายของแต่ละองค์ประกอบไว้ให้ตรวจสอบย้อนหลังได้
+
+⚠️ นี่เป็น**นโยบายสำหรับ hackathon ไม่ใช่การอนุมัติสินเชื่อ ไม่ใช่เกณฑ์มาตรฐานอุตสาหกรรม
+และไม่ใช่ค่าความน่าจะเป็นที่จะผิดนัดชำระที่ผ่านการปรับเทียบ** · ภาวะวิกฤตทางการเงิน
+ถูกรายงานแยกจากคะแนนด้วย
+
+`examples/analysis_input.json` เป็นข้อมูลสังเคราะห์ ได้เกรด B คะแนน 75.00
 
 ## Analysis API
 
-`POST /api/analyze` and its `/api/v1/analyze` alias accept:
+`POST /api/analyze` และ alias `/api/v1/analyze` รับ:
 
 ```json
 {
@@ -62,83 +74,92 @@ probability. Financial distress is also reported independently of the score.
 }
 ```
 
-This minimal request is valid but incomplete: it returns HTTP 200 with
-`insufficient_data`, null metrics and a null grade. Invalid balances or
-inconsistent supplied net income return HTTP 422. `use_llm` is a strict boolean.
-`POST /api/analyze/excel?use_llm=false` accepts the canonical workbook through
-multipart field `file`. JSON and Excel run the same validation and analysis.
-The upload is capped at 5 MiB and workbook bytes are never persisted.
+คำขอขั้นต่ำนี้ถูกต้องตามรูปแบบแต่ข้อมูลไม่ครบ จะได้ HTTP 200 พร้อม `insufficient_data`
+ตัวชี้วัดเป็น null และเกรดเป็น null · งบที่ไม่สมดุลหรือ net income ที่ส่งมาไม่สอดคล้องกัน
+จะได้ HTTP 422 · `use_llm` เป็น boolean แบบเข้มงวด
 
-`GET /api/analysis/example` returns only the fixed synthetic example, marked
-`simulated`. `GET /api/analysis/template.xlsx` generates the corresponding
-importable workbook in memory. Both also have `/api/v1/` aliases.
+`POST /api/analyze/excel?use_llm=false` รับ workbook มาตรฐานผ่าน multipart field `file` ·
+JSON และ Excel ใช้การตรวจสอบและการวิเคราะห์ชุดเดียวกัน · จำกัดขนาด 5 MiB และ
+**ไม่เคยบันทึกไบต์ของ workbook ลงที่ใด**
 
-An analysis response has the existing Envelope metadata, `inputHash` and
-`schemaVersion: analysis-v1`. `data` contains normalized `input`, decimal-string
-`metrics`, `grading`, UI-compatible `indicators`, classified `findings`,
-`explanation`, `aiMode` and `aiWarning`. Every finding references at least one
-available metric by `evidenceIds`. Explanation `dataUsed` includes display
-values and `targetElementId` matching health-page cards. Threshold decisions
-for DSCR, liquidity and reserve months use unrounded values. Display values
-are rounded only at the presentation boundary.
+`GET /api/analysis/example` คืนเฉพาะตัวอย่างสังเคราะห์ชุดคงที่ ติดป้าย `simulated` ·
+`GET /api/analysis/template.xlsx` สร้าง workbook ที่นำเข้าได้ในหน่วยความจำ ·
+ทั้งสองมี alias `/api/v1/` ด้วย
 
-These routes are stateless. Caller data is returned only to the caller and
-is not used as a global "latest business" for other clients. SHA-256 fingerprints
-describe normalized inputs; they are not anonymization, authentication or an
-authorization control. The browser holds the latest result in memory and marks
-it stale when inputs change. Results are not retained across a page reload.
+คำตอบของการวิเคราะห์มี metadata แบบ Envelope เดิม พร้อม `inputHash` และ
+`schemaVersion: analysis-v1` · `data` มี `input` ที่ปรับรูปแล้ว, `metrics` เป็นสตริงทศนิยม,
+`grading`, `indicators` ที่เข้ากับ UI, `findings` ที่จัดหมวดแล้ว, `explanation`,
+`aiMode` และ `aiWarning`
 
-## Rules and optional model mode
+**ทุก finding ต้องอ้างตัวชี้วัดที่มีอยู่จริงอย่างน้อยหนึ่งตัวผ่าน `evidenceIds`** ·
+`dataUsed` ใน explanation มีค่าที่ใช้แสดงและ `targetElementId` ที่ตรงกับการ์ดในหน้า health ·
+การตัดสินเกณฑ์ของ DSCR, สภาพคล่อง และจำนวนเดือนเงินสำรอง **ใช้ค่าที่ยังไม่ปัดเศษ**
+ค่าที่แสดงจะปัดเฉพาะตอนนำไปแสดงผล
 
-Rules identify debt service shortfalls, negative cash flow, uncovered working
-capital, inadequate reserve coverage, negative equity, period losses and
-nonpositive unit margins. Strengths and weaknesses are also recorded when
-supported. Rules do not infer late customer payments, transaction anomalies,
-industry trends or future cash from unavailable data. Unknowns explicitly
-state that a dated 30-90 day forecast and expense-history analysis are outside
-this milestone. Good/warning thresholds are declared demo policies; cost,
-PMT and break-even cards are informational rather than industry ratings.
+เส้นทางเหล่านี้เป็น stateless · ข้อมูลของผู้เรียกถูกส่งกลับให้ผู้เรียกเท่านั้น
+และไม่ถูกใช้เป็น "ธุรกิจล่าสุด" ร่วมกับ client รายอื่น · ลายนิ้วมือ SHA-256 ใช้ระบุ input
+ที่ปรับรูปแล้ว **ไม่ใช่การทำ anonymization ไม่ใช่การยืนยันตัวตน และไม่ใช่กลไกควบคุมสิทธิ์** ·
+เบราว์เซอร์เก็บผลล่าสุดไว้ในหน่วยความจำและทำเครื่องหมายว่า stale เมื่อ input เปลี่ยน
+ผลลัพธ์ไม่ถูกเก็บข้ามการรีโหลดหน้า
 
-Default `aiMode: rules` requires no model credentials. To opt into model-assisted
-prioritization, configure backend-only `OPENAI_API_KEY` and `OPENAI_MODEL`, then
-send `use_llm: true`. Choose a model that supports Responses API Structured
-Outputs. No provider or model is silently substituted. Do not put secrets into
-VITE-prefixed variables.
+## โหมด rules และโหมดโมเดล (optional)
 
-The model receives calculated metrics, the grade and supported findings, not
-the workbook or contact details. The request sets `store: false`. Structured
-Outputs constrain its response to existing finding IDs. Backend validation
-rejects unknown IDs and unexpected fields. The model cannot change metrics,
-grades, evidence or recommendation text. It ranks findings within fixed
-severity levels and cannot move a low-severity strength above a critical risk.
-No findings are dropped. Timeout, refusal, incomplete or invalid output falls
-back to rules with a visible `aiWarning`. Errors do not expose provider bodies
-or credentials. Live model calls require configured credentials; unit tests
-exercise the provider boundary with mocked responses.
+Rules ระบุ: การชำระหนี้ไม่พอ, กระแสเงินสดติดลบ, เงินทุนหมุนเวียนที่ยังไม่มีแหล่งทุน,
+เงินสำรองไม่เพียงพอ, ส่วนของเจ้าของติดลบ, ขาดทุนในงวด และกำไรต่อหน่วยไม่เป็นบวก ·
+จุดแข็งและจุดอ่อนก็ถูกบันทึกเมื่อมีหลักฐานรองรับ
 
-Source: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
+**Rules ไม่อนุมานเรื่องลูกค้าจ่ายช้า ความผิดปกติของรายการ แนวโน้มอุตสาหกรรม
+หรือเงินสดในอนาคต จากข้อมูลที่ไม่มี** · ส่วน unknowns ระบุชัดว่าการพยากรณ์แบบระบุวันที่
+30-90 วัน และการวิเคราะห์ประวัติค่าใช้จ่าย อยู่นอกขอบเขตของ milestone นี้
 
-## Frontend boundary
+> **หมายเหตุ (อัปเดต 2026-10-15):** ข้อความข้างต้นล้าสมัยแล้ว — `app/forecasting.py`
+> ทำการพยากรณ์ 30/60/90 วันได้แล้ว และเปิดใช้ผ่าน `GET /api/forecast`
 
-All frontend files are restored to commit `73649fc`, the original design before
-backend development. There are no added JSON editors, upload controls, grade
-cards, mode badges, frontend analysis stores or Vite proxy changes. The original
-frontend mock and API adapter behavior is preserved exactly.
+เกณฑ์ good/warning เป็นนโยบายเดโมที่ประกาศไว้ · การ์ดเรื่องต้นทุน PMT และจุดคุ้มทุน
+เป็นข้อมูลประกอบ **ไม่ใช่การจัดอันดับแบบอุตสาหกรรม**
 
-Backend calculations, grading, rules, optional model integration and all
-`/api/*` and `/api/v1/*` endpoints remain under `backend/app`. Analysis can be
-tested independently through `/docs` or API requests. The existing example and
-Excel template endpoints are retained. Removing UI controls does not remove
-these services.
+ค่าเริ่มต้น `aiMode: rules` ไม่ต้องใช้ credential ของโมเดล · หากต้องการให้โมเดลช่วย
+จัดลำดับความสำคัญ ให้ตั้ง `OPENAI_API_KEY` และ `OPENAI_MODEL` **ที่ฝั่ง backend เท่านั้น**
+แล้วส่ง `use_llm: true` · เลือกโมเดลที่รองรับ Structured Outputs ของ Responses API ·
+**ไม่มีการสลับผู้ให้บริการหรือโมเดลแบบเงียบ ๆ** · **ห้ามใส่ความลับในตัวแปรที่ขึ้นต้นด้วย VITE**
 
-Future integration must use the existing component tags, Tailwind classes,
-layout and page structure unchanged. Frontend owners may connect fetch hooks
-or props using this contract. Calculation and decision logic must remain in
-the backend. The analysis POST routes are not currently wired into the original
-UI. The existing adapter's `VITE_API_BASE_URL` is unchanged; simply disabling
-mock mode is insufficient because its dashboard GET endpoints are a separate
-contract. Deploying the frontend does not deploy FastAPI.
+โมเดลได้รับตัวชี้วัดที่คำนวณแล้ว เกรด และ finding ที่มีหลักฐานรองรับ
+**ไม่ได้รับ workbook หรือข้อมูลติดต่อ** · คำขอตั้ง `store: false` ·
+Structured Outputs บังคับให้คำตอบอ้างได้แค่ finding ID ที่มีอยู่
+และ backend ปฏิเสธ ID ที่ไม่รู้จักและฟิลด์ที่เกินมา
 
-Backend tests cover known financial answers, boundaries, source equivalence,
-evidence references, input isolation, validation and provider fallback. The
-synthetic example still has grade B / 75.00 through the API.
+**โมเดลเปลี่ยนตัวชี้วัด เกรด หลักฐาน หรือข้อความข้อเสนอแนะไม่ได้** ·
+ทำได้แค่จัดลำดับ finding ภายในระดับความรุนแรงที่กำหนดไว้ และ
+**ย้ายจุดแข็งความรุนแรงต่ำขึ้นไปเหนือความเสี่ยงระดับวิกฤตไม่ได้** · ไม่มี finding ใดถูกตัดออก
+
+กรณี timeout ปฏิเสธ ตอบไม่ครบ หรือตอบผิดรูปแบบ จะถอยกลับไปใช้ rules
+พร้อมแสดง `aiWarning` ให้เห็น · ข้อความ error ไม่เปิดเผย response body ของผู้ให้บริการ
+หรือ credential · การเรียกโมเดลจริงต้องมี credential ที่ตั้งไว้ ส่วน unit test
+ทดสอบขอบเขตของผู้ให้บริการด้วยคำตอบจำลอง
+
+อ้างอิง: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)
+
+## ขอบเขตฝั่ง Frontend
+
+ไฟล์ frontend ทั้งหมดถูกคืนสภาพไปที่ commit `73649fc` ซึ่งเป็นดีไซน์เดิมก่อนเริ่มพัฒนา backend ·
+ไม่มีการเพิ่ม JSON editor, ปุ่มอัปโหลด, การ์ดเกรด, ป้ายโหมด, store วิเคราะห์ฝั่ง frontend
+หรือการแก้ Vite proxy · พฤติกรรม mock และ API adapter เดิมถูกรักษาไว้เหมือนเดิมทุกจุด
+
+การคำนวณ การให้เกรด rules การต่อโมเดล (optional) และทุก endpoint `/api/*` กับ `/api/v1/*`
+อยู่ภายใต้ `backend/app` · ทดสอบการวิเคราะห์แยกได้ผ่าน `/docs` หรือยิง API ·
+endpoint ตัวอย่างและ Excel template ยังอยู่ · การไม่มีปุ่มบน UI ไม่ได้ทำให้บริการเหล่านี้หายไป
+
+การต่อ frontend ในอนาคตต้องใช้ component tag, Tailwind class, layout และโครงสร้างหน้าเดิม
+โดยไม่เปลี่ยน · เจ้าของ frontend ต่อ fetch hook หรือ props ตามสัญญานี้ได้
+**ตรรกะการคำนวณและการตัดสินใจต้องอยู่ที่ backend**
+
+> **หมายเหตุ (อัปเดต 2026-10-15):** ข้อความเดิมระบุว่าเส้นทาง analysis POST ยังไม่ถูกต่อเข้า UI
+> และการปิด mock mode เพียงอย่างเดียวไม่พอ เพราะ GET endpoint ของ dashboard เป็นสัญญาแยก
+> — ข้อสังเกตนั้นถูกต้องและได้ดำเนินการแล้ว: ปัจจุบัน contract ทั้ง 16 เส้นทางที่
+> `src/api/client.ts` เรียก ตอบ 200 ครบแล้ว (ดู `progress.md`) · สิ่งที่เหลือคือการ deploy
+> backend แล้วตั้ง `VITE_API_BASE_URL` กับ `VITE_USE_MOCK=false` · และยังเป็นจริงว่า
+> **การ deploy frontend ไม่ได้ deploy FastAPI ไปด้วย**
+
+เทสต์ฝั่ง backend ครอบคลุม: คำตอบทางการเงินที่รู้ค่าแน่นอน, ค่าขอบ, ความเท่ากันของแหล่งข้อมูล,
+การอ้างอิงหลักฐาน, การแยกข้อมูลระหว่างผู้เรียก, การตรวจสอบข้อมูล และการถอยกลับเมื่อผู้ให้บริการล่ม ·
+ตัวอย่างสังเคราะห์ยังได้เกรด B / 75.00 ผ่าน API

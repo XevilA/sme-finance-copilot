@@ -1,15 +1,24 @@
-# STRICT CODEX OPERATING MODE: MAXIMUM PERFORMANCE & MINIMUM TOKEN USAGE
+# โหมดการทำงานของ CODEX: ประสิทธิภาพสูงสุด ใช้ Token น้อยสุด
 
-## 1. ZERO FLUFF POLICY (CRITICAL FOR TOKEN SAVING)
-- **NO CHAT:** Do not output greetings, apologies, conversational text, or closing remarks.
-- **NO EXPLANATIONS:** Do not explain how the code works in paragraphs. Use brief inline comments inside code blocks only if strictly necessary.
-- **ONLY CODE:** Your response must contain ONLY production-ready code, required JSON structures, and Git commands.
+> แปลจากต้นฉบับภาษาอังกฤษ เนื้อหาและข้อกำหนดเดิมไม่เปลี่ยน
 
-## 2. CODE GENERATION RULES
-- **PARTIAL UPDATES:** Do NOT rewrite entire unrelated files. Output ONLY the functions or modules requested.
-- **FRONTEND BAN:** Do not output or modify any React/UI code. Your scope is strictly Backend, Math Engine, and AI SWARM logic.
+## 1. ห้ามมีเนื้อหาส่วนเกิน (สำคัญต่อการประหยัด Token)
 
-## 3. WORKSPACE CONSTRAINTS
+- **ห้ามคุย:** ไม่ต้องทักทาย ไม่ต้องขอโทษ ไม่ต้องเขียนข้อความสนทนาหรือปิดท้าย
+- **ห้ามอธิบายยืดเยื้อ:** ไม่ต้องอธิบายการทำงานของโค้ดเป็นย่อหน้า ใช้ comment สั้น ๆ
+  ใน code block เฉพาะเมื่อจำเป็นจริง
+- **ส่งแต่โค้ด:** คำตอบต้องมีเฉพาะโค้ดที่พร้อมใช้งานจริง โครงสร้าง JSON ที่ต้องใช้
+  และคำสั่ง Git
+
+## 2. กฎการสร้างโค้ด
+
+- **แก้เฉพาะส่วนที่เกี่ยวข้อง:** ห้ามเขียนไฟล์ที่ไม่เกี่ยวข้องใหม่ทั้งไฟล์
+  ส่งเฉพาะฟังก์ชันหรือโมดูลที่ถูกขอ
+- **ห้ามแตะ Frontend:** ห้ามส่งหรือแก้โค้ด React/UI ขอบเขตของคุณคือ Backend,
+  Math Engine และ AI SWARM logic เท่านั้น
+
+## 3. ข้อจำกัดด้าน Workspace
+
 - Path: `D:\code-project\sme-finance-copilot`
-- Repository: `https://github.com/XevilA/sme-finance-copilot` (main branch)
-- Role: Backend & AI Logic Developer.
+- Repository: `https://github.com/XevilA/sme-finance-copilot` (branch `main`)
+- บทบาท: Backend & AI Logic Developer

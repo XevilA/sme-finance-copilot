@@ -31,3 +31,72 @@
   - สร้างเซิร์ฟเวอร์ Express.js / FastAPI และทำ RESTful API endpoints สำหรับทุกโมดูล (เช่น `/api/upload`, `/api/calculate`, `/api/swarm`)[cite: 1]
 - **Module 6 (What-If Simulator):** สร้าง Endpoint `/api/simulate` โดยผูกลอจิกให้รับตัวแปรที่เปลี่ยนไป (เช่น ยอดขาย, ต้นทุน, การเพิ่ม/ลดร้านค้า) แล้วส่งไปกระตุ้นให้ระบบของ Codex คำนวณ Module 2-5 ใหม่แบบเรียลไทม์ เพื่อเปรียบเทียบแผน A/B[cite: 1]
 - **Frontend Integration (แบบไม่กระทบ UI):** เขียนโค้ด `fetch` หรือ `axios` ภายใน State management ของหน้าเว็บเพื่อดึง API **กฎเหล็ก:** ส่งต่อข้อมูลผ่าน hooks/props เท่านั้น ห้ามแก้ไขดีไซน์และสไตล์ของ UI เด็ดขาด[cite: 1]
+
+---
+
+## 📊 3. สถานะงาน: ทำแล้ว / ยังไม่ได้ทำ
+
+> อัปเดต 2026-10-15 ตรวจกับ commit `ee320dd` · 330 tests ผ่าน (มี PostgreSQL) ·
+> 29 API routes · 20 ตารางฐานข้อมูล · รายละเอียดอยู่ใน `progress.md` และ `CODEX_HANDOFF.md`
+
+### ✅ Pipeline หลัก — ครบทุกขั้นแล้ว
+
+`Read Data → Calculate → AI Analyze → Match Funding → Simulate → Return JSON to Web`
+
+| ขั้น | Endpoint | สถานะ |
+| --- | --- | --- |
+| Read Data | `POST /api/upload` | ✅ |
+| Calculate | `POST /api/calculate` | ✅ |
+| AI Analyze | `POST /api/analyze` | ✅ (โหมด rules · ยังไม่ต่อ LLM จริง) |
+| Match Funding | `POST /api/match-funding` | ✅ |
+| Simulate | `POST /api/simulate` | ✅ |
+| Return JSON | `/api/v1/*` 16 contract | ✅ ตอบ 200 ครบ |
+| เพิ่มเติม | `GET /api/forecast` · `GET /api/industry/trends` | ✅ |
+
+### ✅ CODEX (บทบาทที่ 1) — ทำแล้ว
+
+| Module | สถานะ | หมายเหตุ |
+| --- | --- | --- |
+| 1 · ตรวจข้อมูล Excel + สมการบัญชี | ✅ | `parsers/excel_parser.py`, `statement_parser.py` |
+| 2 · Math Engine + เกรด A-D | ✅ | `engines/financial_engine.py`, `grading.py` · สูตร `G = 0.35(DSCR) + 0.30(Cash flow) + 0.20(Debt burden) + 0.15(Cash reserve)` |
+| 3 · วิเคราะห์ธุรกิจ + พยากรณ์ 30/60/90 วัน | ✅ | `analysis.py`, `forecasting.py` |
+| 4 · จับคู่แหล่งทุนและนักลงทุน | ✅ | `matching.py` · ให้คะแนน 0-100 + ตรวจ DSCR หลังรับทุน |
+| 5 · SWARM Logic | ✅ | `swarm.py` v2 แบบออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
+| 7 · แนวโน้มอุตสาหกรรม | ✅ | `industry.py` · ดึงข่าวผ่าน GDELT + สถานะ stale/unavailable |
+
+### ✅ CLAUDE (บทบาทที่ 2) — ทำแล้ว
+
+| Module | สถานะ | หมายเหตุ |
+| --- | --- | --- |
+| 8 · Database schema | ✅ | 20 ตาราง · Users, SME Profiles, Investors, Projects, Analysis Results ครบ · `schema.sql` รันซ้ำได้ |
+| 8 · RBAC | ⚠️ ครึ่งทาง | role model + จุดตัดสินใจทำแล้ว ปิดเป็นค่าเริ่มต้น · **ยังไม่ใช่ authentication จริง** |
+| 8 · FastAPI + RESTful endpoints | ✅ | 29 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
+| 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
+| Frontend Integration | ⚠️ ครึ่งทาง | 16/16 contract ตอบ 200 + `src/services/api.ts` · **แต่เว็บยังเป็น mock เพราะ backend ยังไม่ได้ deploy** |
+
+**UI ไม่ถูกแตะเลย** — build ได้ `1955 modules` และ asset hash เท่าเดิมทุกครั้ง
+
+### ❌ ยังไม่ได้ทำ
+
+| งาน | เจ้าของ | ติดอะไร |
+| --- | --- | --- |
+| **Deploy backend ขึ้น host** | CLAUDE | ต้องใช้บัญชี/credential ของทีม · **นี่คือตัวบล็อกใหญ่สุดของการเดโมเว็บจริง** |
+| **ปลด frontend จากโหมด mock** | CLAUDE | ต้อง deploy ก่อน แล้วตั้ง `VITE_API_BASE_URL` + `VITE_USE_MOCK=false` |
+| **Authentication จริง** | CLAUDE | ตอนนี้ใช้ header `X-User-Email` ซึ่งใครก็ตั้งได้ · ต้องมี token ที่เซ็น/ตรวจได้ |
+| ต่อ LLM จริง | CODEX | `OPENAI_API_KEY` / `OPENAI_MODEL` ยังไม่ได้ตั้ง (ไม่มีเครดิต) · `aiMode` คืน `"rules"` ตลอด · พฤติกรรมผู้ให้บริการจริงยังไม่เคยทดสอบ |
+| ดึงข่าวสดได้สำเร็จ | CODEX | GDELT ตอบ 429 และ timeout · เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้จริง |
+| พิกัดร้านค้าจริง | ทีม | คอลัมน์ `latitude`/`longitude` พร้อมแล้วแต่ยังไม่มีข้อมูล · ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
+| `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker ควรเพิ่มก่อนรันหลายเครื่อง |
+| ต่อ `project_cash_events()` เข้า route | CLAUDE | ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ |
+| แปล `actionableItems` เป็นไทย | CODEX | ข้อความมาจาก `findings` ของ Module 3 ตรง ๆ ขณะที่ UI เป็นไทย |
+
+### ⚠️ เรื่องที่ทีมต้องตัดสินใจ (ไม่ใช่งานโค้ด)
+
+1. **เว็บจริงกับ repo ไม่ตรงกัน** — bundle บน Vercel ใหญ่กว่าที่ repo build ได้
+   (JS +48.6 kB, CSS +21.6 kB) และ UI นั้นไม่มีอยู่ใน git
+2. **"โครงการล่าสุด"** ที่ `/api/v1/order`, `/projects`, `/swarm/proposal` ใช้
+   คือสิ่งที่ถูกเขียนล่าสุด **รวมออเดอร์ที่เทสต์สร้าง** · ตอนเดโมให้ส่ง
+   `?order_ref=PO-STP-2026-091` หรือรันออเดอร์จริงเป็นตัวสุดท้าย
+3. **ข้อมูลเดโมเป็นข้อมูลสังเคราะห์ทั้งหมด** — Baan Suan เกรด A (88.37),
+   Rung Charoen เกรด D (34.61) · เกรดและการจับคู่แหล่งทุนเป็นนโยบายเดโม
+   **ไม่ใช่การอนุมัติสินเชื่อ**
