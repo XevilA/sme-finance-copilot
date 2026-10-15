@@ -15,6 +15,7 @@ from .models import (
     CashEvent,
     ChaosScenario,
     FundingProduct,
+    InvestorProfile,
     SalesChannel,
     SalesProduct,
     SharedResource,
@@ -112,6 +113,8 @@ async def load_shops(session: AsyncSession | None) -> list[dict]:
             "location": profile.location or profile.province,
             "tags": profile.tags or [],
             "statusNote": profile.status_note,
+            "businessType": profile.business_type or profile.sector,
+            "sector": profile.sector,
             "workingCapitalNeeded": None if allocation is None else float(allocation.working_capital_needed),
             "fundingGap": None if allocation is None else float(allocation.funding_gap),
             "allocationStatus": None if allocation is None else allocation.status,
@@ -379,6 +382,38 @@ async def load_funding_products(session: AsyncSession | None) -> list[dict]:
             "minDscr": none_or_float(row.min_dscr),
             "requiredDocs": row.required_docs or [],
             "eligibility": row.eligibility or [],
+        }
+        for row in rows
+    ]
+
+
+async def load_investor_profiles(session: AsyncSession | None) -> list[dict]:
+    """Active investors in snake_case, which the matcher accepts directly."""
+    if session is None:
+        return []
+    rows = (
+        await session.scalars(
+            select(InvestorProfile)
+            .where(InvestorProfile.active.is_(True))
+            .order_by(InvestorProfile.name)
+        )
+    ).all()
+    return [
+        {
+            # The matcher's Investor model keys on `id`; it returns the match
+            # under `investor_id`, which is a different field.
+            "id": str(row.id),
+            "name": row.name,
+            "type": row.type,
+            "province": row.province,
+            "ticket_min": none_or_float(row.ticket_min),
+            "ticket_max": none_or_float(row.ticket_max),
+            "target_sectors": row.target_sectors or [],
+            "risk_appetite": row.risk_appetite,
+            "min_grade": row.min_grade,
+            "min_dscr": none_or_float(row.min_dscr),
+            "horizon_months": row.horizon_months,
+            "contact_email": row.contact_email,
         }
         for row in rows
     ]

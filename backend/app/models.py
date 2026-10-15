@@ -41,6 +41,9 @@ class SmeProfile(Base):
     location: Mapped[str | None] = mapped_column(Text)
     tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     status_note: Mapped[str | None] = mapped_column(Text)
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(12, 8))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(12, 8))
+    business_type: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -399,3 +402,23 @@ class ProjectEvidence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     project: Mapped[SwarmProject] = relationship(back_populates="evidence")
+
+
+class IndustryNews(Base):
+    """Cache for the trends module. id is the fetcher hash of sector plus URL."""
+
+    __tablename__ = "industry_news"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sector: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    date_source: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str | None] = mapped_column(Text)
+    raw: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -10,10 +10,7 @@ velocity bands, the funder recommendation ladder) are marked as demo policy
 where they appear and are returned to the caller so the UI can disclose them.
 """
 
-from decimal import Decimal, ROUND_HALF_UP
-
-from .finance import calculate_pmt
-from .schemas import LoanTerms
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 # Demo policy: inventory turnover bands, in days.
 VELOCITY_FAST_DAYS = Decimal("7")
@@ -63,16 +60,14 @@ def percent(numerator: float, denominator: float) -> float:
     return float(ratio.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
-def installment_for(amount: float, annual_rate: float, term_months: int) -> float:
-    """Monthly payment through the existing PMT engine, not a second formula."""
-    loan = LoanTerms.model_validate({
-        "principal": f"{Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}",
-        "annual_interest_rate": str(annual_rate),
-        "periods": term_months,
-        "payments_per_year": 12,
-        "timing": "end",
-    })
-    return money(calculate_pmt(loan))
+def to_number(value) -> float | None:
+    """The matcher serialises money and ratios as decimal strings."""
+    if value is None:
+        return None
+    try:
+        return float(Decimal(str(value)))
+    except (InvalidOperation, ValueError):
+        return None
 
 
 # --- /shops ------------------------------------------------------------------
@@ -276,48 +271,62 @@ def cashflow_timeline(events: list[dict], opening_cash: float, reserve: float) -
 # --- /funding/options --------------------------------------------------------
 
 def funding_options(
-    products: list[dict], requested_amount: float, dscr: float | None
+    products: list[dict], matches: list[dict] | None, requested_amount: float
 ) -> tuple[list[dict], list[str]]:
-    """Hard eligibility from product constraints; ranking is not computed here.
+    """Merges catalogue metadata with the matcher's ranking.
 
-    Amount range and minimum DSCR are contractual limits stored with the
-    product, so they can be checked. matchScore is a ranking decision that
-    belongs to the funding matcher module, so it is returned as 0 and declared
-    missing rather than invented.
+    Scoring, eligibility and the repayment stress test all come from
+    app/matching.py - this only reshapes them into the frontend FundingOption.
+    Nothing is recomputed here, so a grant keeps the matcher's zero repayment
+    instead of being amortised like a 0% loan.
+
+    With no matcher result (no stored statement to score against) the products
+    are still listed, as requires_info with a null payment and the reason
+    declared, rather than shown with an invented score.
     """
-    missing = ["funding_match_score"]
-    if dscr is None:
-        missing.append("dscr_for_eligibility")
+    missing: list[str] = []
+    by_product = {row.get("product_id"): row for row in (matches or [])}
+    if matches is None:
+        missing.append("financial_record_for_matching")
 
     options = []
     for product in products:
-        reasons = []
-        status = "eligible"
+        match = by_product.get(product["id"])
 
-        if requested_amount <= 0:
-            status = "requires_info"
-            reasons.append("ยังไม่ได้ระบุวงเงินที่ต้องการ")
-        elif requested_amount < product["minAmount"]:
-            status = "not_eligible"
-            reasons.append(f"ต่ำกว่าวงเงินขั้นต่ำ {money(product['minAmount']):,.0f} บาท")
-        elif requested_amount > product["maxAmount"]:
-            status = "not_eligible"
-            reasons.append(f"เกินวงเงินสูงสุด {money(product['maxAmount']):,.0f} บาท")
+        if match is None:
+            score, status = 0, "requires_info"
+            reason = "ยังไม่มีงบการเงินในระบบสำหรับประเมินการจับคู่"
+            payment = None
+            total_repayment = None
+            notice = None
+        else:
+            score = int(match["match_score"])
+            status = match["status"]
+            reason = match.get("match_reason") or ""
+            payment = to_number(match.get("monthly_payment"))
+            # The UI field means total repayment over the facility life, so it
+            # multiplies by the tenor. The matcher's period_installments is a
+            # different quantity - installments inside the reporting period,
+            # used for its DSCR stress test - and must not be used here.
+            total_repayment = (
+                None if payment is None
+                else money(Decimal(str(payment)) * Decimal(str(product["termMonths"])))
+            )
+            notice = match.get("notice")
 
-        if product["minDscr"] is not None:
-            if dscr is None:
-                if status == "eligible":
-                    status = "requires_info"
-                reasons.append(f"ต้องมี DSCR อย่างน้อย {product['minDscr']} แต่ยังคำนวณไม่ได้")
-            elif dscr < product["minDscr"]:
-                status = "not_eligible"
-                reasons.append(f"DSCR {dscr:.2f} ต่ำกว่าเกณฑ์ {product['minDscr']}")
+        if payment is None:
+            impact = f"เงินเข้าบัญชีภายใน {product['disbursementDays']} วัน (ยังคำนวณค่างวดไม่ได้)"
+        elif payment == 0:
+            impact = (
+                f"ไม่มีภาระผ่อนชำระ เงินเข้าบัญชีภายใน {product['disbursementDays']} วัน"
+            )
+        else:
+            impact = (
+                f"ผ่อนเดือนละ {payment:,.0f} บาท เป็นเวลา {product['termMonths']} เดือน "
+                f"เงินเข้าบัญชีภายใน {product['disbursementDays']} วัน"
+            )
 
-        amount = min(max(requested_amount, product["minAmount"]), product["maxAmount"])
-        payment = installment_for(amount, product["interestRateAnnual"], product["termMonths"])
-        total_repayment = money(Decimal(str(payment)) * product["termMonths"])
-
-        options.append({
+        option = {
             "id": product["id"],
             "name": product["name"],
             "provider": product["provider"],
@@ -328,18 +337,26 @@ def funding_options(
             "interestRateAnnual": product["interestRateAnnual"],
             "termMonths": product["termMonths"],
             "disbursementDays": product["disbursementDays"],
-            "monthlyPayment": payment,
-            "totalRepayment": total_repayment,
-            "impactOnCash": (
-                f"ผ่อนเดือนละ {payment:,.0f} บาท เป็นเวลา {product['termMonths']} เดือน "
-                f"เงินเข้าบัญชีภายใน {product['disbursementDays']} วัน"
-            ),
+            "monthlyPayment": payment if payment is not None else 0,
+            "totalRepayment": total_repayment if total_repayment is not None else 0,
+            "impactOnCash": impact,
             "requiredDocs": product["requiredDocs"],
             "eligibilityConditions": product["eligibility"],
-            "matchScore": 0,
-            "matchReason": " / ".join(reasons) if reasons else "ผ่านเกณฑ์วงเงินและ DSCR ที่เก็บไว้กับผลิตภัณฑ์",
+            "matchScore": score,
+            "matchReason": reason,
             "status": status,
-        })
+        }
+        if match is not None:
+            # Carried through so a screen can disclose the stress test and the
+            # fact that a ranking is not a credit decision.
+            option["postFundingDscr"] = match.get("post_funding_dscr")
+            option["policyVersion"] = match.get("policy_version")
+            option["notice"] = notice
+        options.append(option)
+
+    # Keep the matcher ordering: best first, rejections last.
+    order = {product_id: index for index, product_id in enumerate(by_product)}
+    options.sort(key=lambda item: order.get(item["id"], len(order)))
     return options, missing
 
 

@@ -8,6 +8,72 @@
 
 ---
 
+## รอบ 2026-10-15 — ต่อโมดูลของ Codex เข้าระบบ
+
+Codex ส่ง 4 โมดูลมา (`6d2b9bc`..`311ef0d`) และไม่แตะไฟล์ฝั่งผมเลย ตรวจแล้ว diff ว่าง
+ผมต่อเข้าระบบและแก้สิ่งที่พบ
+
+### P0 สูตร SWARM — แก้แล้วและ reseed
+
+สูตรใหม่ (`swarm-allocator/v2`, finite order) ให้เงินทุนหมุนเวียน = ต้นทุนผลิตจริง
+ตรวจทวนด้วยมือ: `450×30×55 = 742,500` · `500×30×60 = 900,000` · `50×30×70 = 105,000`
+
+| | v1 (เดิม) | v2 (ใหม่) |
+| --- | --- | --- |
+| Sahai WC / gap | 1,485,000 / 315,000 | **742,500 / 0** |
+| Baan Suan WC / gap | 1,800,000 / 0 | **900,000 / 0** |
+| Rung Charoen WC / gap | 210,000 / 150,000 | **105,000 / 45,000** |
+| ส่วนขาดรวม | 465,000 | **45,000** |
+
+`seed.sql` อัปเดตจาก `SWARM_RESEED_VALUES.json` แล้ว · ยืนยันว่าค่าที่เก็บตรงกับการคำนวณสด
+
+### ที่ต่อเพิ่ม
+
+| สิ่งที่ทำ | รายละเอียด |
+| --- | --- |
+| `POST /api/match-funding` | เรียก `match_funding` + `match_investors` คืนหนี้และทุนแยกกัน บันทึกลง `funding_matches` / `investor_matches` แบบแทนที่ไม่ต่อท้าย |
+| `/api/v1/funding/options` | เปลี่ยนมาใช้ matcher แทนเกณฑ์ของผมเอง เอาโค้ด PMT ซ้ำออก |
+| `GET /api/forecast` | เปิด `forecast_cashflow` · ตรงกับค่าที่ Codex ระบุ: ต่ำสุด 3,370,000 วันที่ 2026-10-25 · 30/60/90 = 3,370,000 / 3,370,000 / 5,770,000 |
+| `GET /api/industry/trends` | เปิด `fetch_industry_trends` + ตาราง `industry_news` เป็น cache (upsert ด้วย id ของ fetcher) |
+| input ใหม่ของ swarm | ส่งต่อ `production_start`, `collection_schedule`, `required_business_types`, `buyer_coordinates`, `max_distance_km`, `business_type`, `coordinates` |
+| schema | เพิ่ม `latitude`/`longitude`/`business_type` ใน `sme_profiles` + ตาราง `industry_news` → **20 ตาราง** |
+| ข้อมูลเดโม | งบการเงินที่ validate แล้ว 2 ชุด: Baan Suan **เกรด A (88.37)** · Rung Charoen **เกรด D (34.61)** |
+
+### บั๊กที่เจอและแก้รอบนี้
+
+| บั๊ก | อาการ | การแก้ |
+| --- | --- | --- |
+| `totalRepayment` ผิดความหมาย | ผมเอา `period_installments` (จำนวนงวดใน**งวดบัญชี** ที่ matcher ใช้ stress test DSCR) ไปคูณ ทำให้ยอดรวมเท่าค่างวดเดือนเดียว | ใช้ `term_months` (อายุสัญญา) ทั้งใน adapter และตอนบันทึก DB |
+| เงินให้เปล่าถูกคิดดอกเบี้ย | adapter เดิมผมคิดเงินให้เปล่าเป็นสินเชื่อ 0% ผ่อน 38,750/เดือน | ใช้ค่างวด 0 จาก matcher ตามที่ Codex เตือน |
+| งบ `simulated` ถูกใช้แทน `actual` | `load_recent_records` เรียงตามความใหม่ ทำให้ what-if ที่เขียนทีหลังกลายเป็นฐานของการให้เกรดและจับคู่ทุน (Baan Suan ได้ B แทน A) | เรียงตาม kind ก่อน: `actual` > `forecast` > `simulated` |
+| "งวดก่อนหน้า" เป็นงวดเดียวกัน | มีงบงวดเดียวกันหลายแถว ทำให้ diff เป็น 0 โดยไม่ประกาศ `previous_period_statement` ซึ่งหลอกตากว่าบอกว่าข้อมูลขาด | dedupe ตามงวด เก็บแถวที่ใหม่สุดต่อหนึ่งงวด |
+| duplicate shop id ตกเป็น 500 | validator ของ engine ทำงานหลัง `SwarmBody` ผ่านแล้ว | ดัก `ValidationError` ใน route แปลงเป็น 422 |
+| investor key ไม่ตรง | `Investor` model ของ matcher ใช้ `id` ไม่ใช่ `investor_id` (ซึ่งเป็น key ของ**ผลลัพธ์**) | แก้ loader ให้ส่ง `id` |
+
+### test ที่แก้เพราะพฤติกรรมเปลี่ยน (ไม่ใช่เพราะ test เสีย)
+
+3 ตัวใน `test_catalog_contracts.py` ยืนยันพฤติกรรมก่อนมี matcher: เงินให้เปล่าถูก amortise,
+ข้อความเหตุผลของผมเอง, และ `matchScore` เป็น 0 เสมอพร้อมประกาศ `funding_match_score`
+ตอนนี้ทั้งสามเป็นจริงไม่ได้แล้วเพราะคะแนนมาจาก matcher จริง จึงเขียนใหม่ให้ยืนยันพฤติกรรมใหม่
+
+### สถานะหลังรอบนี้
+
+- **330 tests ผ่าน** (มี Postgres) · **286 ผ่าน + 44 skip** (ไม่มี DB)
+- 20 ตาราง · frontend bundle ไม่ขยับ (`1955 modules`, hash เดิม) · 16/16 contract ยังตอบ 200
+- GDELT timeout ในเครื่องนี้ → endpoint คืน `unavailable` + `missing: ["industry_news"]`
+  ไม่มีข่าวปลอม ซึ่งเป็น path ที่ออกแบบไว้
+
+### ยังค้าง
+
+| งาน | ติดอะไร |
+| --- | --- |
+| Deploy backend + ปลด frontend จาก mock | ต้องใช้ credential ของทีม (`VITE_API_BASE_URL` + `VITE_USE_MOCK=false`) |
+| Auth จริง | `X-User-Email` ไม่ใช่เส้นแบ่งความปลอดภัย |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | ยังไม่ได้ตั้ง → `aiMode` คืน `"rules"` ตลอด |
+| พิกัดร้านจริง | คอลัมน์พร้อมแล้วแต่ยังไม่มีข้อมูล ตัวกรองระยะทางจึงยังตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
+
+---
+
 ## สรุปสถานะ
 
 | ตัวชี้วัด | ค่า |

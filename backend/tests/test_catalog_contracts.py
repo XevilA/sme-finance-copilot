@@ -205,30 +205,40 @@ def test_funding_options_shape_and_repayment_arithmetic():
 
 
 @needs_db
-def test_zero_interest_product_repays_exactly_the_principal():
-    """The grant is 0%, so twelve payments must total the amount drawn."""
-    options = get("/funding/options?amount=465000")["data"]
+def test_grant_carries_no_repayment():
+    """Behaviour changed: the grant used to be amortised like a 0% loan.
+
+    Repayment now comes from the matcher, which treats a grant as having no
+    debt service at all, so there is no installment to show.
+    """
+    options = get(f"/funding/options?sme_id={BAAN_SUAN}&amount=465000")["data"]
     grant = next(o for o in options if o["type"] == "grant")
-    assert grant["monthlyPayment"] == pytest.approx(465000 / grant["termMonths"])
-    assert grant["totalRepayment"] == pytest.approx(465000)
+    assert grant["monthlyPayment"] == 0
+    assert grant["totalRepayment"] == 0
 
 
 @needs_db
 def test_amount_outside_a_product_range_is_not_eligible():
-    options = get("/funding/options?amount=20000")["data"]
+    """The reason text now comes from the matcher, so only the verdict is asserted."""
+    options = get(f"/funding/options?sme_id={BAAN_SUAN}&amount=20000")["data"]
     too_small = [o for o in options if 20000 < o["minAmount"]]
     assert too_small, "expected at least one product with a higher minimum"
     for option in too_small:
         assert option["status"] == "not_eligible"
-        assert "ขั้นต่ำ" in option["matchReason"]
+        assert option["matchReason"]
 
 
 @needs_db
-def test_match_score_is_declared_missing_not_invented():
-    """Ranking belongs to the funding matcher module, so it is not guessed here."""
-    body = get("/funding/options?amount=465000")
-    assert "funding_match_score" in body["missing"]
-    assert all(option["matchScore"] == 0 for option in body["data"])
+def test_match_score_now_comes_from_the_matcher():
+    """Behaviour changed: the matcher module exists, so the score is real.
+
+    It was previously returned as 0 with funding_match_score declared missing,
+    because no ranking logic existed yet.
+    """
+    body = get(f"/funding/options?sme_id={BAAN_SUAN}&amount=465000")
+    assert "funding_match_score" not in body["missing"]
+    assert any(option["matchScore"] > 0 for option in body["data"])
+    assert all(option["notice"] for option in body["data"])
 
 
 # --- /sales/* ----------------------------------------------------------------

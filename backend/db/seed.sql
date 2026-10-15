@@ -72,29 +72,33 @@ ON CONFLICT (id) DO NOTHING;
 -- funding gaps are what app/swarm.py computes for this order, so the stored
 -- rows and a live recomputation agree.
 --
--- NOTE: that working-capital formula is under review (see DEMO_READINESS.md
--- P0 - it charges production cost across the payment-wait days). These rows
--- match the engine as it stands today; when the formula changes, reseed.
+-- Values come from swarm-allocator/v2 (finite-order cash exposure): working
+-- capital is the peak cumulative production-cost deficit after buyer
+-- collections, excluding the initial deposit. Reseeded from
+-- docs/SWARM_RESEED_VALUES.json after the v1 formula was corrected - v1 charged
+-- production cost across the payment-wait days and overstated a finite order.
 INSERT INTO swarm_allocations (id, project_id, sme_id, assigned_role, share_per_day,
                                working_capital_needed, current_cash, funding_gap, status,
                                selling_price_per_unit, raw_material_cost,
                                additional_labor_cost, delivery_cost, service_fee,
                                buyer_signed, shop_signed, logistics_signed, funder_signed)
 VALUES
-  -- Sahai Packing: cheapest unit cost, so it is allocated first.
+  -- Sahai Packing: cheapest unit cost, so it is allocated first. Its own cash
+  -- covers the finite-order exposure, so v2 leaves no gap.
   ('b1000000-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000001',
    '33333333-3333-4333-8333-333333333333', 'lead_producer', 450,
-   1485000.00, 1200000.00, 315000.00, 'review',
+   742500.00, 1200000.00, 0.00, 'ready',
    100.00, 742500.00, 40500.00, 20250.00, 6750.00, TRUE, TRUE, TRUE, FALSE),
   -- Baan Suan: healthy cash, no gap.
   ('b1000000-0000-4000-8000-000000000002', 'bbbbbbbb-0000-4000-8000-000000000001',
    '11111111-1111-4111-8111-111111111111', 'co_producer', 500,
-   1800000.00, 5000000.00, 0.00, 'ready',
+   900000.00, 5000000.00, 0.00, 'ready',
    100.00, 900000.00, 45000.00, 22500.00, 7500.00, TRUE, TRUE, TRUE, TRUE),
-  -- Rung Charoen: distressed, blocked on funding.
+  -- Rung Charoen: distressed. Usable cash of 30,000 against a 75,000 deficit
+  -- after the deposit leaves a 45,000 gap.
   ('b1000000-0000-4000-8000-000000000003', 'bbbbbbbb-0000-4000-8000-000000000001',
    '22222222-2222-4222-8222-222222222222', 'finisher', 50,
-   210000.00, 180000.00, 150000.00, 'blocked',
+   105000.00, 180000.00, 45000.00, 'blocked',
    100.00, 105000.00, 4500.00, 2250.00, 750.00, TRUE, FALSE, FALSE, FALSE)
 ON CONFLICT (id) DO NOTHING;
 
@@ -252,4 +256,23 @@ VALUES
    'investor', NULL, 'cccccccc-0000-4000-8000-000000000001'),
   ('dddddddd-0000-4000-8000-000000000004', 'admin@example.test', 'Platform Admin',
    'admin', NULL, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+-- Validated statements for the two contrasted SMEs, so grading, analysis and
+-- funding matching all have real input. Verified against app/grading.py before
+-- being written here.
+--
+-- `computed` is left NULL deliberately: the engine recomputes on read, and a
+-- hand-written metrics blob would drift from it silently.
+INSERT INTO financial_records (id, sme_id, currency, kind, source, period_start,
+                               period_end, payload, computed, status)
+VALUES
+  -- Baan Suan: grade A (88.37). DSCR 2.7083, liquidity 4.5833, no funding gap.
+  ('c1000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'THB', 'actual', 'manual',
+   '2026-09-01', '2026-09-30',
+   '{"currency": "THB", "kind": "actual", "period_start": "2026-09-01", "period_end": "2026-09-30", "assets": "8000000.00", "liabilities": "3000000.00", "equity": "5000000.00", "opening_assets": "7500000.00", "opening_equity": "4700000.00", "current_assets": "5500000.00", "current_liabilities": "1200000.00", "cash_balance": "5000000.00", "net_income": "600000.00", "operating_cash_flow": "700000.00", "investing_cash_flow": "-150000.00", "financing_cash_flow": "-100000.00", "capital_expenditure": "150000.00", "cash_available_for_debt_service": "650000.00", "debt_principal_due": "200000.00", "debt_interest_due": "40000.00", "working_capital_needed": "900000.00", "minimum_cash_reserve": "200000.00", "buyer_deposit": "300000.00", "committed_funding": "0.00", "revenue": "3000000.00", "cost_of_goods_sold": "1800000.00", "operating_expenses": "450000.00", "interest_expense": "40000.00", "tax_expense": "110000.00", "operating_cash_outflow": "2300000.00", "units_sold": 30000, "unit_price": "100.00", "variable_cost_per_unit": "60.00", "fixed_costs": "450000.00", "initial_investment": "500000.00", "investment_net_gain": "120000.00", "loan": {"principal": "1500000.00", "annual_interest_rate": "0.0725", "periods": 36, "payments_per_year": 12, "timing": "end"}}'::jsonb, NULL, 'ok'),
+  -- Rung Charoen: grade D (34.61). DSCR 0.8219 below 1, liquidity 0.75, funding gap 45,000.
+  ('c1000000-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222', 'THB', 'actual', 'manual',
+   '2026-09-01', '2026-09-30',
+   '{"currency": "THB", "kind": "actual", "period_start": "2026-09-01", "period_end": "2026-09-30", "assets": "1200000.00", "liabilities": "980000.00", "equity": "220000.00", "opening_assets": "1250000.00", "opening_equity": "260000.00", "current_assets": "420000.00", "current_liabilities": "560000.00", "cash_balance": "180000.00", "net_income": "-18000.00", "operating_cash_flow": "35000.00", "investing_cash_flow": "-10000.00", "financing_cash_flow": "20000.00", "capital_expenditure": "10000.00", "cash_available_for_debt_service": "60000.00", "debt_principal_due": "55000.00", "debt_interest_due": "18000.00", "working_capital_needed": "105000.00", "minimum_cash_reserve": "150000.00", "buyer_deposit": "30000.00", "committed_funding": "0.00", "revenue": "520000.00", "cost_of_goods_sold": "380000.00", "operating_expenses": "140000.00", "interest_expense": "18000.00", "tax_expense": "0.00", "operating_cash_outflow": "540000.00", "units_sold": 7000, "unit_price": "74.00", "variable_cost_per_unit": "54.00", "fixed_costs": "140000.00", "initial_investment": "150000.00", "investment_net_gain": "-20000.00", "loan": {"principal": "300000.00", "annual_interest_rate": "0.13", "periods": 12, "payments_per_year": 12, "timing": "end"}}'::jsonb, NULL, 'ok')
 ON CONFLICT (id) DO NOTHING;

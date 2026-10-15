@@ -8,12 +8,15 @@ an empty payload with the reason in `missing`, rather than 404 or invented rows,
 so the UI renders its own empty state.
 """
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 
 from .. import adapters, adapters_catalog, catalog
 from ..db import DB_ENABLED, session_scope
-from ..finance import calculate_financials
+from ..grading import grade_financials
+from ..matching import match_funding
 from ..rbac import Principal, funder_access, resolve_principal
 from ..repository import load_recent_records, parse_uuid
 from ..schemas import FinancialInput
@@ -111,10 +114,15 @@ async def funding_options(
     sme_id: str | None = Query(default=None),
     amount: float | None = Query(default=None),
 ) -> dict:
-    """Eligibility from stored product constraints; ranking is not computed.
+    """Catalogue plus the matcher ranking for one SME.
 
-    The requested amount comes from `amount`, or from the SME's own funding gap
-    in its latest allocation. DSCR comes from the SME's latest statement.
+    Scoring lives in app/matching.py; this route resolves the SME, loads the
+    products and reshapes the result. The requested amount comes from `amount`,
+    or from the SME funding gap in its latest allocation.
+
+    Without a stored statement there is nothing to score against, so the
+    products are listed as requires_info and that is declared, rather than
+    ranked against assumed figures.
     """
     if not DB_ENABLED:
         return offline([])
@@ -130,14 +138,17 @@ async def funding_options(
         requested = (match or {}).get("fundingGap") or 0.0
     requested = requested or 0.0
 
-    dscr = None
-    if records:
+    matches = None
+    if records and requested > 0:
         data = FinancialInput.model_validate(records[0]["payload"])
-        metric = (await run_in_threadpool(calculate_financials, data))["data"].get("dscr", {})
-        if metric.get("status") == "ok":
-            dscr = float(metric["value"])
+        grade = await run_in_threadpool(grade_financials, data)
+        matches = await run_in_threadpool(
+            match_funding, data, grade, Decimal(str(requested)), products
+        )
 
-    options, missing = adapters_catalog.funding_options(products, requested, dscr)
+    options, missing = adapters_catalog.funding_options(products, matches, requested)
+    if requested <= 0:
+        missing = [*missing, "requested_amount"]
     return adapters.envelope(
         options, "forecast", missing, "", source="stored_record",
         requestedAmount=requested,

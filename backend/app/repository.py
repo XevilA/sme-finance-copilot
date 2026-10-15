@@ -5,7 +5,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import delete, select
+from sqlalchemy import case, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -148,6 +148,14 @@ async def load_shop_capacities(session: AsyncSession | None, sme_ids: list[uuid.
             "cost_per_unit": row.cost_per_unit,
             "cash_balance": row.cash_balance,
             "minimum_cash_reserve": row.minimum_cash_reserve,
+            # business_type falls back to sector; the matcher compares these
+            # case-insensitively. Coordinates stay absent when unknown so the
+            # distance filter excludes the shop instead of guessing a position.
+            "business_type": row.business_type or row.sector,
+            "coordinates": (
+                None if row.latitude is None or row.longitude is None
+                else {"latitude": row.latitude, "longitude": row.longitude}
+            ),
         }
         for row in rows
     ]
@@ -156,21 +164,52 @@ async def load_shop_capacities(session: AsyncSession | None, sme_ids: list[uuid.
 async def load_recent_records(
     session: AsyncSession | None, sme_id: uuid.UUID | None, limit: int = 2
 ) -> list[dict]:
-    """Latest statements for one SME, newest period first.
+    """Latest statements for one SME, newest period first, one row per period.
 
     The frontend overview needs two: the current period and the one before it,
     so a period-on-period difference can be computed instead of invented.
+
+    Rows are deduplicated by period, keeping the most recently created one. An
+    SME can legitimately hold several statements for the same period - a revised
+    upload, or a forecast beside an actual - and returning two of those as
+    "current" and "previous" would produce a difference of zero that looks
+    verified instead of declaring the previous period missing.
     """
     if session is None or sme_id is None:
         return []
+    # Within one period an `actual` statement is the authoritative record and a
+    # `simulated` one is only a scenario, so kind decides before recency does.
+    # Without this, storing a what-if after the real statement would silently
+    # make the scenario the basis for grading and funding decisions.
+    kind_rank = case(
+        (FinancialRecord.kind == "actual", 0),
+        (FinancialRecord.kind == "forecast", 1),
+        else_=2,
+    )
     rows = (
         await session.scalars(
             select(FinancialRecord)
             .where(FinancialRecord.sme_id == sme_id)
-            .order_by(FinancialRecord.period_end.desc(), FinancialRecord.created_at.desc())
-            .limit(limit)
+            .order_by(
+                FinancialRecord.period_end.desc(),
+                kind_rank,
+                FinancialRecord.created_at.desc(),
+            )
         )
     ).all()
+
+    seen: set[tuple] = set()
+    unique = []
+    for row in rows:
+        period = (row.period_start, row.period_end)
+        if period in seen:
+            continue
+        seen.add(period)
+        unique.append(row)
+        if len(unique) >= limit:
+            break
+    rows = unique
+
     return [
         {
             "recordId": str(row.id),

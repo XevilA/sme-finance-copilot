@@ -240,6 +240,12 @@ ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS category      TEXT;
 ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS location      TEXT;
 ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS tags          JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS status_note   TEXT;
+-- Coordinates for the SWARM distance filter. Nullable on purpose: a shop with
+-- no coordinates is excluded when a radius is required, never given a guessed
+-- position derived from its province text.
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS latitude      NUMERIC(12,8) CHECK (latitude BETWEEN -90 AND 90);
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS longitude     NUMERIC(12,8) CHECK (longitude BETWEEN -180 AND 180);
+ALTER TABLE sme_profiles  ADD COLUMN IF NOT EXISTS business_type TEXT;
 
 ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS code                TEXT;
 ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS title               TEXT;
@@ -389,6 +395,28 @@ CREATE TABLE IF NOT EXISTS project_evidence (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS project_evidence_project_idx ON project_evidence (project_id);
+
+-- 17. Industry news cache ----------------------------------------------------
+-- Cache for the trends module. `id` is the SHA-256 the fetcher derives from
+-- sector plus canonical URL, so re-ingesting the same article is an upsert.
+-- published_at stays nullable: the provider does not establish a publication
+-- timestamp, and observed_at records only when the article was first seen.
+CREATE TABLE IF NOT EXISTS industry_news (
+    id              CHAR(64) PRIMARY KEY,
+    sector          TEXT        NOT NULL,
+    provider        TEXT        NOT NULL,
+    source          TEXT,
+    url             TEXT        NOT NULL,
+    title           TEXT        NOT NULL,
+    published_at    TIMESTAMPTZ,
+    observed_at     TIMESTAMPTZ,
+    fetched_at      TIMESTAMPTZ NOT NULL,
+    date_source     TEXT,
+    status          TEXT,
+    raw             JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS industry_news_sector_idx ON industry_news (sector, fetched_at DESC);
 
 -- updated_at triggers --------------------------------------------------------
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
