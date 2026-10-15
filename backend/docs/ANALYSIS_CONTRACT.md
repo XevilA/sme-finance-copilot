@@ -163,3 +163,42 @@ endpoint ตัวอย่างและ Excel template ยังอยู่ 
 เทสต์ฝั่ง backend ครอบคลุม: คำตอบทางการเงินที่รู้ค่าแน่นอน, ค่าขอบ, ความเท่ากันของแหล่งข้อมูล,
 การอ้างอิงหลักฐาน, การแยกข้อมูลระหว่างผู้เรียก, การตรวจสอบข้อมูล และการถอยกลับเมื่อผู้ให้บริการล่ม ·
 ตัวอย่างสังเคราะห์ยังได้เกรด B / 75.00 ผ่าน API
+
+## Live provider verification: 2026-10-15
+
+- Model: `gpt-6-luna`, present in the account's authenticated `GET /v1/models`
+  response. Selected as the cheapest current, non-deprecated text model in the
+  reviewed official catalog that supports Responses and Structured Outputs.
+  The cheaper legacy `gpt-5-nano` is marked deprecated in the official catalog.
+- Two real `POST /api/analyze` requests were made over local HTTP with
+  `use_llm: true`, using the synthetic example and a cash-shortfall variant.
+  Both provider responses were HTTP 200 with `status: completed`; both API
+  results reported `aiMode: openai`, `aiModel: gpt-6-luna`, `aiWarning: null`.
+- `max_output_tokens` remains **600**, `store` remains **false**, and no automatic
+  retry or model substitution was added. The key exists only in the ignored
+  `backend/.env`; the example environment contains only the model ID.
+- Metrics and grading were byte-identical under canonical JSON serialization
+  for `use_llm: false` and `true`. Each complete finding, compared by its stable
+  ID, was also byte-identical, including text, action, evidence and severity.
+  The example retained its original array order. The cash-shortfall case
+  reordered findings within severity groups, so its **array order differs**.
+  Whole-array byte identity is not promised when prioritization is requested.
+- Automated HTTP-transport mocks cover valid JSON, malformed HTTP/model JSON,
+  refusal, timeout, 401/403, 429 and 500. Failures preserve rules results and
+  expose a nonempty `aiWarning` without disclosing provider bodies or secrets.
+  The automated suite does not call the live model.
+- All 12 rule-generated `finding.text` and `finding.action.text` branches now
+  use Thai. `explanation.summary` and `explanation.reasoning` also use Thai;
+  all keys, IDs, categories, severities, target pages and formulas are unchanged.
+  Existing metric labels, diagnostic unknowns and provider warnings retain their
+  English technical wording. The rules path preserves all numerical values;
+  its user-facing narrative intentionally changes language.
+- Real HTTP checks of `/api/v1/overview?sme_id=...` confirmed Thai `title`,
+  `description` and `actionText` for both demo SMEs, with unchanged `act-*` IDs.
+
+Usage and cost evidence, including cache-write charges and billing limitations:
+[LIVE_PROVIDER_VERIFICATION.md](LIVE_PROVIDER_VERIFICATION.md).
+
+Sources: [model capabilities and rates](https://developers.openai.com/api/docs/models/gpt-6-luna),
+[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses),
+[legacy GPT-5 nano status](https://developers.openai.com/api/docs/models/gpt-5-nano).

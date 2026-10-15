@@ -26,7 +26,11 @@ def invoke(monkeypatch, handler):
     result = asyncio.run(ai_provider.apply_model_priorities(deepcopy(before)))
     assert result["data"]["metrics"] == before["data"]["metrics"]
     assert result["data"]["grading"] == before["data"]["grading"]
-    assert {row["id"] for row in result["data"]["findings"]} == {row["id"] for row in before["data"]["findings"]}
+    canonical = lambda rows: json.dumps(sorted(rows, key=lambda row: row["id"]), sort_keys=True, ensure_ascii=False).encode()
+    assert canonical(result["data"]["findings"]) == canonical(before["data"]["findings"])
+    severity = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    ranks = [severity[row["severity"]] for row in result["data"]["findings"]]
+    assert ranks == sorted(ranks)
     assert "test-only-key" not in json.dumps(result)
     return result["data"]
 
@@ -65,9 +69,11 @@ def test_valid_structured_json_over_http_transport_preserves_all_financial_evide
 
     result = invoke(monkeypatch, valid)
     assert result["aiMode"] == "openai"
+    assert result["aiModel"] == "test-model"
     assert result["aiWarning"] is None
     assert len(calls) == 1
     assert calls[0]["text"]["format"]["type"] == "json_schema"
     assert calls[0]["text"]["format"]["strict"] is True
     assert calls[0]["text"]["format"]["schema"]["additionalProperties"] is False
     assert calls[0]["store"] is False
+    assert calls[0]["max_output_tokens"] == 600

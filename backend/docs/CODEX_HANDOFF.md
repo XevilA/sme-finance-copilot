@@ -1,5 +1,29 @@
 # การส่งมอบงานของ CODEX
 
+## Latest verification: 2026-10-15
+
+This update supersedes earlier notes below about missing OpenAI credentials and
+the previous unverified live LLM path. Claude's wiring/reseed work is recorded in
+`progress.md`; the historical notes below are not a current integration backlog.
+
+- `backend/.env` now holds the local key and `OPENAI_MODEL=gpt-6-luna`; the key is
+  ignored by Git and is never included in handoff artifacts.
+- Two real HTTP analysis requests completed with `aiMode: openai`. Metrics,
+  grades and every complete finding by ID were byte-identical to rules output;
+  only permitted ordering within severity groups changed in the shortfall case.
+- Usage-priced cost including cache writes: **$0.00144635**; estimated remainder
+  from the reported $5.98: **$5.97855365**. Actual billing balance is unverified.
+- All 12 finding/action branches and the explanation summary/reasoning are Thai.
+  IDs, categories, severity, evidence references, targets and JSON shape remain
+  unchanged. Both demo overview endpoints returned Thai action fields over HTTP.
+- News remains honestly unavailable. DNS/TCP succeed, HTTPS TLS stalls, and a
+  separate plain-HTTP diagnostic returns 429. No successful articles or live
+  deduplication/publication-date checks are claimed. Claude still owns provider
+  scheduling; network/provider TLS diagnosis is also needed at deployment.
+- Frontend and all Claude-owned files remain unchanged.
+
+Detailed evidence and limitations: `LIVE_PROVIDER_VERIFICATION.md`.
+
 > แปลจากต้นฉบับภาษาอังกฤษของ CODEX · signature ของฟังก์ชัน ชื่อฟิลด์ ชื่อ key ตัวเลข
 > และ code block ทั้งหมดคงเดิม · หัวข้อที่ CLAUDE ดำเนินการแล้วหรือยังค้าง มีหมายเหตุกำกับ
 

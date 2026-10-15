@@ -47,7 +47,7 @@
 | --- | --- | --- |
 | Read Data | `POST /api/upload` | ✅ |
 | Calculate | `POST /api/calculate` | ✅ |
-| AI Analyze | `POST /api/analyze` | ✅ (โหมด rules · ยังไม่ต่อ LLM จริง) |
+| AI Analyze | `POST /api/analyze` | ✅ rules + live OpenAI verified with `gpt-6-luna` on 2026-10-15 |
 | Match Funding | `POST /api/match-funding` | ✅ |
 | Simulate | `POST /api/simulate` | ✅ |
 | Return JSON | `/api/v1/*` 16 contract | ✅ ตอบ 200 ครบ |
@@ -63,6 +63,8 @@
 | 4 · จับคู่แหล่งทุนและนักลงทุน | ✅ | `matching.py` · ให้คะแนน 0-100 + ตรวจ DSCR หลังรับทุน |
 | 5 · SWARM Logic | ✅ | `swarm.py` v2 แบบออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
 | 7 · แนวโน้มอุตสาหกรรม | ✅ | `industry.py` · ดึงข่าวผ่าน GDELT + สถานะ stale/unavailable |
+| Live LLM verification | ✅ | Two real Structured Outputs calls; deterministic metrics/grades and complete findings preserved; model `gpt-6-luna`; output cap 600 |
+| Thai analysis actions | ✅ | All 12 finding branches and their actions translated; overview HTTP checked for both demo SMEs; IDs and shape unchanged |
 
 ### ✅ CLAUDE (บทบาทที่ 2) — ทำแล้ว
 
@@ -83,12 +85,10 @@
 | **Deploy backend ขึ้น host** | CLAUDE | ต้องใช้บัญชี/credential ของทีม · **นี่คือตัวบล็อกใหญ่สุดของการเดโมเว็บจริง** |
 | **ปลด frontend จากโหมด mock** | CLAUDE | ต้อง deploy ก่อน แล้วตั้ง `VITE_API_BASE_URL` + `VITE_USE_MOCK=false` |
 | **Authentication จริง** | CLAUDE | ตอนนี้ใช้ header `X-User-Email` ซึ่งใครก็ตั้งได้ · ต้องมี token ที่เซ็น/ตรวจได้ |
-| ต่อ LLM จริง | CODEX | `OPENAI_API_KEY` / `OPENAI_MODEL` ยังไม่ได้ตั้ง (ไม่มีเครดิต) · `aiMode` คืน `"rules"` ตลอด · พฤติกรรมผู้ให้บริการจริงยังไม่เคยทดสอบ |
-| ดึงข่าวสดได้สำเร็จ | CODEX | GDELT ตอบ 429 และ timeout · เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้จริง |
+| Successful live industry fetch | CODEX / hosting team | Still unverified: DNS and TCP succeed, HTTPS TLS handshake times out; separate HTTP diagnostic returns 429. Query simplification does not fix TLS. Deployment-host TLS connectivity and provider rate coordination are needed; see `LIVE_PROVIDER_VERIFICATION.md`. |
 | พิกัดร้านค้าจริง | ทีม | คอลัมน์ `latitude`/`longitude` พร้อมแล้วแต่ยังไม่มีข้อมูล · ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
 | `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker ควรเพิ่มก่อนรันหลายเครื่อง |
 | ต่อ `project_cash_events()` เข้า route | CLAUDE | ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ |
-| แปล `actionableItems` เป็นไทย | CODEX | ข้อความมาจาก `findings` ของ Module 3 ตรง ๆ ขณะที่ UI เป็นไทย |
 
 ### ⚠️ เรื่องที่ทีมต้องตัดสินใจ (ไม่ใช่งานโค้ด)
 
