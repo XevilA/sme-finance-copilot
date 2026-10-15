@@ -15,6 +15,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from . import bootstrap
 from .db import DB_ENABLED, dispose_engine
 from .extraction import ExtractionError, MAX_UPLOAD_BYTES, parse_excel
 from .finance import calculate_financials
@@ -30,8 +31,20 @@ from .routers import upload as upload_router
 from .schemas import FinancialInput
 
 
+BOOTSTRAP_RESULT: dict = {"mode": "not_run"}
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # A deployed instance starts against an empty database, so the schema is
+    # applied here rather than requiring a manual migration step. Controlled by
+    # DB_BOOTSTRAP; a failure is reported through /health instead of taking the
+    # process down, so the cause is visible rather than a crash loop.
+    global BOOTSTRAP_RESULT
+    try:
+        BOOTSTRAP_RESULT = await bootstrap.run()
+    except Exception as exc:
+        BOOTSTRAP_RESULT = {"mode": bootstrap.mode(), "applied": [], "error": type(exc).__name__}
     yield
     await dispose_engine()
 
@@ -62,7 +75,15 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "sme-swarm-finance-engine", "persistence": DB_ENABLED}
+    """Readiness probe. Reports whether the schema bootstrap succeeded, so a
+    deployment that came up against an empty database is visible here."""
+    return {
+        "status": "ok",
+        "service": "sme-swarm-finance-engine",
+        "version": app.version,
+        "persistence": DB_ENABLED,
+        "bootstrap": BOOTSTRAP_RESULT,
+    }
 
 
 @app.post("/api/v1/inputs/manual")

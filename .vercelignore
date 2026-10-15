@@ -4,3 +4,6 @@ node_modules
 *.docx
 *.pdf
 extracted_doc_text.txt
+
+# The Vite build does not use the Python backend.
+backend

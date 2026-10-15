@@ -82,12 +82,12 @@
 
 | งาน | เจ้าของ | ติดอะไร |
 | --- | --- | --- |
-| **Deploy backend ขึ้น host** | CLAUDE | ต้องใช้บัญชี/credential ของทีม · **นี่คือตัวบล็อกใหญ่สุดของการเดโมเว็บจริง** |
-| **ปลด frontend จากโหมด mock** | CLAUDE | ต้อง deploy ก่อน แล้วตั้ง `VITE_API_BASE_URL` + `VITE_USE_MOCK=false` |
+| **Deploy backend ขึ้น host** | ทีม | **เตรียมครบและทดสอบจริงแล้ว** — `Dockerfile`, `railway.json`, bootstrap schema/seed ตอน startup, รองรับ `DATABASE_URL` ของ Railway · build image แล้วรัน container เทียบ Postgres จริงผ่าน · เหลือแค่สร้าง service บนบัญชี Railway ตาม `DEPLOY.md` |
+| **ปลด frontend จากโหมด mock** | ทีม | ติด deploy · ขั้นตอนอยู่ใน `DEPLOY.md` ข้อ 5 (ตั้ง 2 ตัวแปรบน Vercel แล้ว redeploy) |
 | **Authentication จริง** | CLAUDE | ตอนนี้ใช้ header `X-User-Email` ซึ่งใครก็ตั้งได้ · ต้องมี token ที่เซ็น/ตรวจได้ |
 | ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ | CODEX / ทีมดูแลโฮสต์ | ยังไม่สำเร็จ: DNS และ TCP เชื่อมต่อได้ แต่ HTTPS TLS handshake หมดเวลารอ · การวินิจฉัยแยกผ่าน HTTP ตอบ 429 · ลดความซับซ้อนของคำค้นแล้วไม่แก้ TLS · ต้องตรวจ TLS จากโฮสต์ที่จะ deploy และประสานจำกัดอัตราคำขอผู้ให้บริการ · ดู `LIVE_PROVIDER_VERIFICATION.md` |
 | พิกัดร้านค้าจริง | ทีม | คอลัมน์ `latitude`/`longitude` พร้อมแล้วแต่ยังไม่มีข้อมูล · ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
-| `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker ควรเพิ่มก่อนรันหลายเครื่อง |
+| `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker · `railway.json` ตั้ง `numReplicas: 1` ไว้ด้วยเหตุนี้ ต้องทำก่อนเพิ่ม replica |
 | ต่อ `project_cash_events()` เข้า route | CLAUDE | ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ |
 
 ### ⚠️ เรื่องที่ทีมต้องตัดสินใจ (ไม่ใช่งานโค้ด)

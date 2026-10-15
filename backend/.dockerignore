@@ -1,0 +1,13 @@
+# Keep the build context small and never ship local state or secrets.
+.venv/
+.deps/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+tests/
+uploads/
+.env
+docs/
+docker-compose.yml
+run.cmd
+requirements.txt
