@@ -101,7 +101,7 @@ python -m pytest -c backend/pytest.ini -q    # 477 ผ่าน + 3 skip (ยั
 | 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
 | 8 · เพิกถอน token | ✅ | `revoked_tokens` เพิกถอนรายเซสชัน · `users.tokens_valid_from` เพิกถอนทั้งบัญชี · `POST /api/auth/logout`, `/auth/revoke-all`, `/auth/revoke` (admin) |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
-| Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 + `src/services/api.ts` · เว็บยังเป็น mock จนกว่า backend จะขึ้น host |
+| Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 · เว็บยังเป็น mock จนกว่า backend จะขึ้น host · **`src/services/api.ts` ถูกลบไปใน `44db2f2`** (การ restore UI) และ `3899cb7` ไม่ได้เอากลับมา · ไม่กระทบ bundle เพราะไม่มีใคร import · กู้คืนด้วย `git checkout addf28e -- src/services/api.ts` ถ้าต้องการ |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
 | ตารางภาระแบบระบุวันที่ | ✅ | `receivables`, `payables`, `expense_transactions`, `allocation_resources` · ต่อ `project_cash_events()` ของ CODEX เข้า `/api/forecast` แล้ว |
 | ข้อมูลเสริมเข้าการวิเคราะห์ | ✅ | ส่ง `forecast` + `expense_history` ของ SME เดียวกันเข้า `build_analysis` ทั้งสี่จุด · ความครบของตารางมาจาก `schedule_complete_through` ของผู้เรียก · sub-status ถูกยกขึ้น `missing` ของ envelope |

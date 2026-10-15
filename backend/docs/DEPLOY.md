@@ -129,8 +129,10 @@ curl "https://<your-service>.up.railway.app/api/v1/shops"
 
 แล้ว redeploy
 
-⚠️ **ชื่อตัวแปรคือ `VITE_API_BASE_URL`** ตามที่ `src/api/client.ts` อ่าน
-(ไฟล์ `src/services/api.ts` ใช้ `VITE_BACKEND_URL` แยกกัน ถ้าจะใช้ไฟล์นั้นด้วยให้ตั้งทั้งคู่)
+⚠️ **ชื่อตัวแปรคือ `VITE_API_BASE_URL`** ตามที่ `src/api/client.ts` อ่าน ·
+`VITE_API_BASE_URL` กับ `VITE_USE_MOCK` คือสองตัวที่ต้องตั้ง **ไม่มีตัวที่สาม** ·
+(เดิมมี `src/services/api.ts` ที่อ่าน `VITE_BACKEND_URL` แยกกัน แต่ไฟล์นั้น
+**ถูกลบไปแล้วใน `44db2f2`** จึงไม่ต้องตั้ง `VITE_BACKEND_URL` อีก)
 
 ⚠️ **ห้ามใส่ `OPENAI_API_KEY` ในตัวแปรที่ขึ้นต้นด้วย `VITE_`**
 ทุกอย่างที่ขึ้นต้นด้วย `VITE_` ถูกฝังลง bundle ที่ใครก็เปิดอ่านได้

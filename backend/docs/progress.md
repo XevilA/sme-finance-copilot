@@ -11,13 +11,13 @@
 
 ## 📌 สถานะปัจจุบัน
 
-> 2026-10-15 · CODEX ตรวจต่อจาก `addf28e`: **477 ผ่าน + 3 skip** กับ PostgreSQL
-> หลังเพิ่ม regression ข่าว 5 กรณี · รายละเอียดใน `CODEX_HANDOFF.md` ·
-> ตารางและบันทึก CLAUDE ด้านล่างเป็นผล ณ `addf28e` ก่อนการแก้ Core ข่าวรอบนี้
+> 2026-10-15 · วัดที่ `3899cb7` · CODEX เพิ่ม regression ข่าว 5 กรณีใน `6e760c7`
+> ต่อจาก `addf28e` · รายละเอียดใน `CODEX_HANDOFF.md` ·
+> บันทึกรายรอบด้านล่างคงตัวเลขของรอบตัวเองไว้ตามปกติ
 
 | ตัวชี้วัด | ค่า |
 | --- | --- |
-| Backend tests | **472 ผ่าน + 3 skip** (มี PostgreSQL) · skip = ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` 2 + เคสที่ยืนยันพฤติกรรมตอนไม่มี DB 1 · **373 ผ่าน + 102 skip** ถ้าไม่มี DB |
+| Backend tests | **477 ผ่าน + 3 skip** (มี PostgreSQL) · skip = ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` 2 + เคสที่ยืนยันพฤติกรรมตอนไม่มี DB 1 · **378 ผ่าน + 102 skip** ถ้าไม่มี DB |
 | API routes | **34** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` (+ 4 เส้นเฉพาะ `/api/v1/*` และ `/health`) |
 | ตารางฐานข้อมูล | **27** · `schema.sql`, `seed.sql`, `seed_obligations.sql` รันซ้ำได้ทั้งสามไฟล์ |
 | Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) · ทุกเส้นมี `source` และ `status` ตาม `missing` |
@@ -674,7 +674,13 @@ Persistence เป็น opt-in: ไม่มี `DATABASE_URL` ทุก endpoi
 ถูกเข้าใจผิดว่าเป็นเลขจริง · `/ai/explain` ส่ง `aiMode` (`rules` / `model`) เพื่อไม่ให้ UI
 ทำเหมือนเรียกโมเดลไปแล้วทั้งที่ rule ตอบ
 
-### `src/services/api.ts` — ไฟล์ frontend เดียวที่เพิ่ม
+### `src/services/api.ts` — ไฟล์ frontend เดียวที่เพิ่ม · **ถูกลบไปแล้ว**
+
+> ⚠️ ไฟล์นี้**ไม่มีอยู่ใน repo แล้ว** · ถูกลบใน `44db2f2` (restore UI จาก `32de206`)
+> และ `3899cb7` เอากลับมาแค่ 8 ไฟล์ UI ไม่รวมไฟล์นี้ · ผลสุทธิต่อ `src/` ระหว่าง
+> `addf28e` → `3899cb7` คือการลบไฟล์นี้เพียงอย่างเดียว **bundle ไม่กระทบ**
+> (ยืนยันแล้ว: `1955 modules`, hash เดิม) เพราะไม่มีใคร import มันอยู่แล้ว ·
+> กู้คืน: `git checkout addf28e -- src/services/api.ts` · บันทึกด้านล่างเก็บไว้เป็นประวัติ
 
 ไม่ import component ไม่แตะ CSS/Tailwind/layout และ**ไม่มีใคร import มัน** Vite จึง tree-shake
 ออกทั้งหมด พิสูจน์ด้วย build ก่อน/หลัง: module count `1955` เท่าเดิม hash เท่าเดิมทุกตัว
