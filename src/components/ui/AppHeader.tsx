@@ -11,6 +11,7 @@ import {
   User,
   Shield,
   Layers,
+  Menu,
 } from "lucide-react";
 
 export const AppHeader: React.FC = () => {
@@ -26,24 +27,36 @@ export const AppHeader: React.FC = () => {
     contextPill,
     pageStateMode,
     setPageStateMode,
+    isMobileMenuOpen,
+    setMobileMenuOpen,
   } = useAppStore();
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-borderLine px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
-      {/* Left: Project Selector & Context Pill */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-brand flex items-center justify-center text-white shadow-sm font-display font-bold text-sm">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-borderLine px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+      {/* Left: Mobile Menu Trigger & Project Selector */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(true)}
+          className="lg:hidden p-2 text-ink hover:text-brand hover:bg-slate-100 rounded-xl transition-colors shrink-0 cursor-pointer"
+          aria-label="เปิดเมนูนำทาง 15 หน้าจอ"
+          title="เมนูนำทาง"
+        >
+          <Menu className="w-5 h-5 text-ink" />
+        </button>
+
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand to-brand-dark flex items-center justify-center text-white shadow-sm font-display font-bold text-xs shrink-0">
             SME
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-xs font-bold text-ink leading-none flex items-center gap-1.5">
-              <span>SME Finance Copilot</span>
-              <span className="text-[10px] font-normal text-brand-dark bg-brand-light px-1.5 py-0.5 rounded-chip border border-brand/20">
+              <span className="truncate">SME Finance Copilot</span>
+              <span className="hidden sm:inline-block text-[10px] font-normal text-brand-dark bg-brand-light px-1.5 py-0.5 rounded-chip border border-brand/20 whitespace-nowrap">
                 ห้องประกอบโอกาสธุรกิจ
               </span>
             </div>
-            <div className="text-[11px] text-ink-muted leading-tight mt-0.5">
+            <div className="text-[11px] text-ink-muted leading-tight mt-0.5 truncate hidden sm:block">
               โครงการ: <strong>อาหารกล่อง 300 กล่อง/วัน</strong> (บจก.สยามเทคโนพาร์ค)
             </div>
           </div>
@@ -75,7 +88,18 @@ export const AppHeader: React.FC = () => {
       </div>
 
       {/* Right Controls: Story Mode, AI Assistant, Role, Reduced Motion, 9-State Tester */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Mobile Quick Search Button */}
+        <button
+          type="button"
+          onClick={() => setCommandPaletteOpen(true)}
+          className="md:hidden p-2 text-ink-muted hover:text-brand hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
+          aria-label="ค้นหา"
+          title="ค้นหา (⌘K)"
+        >
+          <Search className="w-4 h-4 text-ink-muted" />
+        </button>
+
         {/* Story Mode Button (For Committee) */}
         <button
           type="button"

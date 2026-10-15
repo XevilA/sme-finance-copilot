@@ -80,6 +80,8 @@ interface AppState {
   // Command Palette & Modals
   isCommandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
+  isMobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
 
   // AI Panel & Evidence Beam
   isAIPanelOpen: boolean;
@@ -112,6 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentPage: (page, context) => {
     set((state) => ({
       currentPage: page,
+      isMobileMenuOpen: false,
       selectedShopId: context?.shopId || state.selectedShopId,
       selectedOrderId: context?.orderId || state.selectedOrderId,
       contextPill: context?.shopId
@@ -210,6 +213,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Command Palette & Modals
   isCommandPaletteOpen: false,
   setCommandPaletteOpen: (open) => set({ isCommandPaletteOpen: open }),
+  isMobileMenuOpen: false,
+  setMobileMenuOpen: (open) => set({ isMobileMenuOpen: open }),
 
   // AI Panel & Evidence Beam
   isAIPanelOpen: false,
