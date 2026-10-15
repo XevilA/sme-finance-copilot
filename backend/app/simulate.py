@@ -327,6 +327,7 @@ def simulate(request: SimulateRequest) -> dict:
             "notes": notes,
         },
         "kind": "simulated",
+        "source": "supplied_input",
         "status": "ok" if plan_b["grading"]["status"] == "ok" else "insufficient_data",
         "missing": plan_b["grading"]["missingFields"],
         "asOf": baseline.period_end.isoformat(),

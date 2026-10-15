@@ -111,6 +111,28 @@ def with_context_gaps(analysis: dict, forecast: dict | None) -> dict:
     return {**analysis, "missing": [*analysis["missing"], *gaps], "status": "insufficient_data"}
 
 
+def analysis_views(analysis: dict, shop_name: str | None = None) -> dict:
+    """Request-scoped dashboard views; never substitute a stored demo SME."""
+    payload = analysis["data"]["input"]
+    metrics = analysis["data"]["metrics"]
+    overview, overview_missing = business_overview(
+        payload, metrics, metrics, shop_name or "ข้อมูลที่ส่งมาวิเคราะห์", None,
+        analysis["data"]["findings"],
+    )
+    costs, cost_missing = cost_breakdown(payload, metrics)
+    common = {"source": "supplied_input", "inputHash": analysis["inputHash"]}
+
+    def wrap(data, missing):
+        return envelope(data, payload["kind"], sorted(set(missing)), payload["period_end"], **common)
+
+    return {
+        "overview": wrap(overview, [*overview_missing, *analysis["missing"]]),
+        "indicators": wrap(analysis["data"]["indicators"], [*analysis["missing"], "indicator_history"]),
+        "cost": wrap(costs, cost_missing),
+        "explanation": wrap(analysis["data"]["explanation"], analysis["missing"]),
+    }
+
+
 def business_overview(
     payload: dict,
     metrics: dict,

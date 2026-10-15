@@ -11,21 +11,56 @@
 
 ## 📌 สถานะปัจจุบัน
 
-> 2026-10-15 · วัดที่ `3899cb7` · CODEX เพิ่ม regression ข่าว 5 กรณีใน `6e760c7`
-> ต่อจาก `addf28e` · รายละเอียดใน `CODEX_HANDOFF.md` ·
+> 2026-10-15 · CODEX ตรวจต่อจาก `dde929e` ตาม brief ทั้งสอง lane ·
+> รายละเอียดรอบ wiring และข้อจำกัดที่พบใน browser อยู่ด้านล่างและ `CODEX_HANDOFF.md` ·
 > บันทึกรายรอบด้านล่างคงตัวเลขของรอบตัวเองไว้ตามปกติ
 
 | ตัวชี้วัด | ค่า |
 | --- | --- |
-| Backend tests | **477 ผ่าน + 3 skip** (มี PostgreSQL) · skip = ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` 2 + เคสที่ยืนยันพฤติกรรมตอนไม่มี DB 1 · **378 ผ่าน + 102 skip** ถ้าไม่มี DB |
+| Backend tests | **482 ผ่าน + 3 skip** (มี PostgreSQL) · skip = ยังไม่ตั้ง `DEMO_LOGIN_PASSWORD` 2 + เคสที่ยืนยันพฤติกรรมตอนไม่มี DB 1 · **383 ผ่าน + 102 skip** ถ้าไม่มี DB |
 | API routes | **34** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` (+ 4 เส้นเฉพาะ `/api/v1/*` และ `/health`) |
 | ตารางฐานข้อมูล | **27** · `schema.sql`, `seed.sql`, `seed_obligations.sql` รันซ้ำได้ทั้งสามไฟล์ |
 | Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) · ทุกเส้นมี `source` และ `status` ตาม `missing` |
-| Frontend bundle | ไม่เปลี่ยนเลย — `1955 modules`, hash `index-DEindwiw.css` / `index-DrkwTzbk.js` |
+| Frontend bundle | `1955 modules` · CSS คงเดิม `index-DEindwiw.css` · JS เปลี่ยนตาม wiring เป็น `index-E6xWZDJT.js` · แก้เพียงสองไฟล์ที่ได้รับอนุญาต |
 | Authentication | token HMAC + รหัสผ่าน scrypt · **เพิกถอนได้แล้ว** รายเซสชันและทั้งบัญชี · ปิด enforcement เป็นค่าเริ่มต้น |
 | Deploy | config ครบและทดสอบด้วย container จริง · รอกดสร้าง service บนบัญชีทีม |
 
 **บันทึกเรียงจากใหม่ไปเก่า** — รอบล่าสุดอยู่ด้านบน
+
+---
+
+## รอบ CODEX 2026-10-15 — Import wiring และตรวจทั้งแปดโมดูล
+
+- แก้เฉพาะ `src/api/client.ts` และ `src/features/import/ImportPage.tsx` ใน frontend:
+  drag/drop, file chooser, template download, validation, calculate และ analyze ·
+  รับครบ 38 ฟิลด์ระดับ FinancialInput รวม loan แบบ nested · ช่องว่างไม่เปลี่ยนเป็นศูนย์
+  และแปลง `units_sold`/จำนวนงวดเป็น integer ก่อน POST · ร่างอยู่ใน sessionStorage
+- ใช้ body แบบ flat เฉพาะ `/inputs/manual` และ wrapped สำหรับ `/calculate` / `/analyze`
+  ตามสัญญาเดิม · ไม่เปิดรับ flat โดยปริยาย · analyze เพิ่ม `shop_name` และคืน `views`
+  ที่ adapter สร้างจากผลคำนวณเดียวกัน พร้อม `source=supplied_input` / `inputHash`
+- ผลที่ยอมรับแล้วอยู่เฉพาะหน่วยความจำแท็บและถูกใช้โดย Overview/Health/Cost/AI panel ·
+  ไม่เปลี่ยน “SME ล่าสุด” ร่วมกัน ไม่ผูก free-text shop name เข้าบัญชีเดโม และไม่บันทึกงบ
+  โดยไม่มี SME ที่ระบุ · reload ล้างผลที่ยอมรับแล้ว แต่ร่างฟอร์มยังอยู่ใน session เดิม
+- เพิ่ม pytest 5 กรณี รวม template → `/upload` จริง, manual/Excel ค่าเท่ากัน,
+  views แยกผู้เรียก, optional ไม่เดาศูนย์ และ request shapes/strict integer ·
+  **482 ผ่าน + 3 skip** กับ DB, **383 ผ่าน + 102 skip** ไม่มี DB · ไม่เขียน test เดิมใหม่
+- `node scripts/test-import-wiring.mjs` ผ่าน: client ยิง HTTP จริง, mock ไม่ยิงเครือข่าย,
+  upload เสีย/เกินขนาด, drag handler, กันส่งซ้ำ, error ไม่เปลี่ยนหน้า และ serializer
+- Browser จริงผ่าน manual และ file chooser ถึง Overview ตัวเลข 250,000 / 200,000 /
+  50,000 / 80,000 · ไม่อ้างว่าลากไฟล์จาก OS ผ่าน browser แล้ว; ส่วนนั้นตรวจ handler แยก
+- `verify_tester_flow.py` ยิง HTTP จริงครบแปดโมดูลและ 16 read contracts แล้วอ่าน DB:
+  34 routes, 27 ตาราง, ส่วนขาด Rung 45,000, forecast ต่ำสุด 29,700 และเริ่มขาด 2026-10-18,
+  synthetic SWARM ต้นทุน 28,000, scenario รายได้ 275,000 · ข่าว gate ปิด/unavailable
+  บทความ 0 · ไม่ force, ไม่ยิง LLM เสียเงิน และไม่อ้างข่าวสดสำเร็จ
+- พบ CORS จริง: `.env` อนุญาต localhost:5173 แต่ Vite default 3000 ถูก POST preflight
+  ปฏิเสธ · ใช้ process tester ที่ 5173 โดยไม่เปลี่ยน `.env` หรือ vite.config.ts
+- ตั้งรหัส admin ใน local DB แล้วโดยไม่แสดง/commit credential · ค่าเก็บใน uploads ที่
+  Git ละเว้น · AUTH_SECRET ยังไม่ตั้ง จึงยังไม่ทดสอบ admin login บน server นี้
+- **บล็อกที่ brief วินิจฉัยไม่ครบ:** Overview ยังมีตัวเลข/ข้อความ/badge คงที่ซึ่งขัดกับผลจริง,
+  Simulator ยังใช้สูตรในหน้า และ SWARM มีปุ่มจำลอง · ต้องขยายสิทธิ์ src มากกว่าสองไฟล์
+  ก่อนอ้างว่าเว็บครบทั้งแปดฟีเจอร์ · ไม่แก้ไฟล์ที่สาม ไม่เปลี่ยน copy หรือ CSS
+- Build ผ่าน 1955 modules, CSS `index-DEindwiw.css` คงเดิม, JS `index-E6xWZDJT.js` ·
+  มีคำเตือน JS เกิน 500kB; ไม่แยก bundle เพราะอยู่นอกงาน wiring รอบนี้
 
 ---
 

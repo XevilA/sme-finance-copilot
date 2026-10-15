@@ -1,5 +1,66 @@
 # การส่งมอบงานของ CODEX
 
+## รอบล่าสุด: Import wiring ทั้งสอง lane และข้อจำกัดก่อนส่ง tester — 2026-10-15
+
+ฐานเริ่ม `dde929e` บน main สะอาดและตรงกับ GitHub · อ่าน CODEX_ASSIGNMENT ครบแล้ว ·
+brief ลงวันที่ 2026-10-16 แต่เวลาที่วัดรอบนี้คือ 2026-10-15 Asia/Bangkok ·
+ข้อมูลด้านล่างเป็นผลตรวจรอบนี้ ไม่ใช่การยกตัวเลขใน brief มารายงาน
+
+### งานที่เปลี่ยนและผลวัด
+
+- **ต่อ src แล้ว** เฉพาะ `src/api/client.ts` และ `src/features/import/ImportPage.tsx`:
+  file chooser, drop handlers, template download, draft state, manual validation,
+  calculate และ analyze · ช่องครบ 38 ฟิลด์ระดับ FinancialInput (7 required/31 optional)
+  รวม loan nested · ช่องว่างละไว้ จำนวนเงินยังเป็น string และหน่วย/งวดเป็น integer
+- ไม่เปลี่ยน CSS/Tailwind/copy/layout/routing ไม่กู้ services/api.ts และไม่แก้ src ไฟล์ที่สาม ·
+  เพิ่มเฉพาะ label และ input ที่ schema ต้องใช้ใน grid เดิม กับ hidden file input/event bindings
+- Browser manual และ file picker ผ่านถึง Overview: 250,000 / 200,000 / 50,000 / 80,000 ·
+  ทดสอบงบไม่สมดุลแล้วเห็น error ไม่แสดงสำเร็จหรือเปลี่ยนหน้า · ปุ่มดาวน์โหลด template ผ่าน
+- Drag/drop ตรวจด้วย event handler regression จาก component จริง ไม่ได้ลากไฟล์จาก OS
+  ผ่าน browser automation · กันส่งซ้ำและ error path ผ่านใน `scripts/test-import-wiring.mjs`
+- `/analyze` เพิ่ม shop_name optional และ views ที่ adapters สร้างจากผล analysis เดียวกัน ·
+  ทุก view มี source=supplied_input/inputHash · เพิ่ม source ให้ calculate/validation/SWARM/
+  simulator ที่ยังขาด · request body เดิมไม่เปลี่ยน (flat เฉพาะ manual, wrapped ที่ calculate/analyze)
+- ผลสำเร็จเก็บในหน่วยความจำแท็บเพื่อให้ Overview/Health/Cost/AI panel ใช้คำขอเดียวกัน ·
+  ไม่ผูกชื่อร้าน free text กับ SME เดโม ไม่เขียน shared “latest input” และไม่อ้างว่าบันทึกงบแล้ว
+- เพิ่ม pytest 5 กรณีโดยไม่เขียนหรือทำ assertion เดิมให้อ่อนลง · **482 ผ่าน + 3 skip**
+  กับ PostgreSQL ใน 36.54 วินาที; **383 ผ่าน + 102 skip** ไม่มี DB ใน 19.80 วินาที ·
+  Starlette/httpx warning เดิมหนึ่งรายการ · targeted 5 กรณีผ่านหลังการแก้สุดท้ายด้วย
+- `node scripts/test-import-wiring.mjs` ผ่าน real client HTTP, upload invalid/limit,
+  mock isolation, drag/drop, duplicate submit, manual serialization และ error ไม่เปลี่ยนหน้า ·
+  harness ไม่ใช่ E2E browser; browser จริงตรวจแยกตามที่ระบุข้างบน
+- **Build: 1955 modules · CSS index-DEindwiw.css คงเดิม · JS index-E6xWZDJT.js** ·
+  invariant checks เดิมผ่าน · มี warning JS เกิน 500kB ไม่แก้ bundling นอกขอบเขต
+- `backend/scripts/verify_tester_flow.py` ยิง HTTP จริงและอ่าน DB กลับ: **34 routes,
+  27 ตาราง, 16 read contracts**; Rung gap 45,000, forecast ต่ำสุด 29,700 เริ่มขาด
+  2026-10-18; synthetic SWARM 28,000; scenario รายได้ 275,000 · ใช้ persist=false
+  สำหรับ calculation/SWARM/simulator/matcher ไม่มีการ reset หรือ reseed
+- เรียกข่าวผ่าน gate หนึ่งครั้งโดยไม่ force: unavailable / provider_gate_closed,
+  บทความ 0 · ไม่อ้างว่าทดสอบ TLS ใหม่หรือ dedup/published_at กับข่าวสดแล้ว · ไม่เรียก LLM เสียเงิน
+- ตั้งรหัส admin ในฐาน local และอ่านกลับว่ามี hash แล้ว · credential อยู่เฉพาะไฟล์
+  `backend/uploads/admin-tester-credentials.txt` ที่ Git ละเว้น ไม่แสดงค่าใน log/เอกสาร ·
+  AUTH_SECRET ยังไม่ตั้ง จึงยังไม่ยืนยัน admin login/revoke บน server ปัจจุบัน
+
+### การตัดสินใจและสิ่งที่ไม่ได้ทำ
+
+- เลือก stateless analysis views แทนการบันทึกไปยังร้าน “ล่าสุด” เพราะไม่มี identity จาก
+  free-text shop name · reload ล้าง accepted result; draft ยังอยู่ใน sessionStorage ·
+  ไม่มีการส่งงบไป LLM โดยอัตโนมัติและ mock writes ไม่แสร้งว่าคำนวณสำเร็จ
+- `.env` อนุญาต localhost:5173 แต่ Vite default 3000 ถูก CORS ปฏิเสธจริง ·
+  เริ่ม tester frontend ที่ 5173 ด้วย process env เท่านั้น ไม่แก้ `.env` หรือ vite.config.ts
+- **brief วินิจฉัยไม่ครบ:** browser แสดง Overview ยอดใหม่ถูกแล้ว แต่ยังมีตัวเลข
+  −5,000 / 36,200 / 10,000 และ badge actual คงที่ใน `OverviewPage.tsx` ·
+  `SimulatorPage.tsx` ยังมีสูตรของตัวเอง, `SwarmPage.tsx` มีปุ่มจำลอง ·
+  ต้องขยายสิทธิ์ frontend มากกว่าสองไฟล์ก่อนอ้างว่าทั้งแปดฟีเจอร์ใช้บนเว็บครบ ·
+  **หยุดที่ขอบเขตนี้ ไม่แก้ไฟล์ที่สามเอง**
+- copy ของ Import เรื่อง XLS/CSV/25MB กับ Column Mapping ขัดกับ parser ที่รับ template
+  XLSX/5MiB · file picker/error ใช้ข้อจำกัดจริง แต่คง copy ตามคำสั่ง · หมวดสต็อกไม่มี
+  inventory ใน FinancialInput จึงไม่สร้าง DIO หรือข้อมูลใหม่เอง
+- พิกัดร้านไม่ได้รับจากทีมจึงไม่เติม · ไม่มี deploy ใหม่หรือ Vercel env ใหม่ให้ตรวจ ·
+  คง RBAC_ENFORCED=false/AUTH_DEV_HEADER=false ตาม brief สำหรับ tester
+- คู่มือส่ง tester และคำสั่ง cmd.exe: `TESTER_READINESS_CURRENT.md` · ภาพ browser และ
+  JSON ผลตรวจเก็บใน uploads ที่ Git ละเว้น · คำเตือน/ข้อจำกัดทั้งหมดเพิ่มใน §4 และ progress แล้ว
+
 ## รอบล่าสุด: ตรวจงานต่อของ CLAUDE และแก้ข่าวซ้ำให้ deterministic — 2026-10-15
 
 - เริ่มจาก working tree สะอาดที่ `addf28ed60d65113b834de69e47544a6a79cb507`

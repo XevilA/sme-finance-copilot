@@ -141,6 +141,15 @@ Structured Outputs บังคับให้คำตอบอ้างได�
 
 ## ขอบเขตฝั่ง Frontend
 
+> อัปเดตรอบ Import wiring หลัง `dde929e`: แก้เพียง client.ts และ ImportPage.tsx
+> ตามสิทธิ์เฉพาะ · `/analyze` เพิ่ม `shop_name` optional และ `views` ที่ backend adapter
+> สร้างจากผล analysis เดียวกัน มี `source=supplied_input` และ `inputHash` ทุก view ·
+> browser เก็บผลที่ยอมรับแล้วเฉพาะในแท็บ เพื่อใช้ Overview/Health/Cost/AI โดยไม่เขียน
+> business state ร่วมกันใน server · เนื้อหาด้านล่างเป็นสถานะก่อน wiring รอบนี้
+>
+> ยังมีค่าคงที่ใน OverviewPage และสูตรใน SimulatorPage ที่ไม่ได้รับสิทธิ์แก้ ·
+> ดู `TESTER_READINESS_CURRENT.md` ก่อนอ้างว่าทุกหน้ารองรับข้อมูลจริงครบแล้ว
+
 ไฟล์ frontend ทั้งหมดถูกคืนสภาพไปที่ commit `73649fc` ซึ่งเป็นดีไซน์เดิมก่อนเริ่มพัฒนา backend ·
 ไม่มีการเพิ่ม JSON editor, ปุ่มอัปโหลด, การ์ดเกรด, ป้ายโหมด, store วิเคราะห์ฝั่ง frontend
 หรือการแก้ Vite proxy · พฤติกรรม mock และ API adapter เดิมถูกรักษาไว้เหมือนเดิมทุกจุด

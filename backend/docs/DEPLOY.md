@@ -1,5 +1,12 @@
 # คู่มือ Deploy backend ขึ้น Railway
 
+> สถานะ tester หลัง Import wiring: ดู `TESTER_READINESS_CURRENT.md` ·
+> วัดล่าสุด **482 ผ่าน + 3 skip**, ไม่มี DB **383 ผ่าน + 102 skip** ·
+> `provider_fetch_state` และ `auth_throttle` ข้าม replica มีแล้ว; ข้อความ “ยังไม่มี”
+> ในประวัติด้านล่างล้าสมัย · สองไฟล์ Import ต่อจริงแล้ว แต่ยังมีค่าคงที่ในหน้าอื่น
+> จึงยังไม่ใช่เว็บที่ต่อครบทุก action · บนเครื่องนี้ใช้ `pnpm exec vite --host localhost
+> --port 5173 --strictPort` เพราะ CORS_ORIGINS ใน .env ไม่อนุญาต default 3000
+
 ทุกขั้นในเอกสารนี้ทดสอบจริงแล้วด้วยการ build image และรัน container เทียบกับ
 PostgreSQL จริง โดยส่ง `DATABASE_URL` รูปแบบเดียวกับที่ Railway ให้ ·
 สิ่งที่ยังไม่ได้ทำคือการกดสร้าง service บนบัญชี Railway ซึ่งต้องใช้บัญชีของทีม

@@ -1,6 +1,10 @@
 # SME SWARM: Finance Copilot - ข้อตกลงและแนวทางการพัฒนาสำหรับ AI
 
 ## ⚠️ 1. กฎเหล็กขั้นเด็ดขาด (เพื่อประหยัด Token และป้องกันระบบพัง)
+> ข้อยกเว้นงานวันนี้ตาม `CODEX_ASSIGNMENT.md`: CODEX ดูแลทั้งสอง lane และแก้เฉพาะ
+> `src/api/client.ts` / `src/features/import/ImportPage.tsx` เพื่อ wiring กับเพิ่มช่องรับข้อมูล
+> โดยคงดีไซน์และข้อความเดิม · ไฟล์ที่สามยังต้องขอขยายขอบเขต
+
 - **ห้ามแก้ไข FRONTEND เด็ดขาด:** หน้าเว็บ (UI) เสร็จสมบูรณ์แล้ว 100% **ห้าม** แก้ไข React components, CSS, Tailwind classes หรือโครงสร้างหน้าเว็บใดๆ ทั้งสิ้น[cite: 1]
 - **การประหยัด TOKEN (Speed Mode):** เราอยู่ในช่วง Hackathon 48 ชั่วโมง ให้สร้างเฉพาะโค้ดที่พร้อมใช้งานจริงบน Production เท่านั้น ห้ามพิมพ์ข้อความเกริ่นนำ ห้ามอธิบายยืดเยื้อ และห้ามพิมพ์คำขอโทษ[cite: 1]
 - **ตำแหน่งไฟล์และ Git:** โค้ดทั้งหมดต้องอยู่ใน `D:\code-project\sme-finance-copilot`[cite: 1] เมื่อเขียนโค้ดชุดใหญ่เสร็จ ต้องให้คำสั่ง Terminal สำหรับ Push โค้ดไปยัง `https://github.com/XevilA/sme-finance-copilot` branch main เสมอ[cite: 1]
@@ -36,8 +40,10 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 (ต่อจาก `addf28e`) · **477 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
-> **34 API routes** · **27 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
+> อัปเดต 2026-10-15 (ต่อจาก `dde929e`) · **482 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
+> ไม่มี DB: **383 ผ่าน + 102 skip** · **34 API routes** · **27 ตารางฐานข้อมูล** ·
+> wiring เฉพาะสองไฟล์ที่อนุญาต: `1955 modules`, CSS `index-DEindwiw.css` คงเดิม,
+> JS `index-E6xWZDJT.js` · มีคำเตือน bundle JS เกิน 500 kB และ Starlette/httpx เดิม
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
 
@@ -56,7 +62,7 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 477 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
+python -m pytest -c backend/pytest.ini -q    # 482 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -101,7 +107,7 @@ python -m pytest -c backend/pytest.ini -q    # 477 ผ่าน + 3 skip (ยั
 | 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
 | 8 · เพิกถอน token | ✅ | `revoked_tokens` เพิกถอนรายเซสชัน · `users.tokens_valid_from` เพิกถอนทั้งบัญชี · `POST /api/auth/logout`, `/auth/revoke-all`, `/auth/revoke` (admin) |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
-| Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 · เว็บยังเป็น mock จนกว่า backend จะขึ้น host · **`src/services/api.ts` ถูกลบไปใน `44db2f2`** (การ restore UI) และ `3899cb7` ไม่ได้เอากลับมา · ไม่กระทบ bundle เพราะไม่มีใคร import · กู้คืนด้วย `git checkout addf28e -- src/services/api.ts` ถ้าต้องการ |
+| Frontend Integration | ✅ Import wiring / ⏳ ยังไม่ครบทุกหน้า | manual/upload/analyze ต่อจริงในสองไฟล์ที่อนุญาต · ผล Overview/Health/Cost/AI มาจากคำขอเดียวกันในแท็บ · `src/services/api.ts` ไม่ถูกกู้คืน · 16 GET contracts ผ่าน HTTP แต่ยังมีข้อความ/สูตรคงที่ในหน้าอื่น ดู §4 |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
 | ตารางภาระแบบระบุวันที่ | ✅ | `receivables`, `payables`, `expense_transactions`, `allocation_resources` · ต่อ `project_cash_events()` ของ CODEX เข้า `/api/forecast` แล้ว |
 | ข้อมูลเสริมเข้าการวิเคราะห์ | ✅ | ส่ง `forecast` + `expense_history` ของ SME เดียวกันเข้า `build_analysis` ทั้งสี่จุด · ความครบของตารางมาจาก `schedule_complete_through` ของผู้เรียก · sub-status ถูกยกขึ้น `missing` ของ envelope |
@@ -114,14 +120,22 @@ python -m pytest -c backend/pytest.ini -q    # 477 ผ่าน + 3 skip (ยั
 
 เรียงตามผลกระทบ · แต่ละข้อบอกชัดว่า **ใครทำ** และ **ขั้นถัดไปคืออะไร**
 
-**ผลตรวจ CODEX หลัง `addf28e`:** gate และการต่อข้อมูลสี่จุด/ทรัพยากรเสร็จแล้ว ·
-แก้ Core ข่าวซ้ำที่เคยขึ้นกับลำดับขาเข้า เพิ่ม 5 regression tests รวม **477 ผ่าน + 3 skip** ·
-เป็นการตรวจด้วยข้อมูลจำลอง ไม่ได้ยืนยันข่าวสดเพิ่ม
+**ผลตรวจ CODEX รอบ wiring:** manual และ file picker ผ่าน browser จริงที่ `localhost:5173`
+ถึงผลรายได้ 250,000 / ค่าใช้จ่าย 200,000 / กำไร 50,000 / เงินสด 80,000 ของตัวอย่าง ·
+drag/drop ผ่าน handler regression ไม่ได้ทดสอบลากจาก OS ผ่าน browser จริง ·
+HTTP ทั้งแปดโมดูลตรวจแล้ว ข่าวคืน gate ปิด/unavailable บทความ 0 รายการ ·
+รายละเอียดและคำสั่ง tester อยู่ใน `TESTER_READINESS_CURRENT.md`
 
-**ก่อนตรวจ HTTP บนเครื่องอีกครั้ง — เจ้าของ: ผู้ดูแล server:** พอร์ต 8000 ยังเป็น
-Python PID `34040` ที่เริ่มก่อนสอง commit ของ CLAUDE · health ผ่าน แต่ OpenAPI ยังไม่มี
-พารามิเตอร์ข้อมูลเสริม และ overview ยังไม่คืน finding ใหม่ · ต้องโหลด checkout ปัจจุบัน
-ก่อนเดโม · รอบนี้ไม่เปิด server ซ้ำหรือหยุด process เดิม รายละเอียดใน `CODEX_HANDOFF.md`
+**บล็อกความถูกต้องของเว็บ — รอขยายสิทธิ์ไฟล์ที่สาม:** `OverviewPage.tsx` ยังฝังเงินหลัง
+สำรอง −5,000 และข้อความกำไร 36,200 / เงินสด 10,000 รวมทั้ง badge actual แม้คำขอเป็น
+simulated · browser ยืนยันว่าขัดกับยอดใหม่จาก API · `SimulatorPage.tsx` และ
+`SwarmPage.tsx` ยังมีสูตร/ปุ่มที่ไม่ได้ POST ไป engine · ไม่สามารถอ้างว่าทั้งแปดฟีเจอร์
+ใช้ผ่านเว็บครบได้ด้วยสิทธิ์แก้เพียงสองไฟล์ · ไม่แก้ข้ามขอบเขตเอง
+
+**ข้อจำกัดข้อความหน้า Import:** ข้อความเดิมระบุ XLS/CSV/25MB และ column mapping
+แต่ backend รองรับ template XLSX ไม่เกิน 5MiB ไม่มี mapping อัตโนมัติ · file picker/error
+ใช้ข้อจำกัดจริงแล้ว · ไม่แก้ copy ที่ผู้ใช้สั่งคงไว้ · หมวดสต็อกไม่มีฟิลด์ inventory ใน
+FinancialInput จึงไม่เพิ่มตัวเลขที่ engine ไม่รองรับ
 
 ### 🔴 บล็อกการเดโมเว็บจริง
 
@@ -178,8 +192,10 @@ analysis findings ของ Plan A/B · หากจะเพิ่ม ให้
   - `POST /api/auth/revoke-all` เพิกถอนทุก token ของบัญชีตัวเอง (กรณี token ถูกขโมย)
   - `POST /api/auth/revoke` `{email}` เพิกถอนทุก token ของบัญชีอื่น · **admin เท่านั้น**
   - ทั้งสามเส้นตรวจ token เสมอแม้ `RBAC_ENFORCED=false` และ**ไม่รับ `AUTH_DEV_HEADER`**
-  - บัญชี `admin@example.test` ที่ seed ไว้**ยังไม่มีรหัสผ่าน** · ถ้าจะใช้
-    `/auth/revoke` ต้องตั้งก่อนด้วย `python backend/scripts/set_password.py admin@example.test`
+  - ตั้งรหัสสุ่มให้ `admin@example.test` ในฐาน local แล้ว และอ่านสถานะกลับมายืนยัน ·
+    เก็บ credential เฉพาะ `backend/uploads/admin-tester-credentials.txt` ที่ Git ละเว้น ·
+    `/health` ยังระบุ `secretConfigured=false` จึงยังไม่อ้างว่า login/revoke ด้วยบัญชีนี้
+    ผ่าน server ปัจจุบันได้ · คง `RBAC_ENFORCED=false`, `AUTH_DEV_HEADER=false` สำหรับ tester
   - แถวใน `revoked_tokens` ตายเองเมื่อ token หมดอายุ · ล้างด้วย
     `token_revocation.purge_expired()` ซึ่งเป็นงาน maintenance **ไม่ได้ผูกกับ request**
 - **`AUTH_DEV_HEADER` ต้องเป็น `false`** บนทุกเครื่องที่เข้าถึงได้จากภายนอก ·

@@ -92,7 +92,8 @@ def health():
 
 @app.post("/api/v1/inputs/manual")
 def validate_manual(data: FinancialInput):
-    return {"status": "ok", "data": data.model_dump(mode="json"), "balanceSheetValid": True}
+    return {"status": "ok", "data": data.model_dump(mode="json"), "balanceSheetValid": True,
+            "source": "supplied_input", "missing": []}
 
 
 async def extract_upload(file: UploadFile) -> FinancialInput:
@@ -113,7 +114,8 @@ async def extract_upload(file: UploadFile) -> FinancialInput:
 @app.post("/api/v1/inputs/excel")
 async def validate_excel(file: UploadFile = File(...)):
     data = await extract_upload(file)
-    return {"status": "ok", "data": data.model_dump(mode="json"), "balanceSheetValid": True}
+    return {"status": "ok", "data": data.model_dump(mode="json"), "balanceSheetValid": True,
+            "source": "supplied_input", "missing": []}
 
 
 @app.post("/api/v1/finance/calculate")

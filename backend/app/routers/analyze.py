@@ -32,6 +32,7 @@ router = APIRouter(tags=["analyze"])
 
 class AnalyzeRequest(StrictModel):
     input: FinancialInput
+    shop_name: str | None = Field(default=None, max_length=200)
     use_llm: Annotated[bool, Field(strict=True)] = False
     # Which stored SME this statement belongs to. With it, the SME's own expense
     # history and cash events are loaded as analysis context; without it neither
@@ -72,6 +73,7 @@ async def analysis_context(
 async def analyze_input(
     data: FinancialInput, use_llm: bool, sme_id: str | None = None,
     schedule_complete_through: date | None = None,
+    shop_name: str | None = None,
 ) -> dict:
     forecast, history = await analysis_context(data, sme_id, schedule_complete_through)
     result = await run_in_threadpool(
@@ -81,13 +83,17 @@ async def analyze_input(
         result = await apply_model_priorities(result)
     # status follows missing here as it does in every other envelope, so a
     # comparison that came back insufficient cannot ride out under `ok`.
-    return adapters.with_context_gaps(result, forecast)
+    result = adapters.with_context_gaps(result, forecast)
+    result["source"] = "supplied_input"
+    result["views"] = adapters.analysis_views(result, shop_name)
+    return result
 
 
 @router.post("/analyze")
 async def analyze(request: AnalyzeRequest):
     return await analyze_input(
-        request.input, request.use_llm, request.sme_id, request.schedule_complete_through
+        request.input, request.use_llm, request.sme_id, request.schedule_complete_through,
+        request.shop_name,
     )
 
 
@@ -111,7 +117,8 @@ async def analyze_excel(file: UploadFile = File(...), use_llm: bool = False):
 def analysis_example():
     path = Path(__file__).resolve().parents[2] / "examples" / "analysis_input.json"
     data = FinancialInput.model_validate(json.loads(path.read_text(encoding="utf-8")))
-    return {"data": data.model_dump(mode="json"), "kind": "simulated", "status": "ok", "asOf": data.period_end.isoformat()}
+    return {"data": data.model_dump(mode="json"), "kind": "simulated", "status": "ok",
+            "missing": [], "source": "demo_dataset", "asOf": data.period_end.isoformat()}
 
 
 @router.get("/analysis/template.xlsx")

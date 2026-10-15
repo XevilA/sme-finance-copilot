@@ -104,6 +104,7 @@ def calculate_financials(data: FinancialInput) -> dict:
         now = datetime.now(timezone.utc).isoformat()
         return {
             "data": {name: metric.model_dump() for name, metric in metrics.items()},
+            "source": "supplied_input",
             "kind": data.kind,
             "status": "insufficient_data" if any(metric.status != "ok" for metric in metrics.values()) else "ok",
             "missing": missing,

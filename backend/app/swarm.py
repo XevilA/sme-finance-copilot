@@ -298,6 +298,7 @@ def _allocate(request: SwarmRequest) -> dict:
             "version": "v2",
         },
         "kind": "forecast",
+        "source": "supplied_input",
         "status": "ok" if proposal_status == "ready" else "insufficient_data" if proposal_status == "incomplete" else "stale",
         "missing": [],
         "asOf": now,
