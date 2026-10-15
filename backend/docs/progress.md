@@ -6,6 +6,114 @@
 
 บันทึกเมื่อ 2026-10-14 (Asia/Bangkok) · โค้ดทั้งหมดอยู่ใน `D:\code-project\sme-finance-copilot`
 
+
+---
+
+## 📌 สถานะปัจจุบัน
+
+> 2026-10-15 · commit `5d583dd`
+
+| ตัวชี้วัด | ค่า |
+| --- | --- |
+| Backend tests | **372 ผ่าน** (มี PostgreSQL + `DEMO_LOGIN_PASSWORD`) · 370 + 2 skip ถ้าไม่ตั้งรหัสเดโม · 323 + 49 skip ถ้าไม่มี DB |
+| API routes | **31** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` |
+| ตารางฐานข้อมูล | **20** · `schema.sql` รันซ้ำได้ |
+| Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) |
+| Frontend bundle | ไม่เปลี่ยนเลย — `1955 modules`, hash `index-DEindwiw.css` / `index-DrkwTzbk.js` |
+| Authentication | มีแล้ว (token HMAC + รหัสผ่าน scrypt) · **ปิด enforcement เป็นค่าเริ่มต้น** |
+| Deploy | config ครบและทดสอบด้วย container จริง · รอกดสร้าง service บนบัญชีทีม |
+
+**บันทึกเรียงจากใหม่ไปเก่า** — รอบล่าสุดอยู่ด้านบน
+
+---
+
+## รอบ 2026-10-15 (ช่วงบ่าย) — เตรียม deploy และ Authentication
+
+### เตรียม Deploy ขึ้น Railway
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `backend/Dockerfile` | รัน unprivileged · ติดตั้งจาก lock file · copy `db/` เพราะ bootstrap ต้องอ่าน · bind `${PORT}` |
+| `backend/railway.json` | health check `/health` · restart on failure · `numReplicas: 1` |
+| `backend/.dockerignore` | กัน `.env`, venv, uploads, tests เข้า image |
+| `backend/app/bootstrap.py` | apply `schema.sql` (+`seed.sql`) ตอน startup ใต้ advisory lock |
+| `.vercelignore` | กัน backend ขึ้น Vercel |
+| `backend/docs/DEPLOY.md` | คู่มือภาษาไทย |
+
+**bootstrap:** Railway Postgres ไม่มี `docker-entrypoint-initdb.d` จึง apply schema
+ตอน startup · ใช้ `pg_try_advisory_lock` แบบไม่บล็อก (instance ที่จับ lock ไม่ได้
+ข้ามไป เพราะตัวที่จับอยู่ทำแล้ว) · `DB_BOOTSTRAP` = `off` / `schema` / `schema+seed` ·
+**ล้มเหลวแล้วรายงานผ่าน `/health` ไม่ crash loop**
+
+#### 🐛 2 บั๊กที่เจอเพราะ build container จริง ไม่ใช่เขียนไฟล์ทิ้งไว้
+
+ถ้าไม่เจอก่อน การ deploy ครั้งแรกพังทั้งสองครั้ง
+
+| บั๊ก | อาการ | การแก้ |
+| --- | --- | --- |
+| `DATABASE_URL` ของ Railway ใช้กับ async engine ไม่ได้ | Railway ให้ `postgresql://...` → SQLAlchemy map ไป driver แบบ sync → async engine ปฏิเสธ | `normalise_database_url()` pin เป็น `postgresql+asyncpg://` และย้าย `sslmode` ไปเป็น connect arg `ssl` ของ asyncpg (ซึ่งไม่รับเป็น query param) · **วางค่าที่ host ให้ได้ตรง ๆ** |
+| `requirements.lock.txt` ขาด `greenlet` | container import SQLAlchemy asyncio ไม่ผ่านเลย · ในเครื่องไม่เจอเพราะ venv มีติดมาก่อน | pin ไว้ + test `test_every_runtime_import_is_pinned` กันหายอีก |
+
+**ผลทดสอบจริง** รัน container บน network เดียวกับ Postgres ด้วย URL แบบ Railway:
+bootstrap apply `schema.sql` + `seed.sql` สำเร็จ และ `/api/v1/overview`,
+`/api/v1/shops`, `/api/v1/funding/options`, `/api/forecast` ตอบ 200 ทั้งหมด
+
+### Authentication จริง
+
+เดิม: เปิด `RBAC_ENFORCED` แล้วใครก็ตั้ง header `X-User-Email` อ้างเป็น role ไหนก็ได้
+ไม่มีการพิสูจน์อะไร · ตอนนี้: token ที่ server เซ็นเอง ออกจาก `POST /api/auth/login`
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `app/security.py` | hash รหัสผ่าน (scrypt) + เซ็น/ตรวจ token (HMAC-SHA256) |
+| `app/routers/auth.py` | `POST /api/auth/login` · `GET /api/auth/me` |
+| `app/rbac.py` | เปลี่ยนมาตรวจ `Authorization: Bearer` |
+| `scripts/set_password.py` | ตั้งรหัสผ่าน · **ไม่ seed credential ลง repo** |
+
+**2 การตัดสินใจเชิงออกแบบ**
+
+- **ไม่ใช้ JWT** — token เป็น `base64url(payload).base64url(hmac)` อัลกอริทึมเดียวตายตัว
+  **ไม่มี header และไม่อ่าน field `alg` จาก input** → บั๊กตระกูล algorithm-confusion
+  ของ JWT เกิดขึ้นไม่ได้ · เป็น HMAC-SHA256 ประกอบแบบเดียวกับ signer ของ Django
+- **scrypt จาก stdlib** — memory-hard ต้าน GPU และ**ไม่ต้องเพิ่ม dependency** ·
+  parameter ติดไปกับ hash แต่ละอัน จึงขึ้นความแข็งแรงภายหลังได้
+
+**จุดสำคัญสุด: DB เป็นผู้ตัดสิน role ไม่ใช่ token**
+token ที่อ้างว่าเป็น `admin` แต่ DB บอก `investor` → ได้ `investor` ·
+ปิดบัญชีหรือเปลี่ยน role มีผลทันที ไม่ต้องรอ token หมดอายุ
+
+**ผลทดสอบ (enforcement เปิด)**
+
+| กรณี | ผล |
+| --- | --- |
+| ไม่ส่ง header | 401 |
+| Bearer token ถูกต้อง | 200 · `role=investor` `method=token` |
+| `X-User-Email` เดี่ยว ๆ (เดิมผ่านได้) | **401 — ช่องโหว่ปิดแล้ว** |
+| payload ถูกแก้ / ตัดลายเซ็น / เซ็นด้วย secret อื่น | 401 ทั้งหมด |
+| token อ้าง `admin` แต่ DB บอก `investor` | 200 · `role=investor` |
+
+login ที่ล้มเหลวทุกแบบ (รหัสผิด / ไม่มีอีเมล / ยังไม่ตั้งรหัส) **ตอบข้อความเดียวกันหมด**
+และ scrypt รันแม้ไม่พบผู้ใช้ เวลาตอบจึงไม่ต่างกัน · ไม่มี `AUTH_SECRET` =
+ออก/รับ token ไม่ได้เลย และตอบ **503 ไม่ใช่ 401** เพื่อไม่ให้ config พลาด
+ดูเหมือนผู้เรียกถูกปฏิเสธ
+
+#### 🐛 บั๊กตัวเองอีก 2 จุด
+
+| บั๊ก | การแก้ |
+| --- | --- |
+| `hashlib.scrypt` ชน OpenSSL maxmem (n=2^15 ต้องการ 32 MiB พอดี) | ลดเป็น n=2^14 (16 MiB, ~50ms) + ระบุ `maxmem` ชัดเจน เพื่อไม่ให้ container เล็กโดน OOM ตอน login พร้อมกัน · เพิ่มการปฏิเสธ record ที่ขอ memory เกินเพดาน |
+| commit รหัสผ่านเดโมติดไปใน test file | ตรวจเจอตอน grep diff ก่อน push รอบสอง → ย้ายไปอ่านจาก `DEMO_LOGIN_PASSWORD` · ยืนยันแล้วไม่มีสตริงรหัสผ่านใน repo |
+
+**test ที่แก้เพราะพฤติกรรมเปลี่ยน** `test_rbac.py` เดิมยืนยันว่า header resolve role ได้
+ซึ่งคือพฤติกรรมที่กำลังถอดออก · เขียนใหม่ให้รัน 2 รอบ: เปิด hatch เพื่อตรวจ role mapping
+และปิด hatch เพื่อพิสูจน์ว่า header เดี่ยว ๆ ถูกปฏิเสธ
+
+### สถานะหลังรอบนี้
+
+- **372 tests ผ่าน** (มี Postgres + `DEMO_LOGIN_PASSWORD`) · 370 + 2 skip ถ้าไม่ตั้งรหัส ·
+  323 + 49 skip ถ้าไม่มี DB
+- **31 routes** · 20 ตาราง · frontend bundle ไม่ขยับ
+
 ---
 
 ## รอบ 2026-10-15 — ต่อโมดูลของ Codex เข้าระบบ
@@ -68,15 +176,17 @@ Codex ส่ง 4 โมดูลมา (`6d2b9bc`..`311ef0d`) และไม�
 | งาน | ติดอะไร |
 | --- | --- |
 | Deploy backend + ปลด frontend จาก mock | ต้องใช้ credential ของทีม (`VITE_API_BASE_URL` + `VITE_USE_MOCK=false`) |
-| Auth จริง | `X-User-Email` ไม่ใช่เส้นแบ่งความปลอดภัย |
+| Auth จริง | `X-User-Email` ไม่ใช่เส้นแบ่งความปลอดภัย — **ทำแล้วในรอบช่วงบ่าย** |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | ยังไม่ได้ตั้ง → `aiMode` คืน `"rules"` ตลอด |
 | พิกัดร้านจริง | คอลัมน์พร้อมแล้วแต่ยังไม่มีข้อมูล ตัวกรองระยะทางจึงยังตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
 
 ---
 
-## สรุปสถานะ
+## สรุปสถานะ ณ 2026-10-14 (ค่าตั้งต้น ไม่ใช่สถานะปัจจุบัน)
 
-| ตัวชี้วัด | ค่า |
+> สถานะปัจจุบันอยู่ที่ตารางบนสุดของไฟล์นี้
+
+| ตัวชี้วัด | ค่า ณ วันนั้น |
 | --- | --- |
 | Backend tests | **225 ผ่าน** (มี PostgreSQL) · **194 ผ่าน + 31 skip** (ไม่มี DB) |
 | ตารางฐานข้อมูล | 19 ตาราง · `schema.sql` เป็น idempotent ทั้งไฟล์ |
@@ -229,6 +339,11 @@ hooks `useBackend` (ยกเลิก request เก่าเมื่อ deps 
 ไม่มีหลักฐานยืนยัน ใช้เป็นสวิตช์ role สำหรับเดโมและการต่อ UI เท่านั้น **ห้ามใช้เป็นเส้นแบ่งความปลอดภัย**
 ก่อนแตะข้อมูลการเงินจริงต้องมี credential จริง (token ที่เซ็นแล้วตรวจกับ secret หรือ session
 หลังตรวจรหัสผ่าน) และจุดนั้นควรอยู่ในโมดูลนี้
+
+> **หมายเหตุ (อัปเดต 2026-10-15 ช่วงบ่าย):** ทำแล้วตามที่ย่อหน้าข้างบนระบุไว้ —
+> token เซ็นด้วย HMAC-SHA256 ตรวจกับ `AUTH_SECRET` และรหัสผ่าน hash ด้วย scrypt ·
+> `X-User-Email` ไม่ถือเป็นตัวตนอีกแล้ว (เหลือเป็น escape hatch สำหรับ dev เท่านั้น
+> ซึ่งปิดเป็นค่าเริ่มต้นและรายงานผ่าน `/health`) · ดูหัวข้อรอบช่วงบ่ายด้านบน
 
 เปิดด้วย `RBAC_ENFORCED=true` **ค่าเริ่มต้นคือปิด** เพราะ frontend ที่ deploy แล้วเรียกโดยไม่ส่ง header
 ถ้าเปิดทันทีจะเด้ง UI ที่ใช้งานได้อยู่

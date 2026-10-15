@@ -34,69 +34,137 @@
 
 ---
 
-## 📊 3. สถานะงาน: ทำแล้ว / ยังไม่ได้ทำ
+## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 ตรวจกับ commit `ee320dd` · 330 tests ผ่าน (มี PostgreSQL) ·
-> 29 API routes · 20 ตารางฐานข้อมูล · รายละเอียดอยู่ใน `progress.md` และ `CODEX_HANDOFF.md`
+> อัปเดต 2026-10-15 · commit `5d583dd` · **372 tests ผ่าน** (มี PostgreSQL) ·
+> **31 API routes** · **20 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
-### ✅ Pipeline หลัก — ครบทุกขั้นแล้ว
+### 🚀 นักพัฒนาใหม่เริ่มที่นี่
+
+```bash
+docker compose -f backend/docker-compose.yml up -d   # ฐานข้อมูล + schema + ข้อมูลเดโม
+backendun.cmd                                      # เซิร์ฟเวอร์ที่ 127.0.0.1:8000
+```
+
+เปิด `http://127.0.0.1:8000/docs` แล้วลองยิง API ได้เลย · UUID เดโมคงที่:
+
+| ร้าน | UUID | เกรด |
+| --- | --- | --- |
+| Baan Suan Kitchen (สุขภาพดี) | `11111111-1111-4111-8111-111111111111` | A (88.37) |
+| Rung Charoen Foods (วิกฤต) | `22222222-2222-4222-8222-222222222222` | D (34.61) |
+| Sahai Packing Co | `33333333-3333-4333-8333-333333333333` | — |
+| ออเดอร์เดโม | `PO-STP-2026-091` | — |
+
+```bash
+python -m pytest -c backend/pytest.ini -q    # 372 ผ่าน (370 + 2 skip ถ้าไม่ตั้งรหัสผ่านเดโม)
+```
+
+**เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
+`CODEX_HANDOFF.md` (งานฝั่ง CODEX) → `DEPLOY.md` (ขึ้น production) ·
+เฉพาะเรื่อง: `FINANCIAL_ENGINE.md`, `ANALYSIS_CONTRACT.md`, `LIVE_PROVIDER_VERIFICATION.md`
+
+### ✅ Pipeline หลัก — ครบทุกขั้น
 
 `Read Data → Calculate → AI Analyze → Match Funding → Simulate → Return JSON to Web`
 
-| ขั้น | Endpoint | สถานะ |
-| --- | --- | --- |
-| Read Data | `POST /api/upload` | ✅ |
-| Calculate | `POST /api/calculate` | ✅ |
-| AI Analyze | `POST /api/analyze` | ✅ ระบบกฎเกณฑ์ + ตรวจ OpenAI จริงด้วย `gpt-6-luna` แล้วเมื่อ 2026-10-15 |
-| Match Funding | `POST /api/match-funding` | ✅ |
-| Simulate | `POST /api/simulate` | ✅ |
-| Return JSON | `/api/v1/*` 16 contract | ✅ ตอบ 200 ครบ |
-| เพิ่มเติม | `GET /api/forecast` · `GET /api/industry/trends` | ✅ |
+| ขั้น | Endpoint |
+| --- | --- |
+| Read Data | `POST /api/upload` |
+| Calculate | `POST /api/calculate` |
+| AI Analyze | `POST /api/analyze` |
+| Match Funding | `POST /api/match-funding` |
+| Simulate | `POST /api/simulate` |
+| Return JSON | `/api/v1/*` 16 contract ที่ frontend เรียก |
+| เพิ่มเติม | `GET /api/forecast` · `GET /api/industry/trends` · `POST /api/auth/login` |
 
-### ✅ CODEX (บทบาทที่ 1) — ทำแล้ว
+### ✅ CODEX (บทบาทที่ 1)
+
+| Module | ไฟล์ | หมายเหตุ |
+| --- | --- | --- |
+| 1 · ตรวจข้อมูล Excel | `parsers/excel_parser.py`, `statement_parser.py` | ตรวจสมการบัญชี Assets = Liabilities + Equity |
+| 2 · Math Engine + เกรด A-D | `engines/financial_engine.py`, `grading.py` | `G = 0.35(DSCR) + 0.30(Cash flow) + 0.20(Debt burden) + 0.15(Cash reserve)` |
+| 3 · วิเคราะห์ + พยากรณ์ 30/60/90 วัน | `analysis.py`, `forecasting.py` | ข้อความวิเคราะห์เป็นภาษาไทยแล้ว (ID และโครงสร้างคงเดิม) |
+| 4 · จับคู่แหล่งทุนและนักลงทุน | `matching.py` | คะแนน 0-100 + ตรวจ DSCR หลังรับทุน · แยกหนี้กับทุน |
+| 5 · SWARM | `swarm.py` v2 | ออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
+| 7 · แนวโน้มอุตสาหกรรม | `industry.py` | GDELT + สถานะ stale/unavailable |
+| ต่อ LLM จริง | `ai_provider.py` | ตรวจ Structured Outputs จริงแล้ว · โมเดลและผลอยู่ใน `LIVE_PROVIDER_VERIFICATION.md` |
+
+### ✅ CLAUDE (บทบาทที่ 2)
 
 | Module | สถานะ | หมายเหตุ |
 | --- | --- | --- |
-| 1 · ตรวจข้อมูล Excel + สมการบัญชี | ✅ | `parsers/excel_parser.py`, `statement_parser.py` |
-| 2 · Math Engine + เกรด A-D | ✅ | `engines/financial_engine.py`, `grading.py` · สูตร `G = 0.35(DSCR) + 0.30(Cash flow) + 0.20(Debt burden) + 0.15(Cash reserve)` |
-| 3 · วิเคราะห์ธุรกิจ + พยากรณ์ 30/60/90 วัน | ✅ | `analysis.py`, `forecasting.py` |
-| 4 · จับคู่แหล่งทุนและนักลงทุน | ✅ | `matching.py` · ให้คะแนน 0-100 + ตรวจ DSCR หลังรับทุน |
-| 5 · SWARM Logic | ✅ | `swarm.py` v2 แบบออเดอร์จบชิ้น + เกณฑ์ประเภทธุรกิจและระยะทาง |
-| 7 · แนวโน้มอุตสาหกรรม | ✅ | `industry.py` · ดึงข่าวผ่าน GDELT + สถานะ stale/unavailable |
-| ตรวจสอบ LLM จริง | ✅ | เรียก Structured Outputs จริงสองคำขอ · ตัวชี้วัด เกรด และ finding ทุกฟิลด์คงเดิม · โมเดล `gpt-6-luna` · เพดาน token ขาออก 600 |
-| คำแนะนำจากการวิเคราะห์เป็นภาษาไทย | ✅ | แปล finding และ action ครบทั้ง 12 เงื่อนไข · ตรวจ overview ผ่าน HTTP ของ SME เดโมทั้งสองรายแล้ว · ID และโครงสร้างคงเดิม |
-
-### ✅ CLAUDE (บทบาทที่ 2) — ทำแล้ว
-
-| Module | สถานะ | หมายเหตุ |
-| --- | --- | --- |
-| 8 · Database schema | ✅ | 20 ตาราง · Users, SME Profiles, Investors, Projects, Analysis Results ครบ · `schema.sql` รันซ้ำได้ |
-| 8 · RBAC + Authentication | ✅ | token เซ็นด้วย HMAC-SHA256 + `POST /api/auth/login` เทียบรหัสผ่านที่ hash ด้วย scrypt · `X-User-Email` ไม่ถือเป็นตัวตนอีกแล้ว · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้นเพื่อไม่ให้ frontend ที่ใช้งานอยู่พัง |
-| 8 · FastAPI + RESTful endpoints | ✅ | 29 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
+| 8 · Database schema | ✅ | 20 ตาราง ครอบคลุม Users, SME Profiles, Investors, Projects, Analysis Results · `schema.sql` รันซ้ำได้ |
+| 8 · RESTful API | ✅ | 31 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
+| 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
-| Frontend Integration | ⚠️ ครึ่งทาง | 16/16 contract ตอบ 200 + `src/services/api.ts` · **แต่เว็บยังเป็น mock เพราะ backend ยังไม่ได้ deploy** |
+| Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 + `src/services/api.ts` · เว็บยังเป็น mock จนกว่า backend จะขึ้น host |
+| เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
 
-**UI ไม่ถูกแตะเลย** — build ได้ `1955 modules` และ asset hash เท่าเดิมทุกครั้ง
+---
 
-### ❌ ยังไม่ได้ทำ
+## 🔜 4. งานที่เหลือ
 
-| งาน | เจ้าของ | ติดอะไร |
-| --- | --- | --- |
-| **Deploy backend ขึ้น host** | ทีม | **เตรียมครบและทดสอบจริงแล้ว** — `Dockerfile`, `railway.json`, bootstrap schema/seed ตอน startup, รองรับ `DATABASE_URL` ของ Railway · build image แล้วรัน container เทียบ Postgres จริงผ่าน · เหลือแค่สร้าง service บนบัญชี Railway ตาม `DEPLOY.md` |
-| **ปลด frontend จากโหมด mock** | ทีม | ติด deploy · ขั้นตอนอยู่ใน `DEPLOY.md` ข้อ 5 (ตั้ง 2 ตัวแปรบน Vercel แล้ว redeploy) |
+เรียงตามผลกระทบ · แต่ละข้อบอกชัดว่า **ใครทำ** และ **ขั้นถัดไปคืออะไร**
 
-| ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ | CODEX / ทีมดูแลโฮสต์ | ยังไม่สำเร็จ: DNS และ TCP เชื่อมต่อได้ แต่ HTTPS TLS handshake หมดเวลารอ · การวินิจฉัยแยกผ่าน HTTP ตอบ 429 · ลดความซับซ้อนของคำค้นแล้วไม่แก้ TLS · ต้องตรวจ TLS จากโฮสต์ที่จะ deploy และประสานจำกัดอัตราคำขอผู้ให้บริการ · ดู `LIVE_PROVIDER_VERIFICATION.md` |
-| พิกัดร้านค้าจริง | ทีม | คอลัมน์ `latitude`/`longitude` พร้อมแล้วแต่ยังไม่มีข้อมูล · ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี |
-| `industry_news_fetch_state` | CLAUDE | ยังไม่มีการล็อก/จำกัดอัตราระดับผู้ให้บริการข้าม worker · `railway.json` ตั้ง `numReplicas: 1` ไว้ด้วยเหตุนี้ ต้องทำก่อนเพิ่ม replica |
-| ต่อ `project_cash_events()` เข้า route | CLAUDE | ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ |
+### 🔴 บล็อกการเดโมเว็บจริง
 
-### ⚠️ เรื่องที่ทีมต้องตัดสินใจ (ไม่ใช่งานโค้ด)
+**1. Deploy backend ขึ้น Railway** — เจ้าของ: **ทีม** (ต้องใช้บัญชี)
+
+- โค้ดและ config พร้อมและทดสอบแล้ว: build image สำเร็จ และรัน container
+  เทียบ PostgreSQL จริงผ่าน ทุก endpoint ตอบ 200
+- **ขั้นถัดไป:** ทำตาม `DEPLOY.md` ข้อ 1-4 (สร้าง service → ตั้ง Root Directory
+  เป็น `backend` → เพิ่ม PostgreSQL → ตั้ง env)
+
+**2. ปลด frontend จากโหมด mock** — เจ้าของ: **ทีม** · ติดข้อ 1
+
+- **ขั้นถัดไป:** หลัง deploy เสร็จ ตั้งบน Vercel 2 ตัว
+  (`VITE_API_BASE_URL`, `VITE_USE_MOCK=false`) แล้ว redeploy · `DEPLOY.md` ข้อ 5
+
+### 🟡 ทำได้แต่ยังไม่จำเป็นต่อการเดโม
+
+**3. ตาราง `industry_news_fetch_state`** — เจ้าของ: **CLAUDE**
+
+- ยังไม่มีการล็อก/จำกัดอัตราคำขอข้าม worker จึงตั้ง `numReplicas: 1`
+  ใน `railway.json` ไว้
+- **ขั้นถัดไป:** ทำก่อนเพิ่ม replica ไม่งั้นหลาย instance จะยิง GDELT พร้อมกันแล้วโดน 429
+
+**4. ต่อ `project_cash_events()` เข้า route** — เจ้าของ: **CLAUDE**
+
+- ฟังก์ชันของ CODEX พร้อมใช้ แต่ยังไม่มีแหล่งข้อมูลลูกหนี้/เจ้าหนี้แบบระบุวันที่ในระบบ
+- **ขั้นถัดไป:** ออกแบบตาราง receivables/payables ก่อน แล้วจึงต่อ route
+
+**5. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
+
+- เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้สำเร็จ
+- อาการ: DNS และ TCP ต่อได้ แต่ **HTTPS TLS handshake หมดเวลารอ** ·
+  ทดสอบแยกผ่าน HTTP ได้ 429 · ลดความซับซ้อนของคำค้นแล้วไม่ช่วย
+- **ขั้นถัดไป:** ลองยิงจากโฮสต์ที่ deploy (egress ต่างกัน อาจผ่าน) ·
+  รายละเอียดใน `LIVE_PROVIDER_VERIFICATION.md`
+
+**6. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
+
+- คอลัมน์ `latitude`/`longitude` ใน `sme_profiles` พร้อมแล้วแต่ยังว่าง
+- ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี **โดยเจตนา**
+  (ไม่เดาพิกัดจากชื่อจังหวัด)
+- **ขั้นถัดไป:** เติมพิกัดจริงลง `sme_profiles`
+
+### 🟠 ต้องทำก่อนเปิดใช้กับข้อมูลจริง
+
+ยังไม่จำเป็นต่อเดโม แต่**อย่าข้าม**ถ้าจะใช้กับข้อมูลลูกค้าจริง
+
+- **ไม่มี rate limit ที่หน้า login** — เปิด public แล้วจะถูก brute force
+- **ไม่มีการเพิกถอน token** ก่อนหมดอายุ จึง clamp อายุไว้ไม่เกิน 7 วัน
+- **`AUTH_DEV_HEADER` ต้องเป็น `false`** บนทุกเครื่องที่เข้าถึงได้จากภายนอก ·
+  ตรวจที่ `/health` → `auth.devHeaderAccepted`
+- **ข้อมูลเดโมเป็นข้อมูลสังเคราะห์** · เกรดและการจับคู่แหล่งทุนเป็นนโยบายเดโม
+  **ไม่ใช่การอนุมัติสินเชื่อ**
+
+---
+
+## ⚠️ 5. เรื่องที่ทีมต้องตัดสินใจ (ไม่ใช่งานโค้ด)
 
 1. **เว็บจริงกับ repo ไม่ตรงกัน** — bundle บน Vercel ใหญ่กว่าที่ repo build ได้
-   (JS +48.6 kB, CSS +21.6 kB) และ UI นั้นไม่มีอยู่ใน git
+   (JS +48.6 kB, CSS +21.6 kB) และ UI เวอร์ชันนั้นไม่มีอยู่ใน git
 2. **"โครงการล่าสุด"** ที่ `/api/v1/order`, `/projects`, `/swarm/proposal` ใช้
-   คือสิ่งที่ถูกเขียนล่าสุด **รวมออเดอร์ที่เทสต์สร้าง** · ตอนเดโมให้ส่ง
-   `?order_ref=PO-STP-2026-091` หรือรันออเดอร์จริงเป็นตัวสุดท้าย
-3. **ข้อมูลเดโมเป็นข้อมูลสังเคราะห์ทั้งหมด** — Baan Suan เกรด A (88.37),
-   Rung Charoen เกรด D (34.61) · เกรดและการจับคู่แหล่งทุนเป็นนโยบายเดโม
-   **ไม่ใช่การอนุมัติสินเชื่อ**
+   คือสิ่งที่ถูกเขียนล่าสุด **รวมออเดอร์ที่เทสต์สร้าง** ·
+   ตอนเดโมให้ส่ง `?order_ref=PO-STP-2026-091` หรือรันออเดอร์จริงเป็นตัวสุดท้าย
