@@ -228,6 +228,9 @@ class User(Base):
     investor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("investor_profiles.id", ondelete="SET NULL"))
     password_hash: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Tokens issued at or before this instant are refused. NULL means no cutoff
+    # has ever been set, which is not the same statement as a cutoff long past.
+    tokens_valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -527,3 +530,16 @@ class AuthThrottle(Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RevokedToken(Base):
+    """One revoked session, named by the token's id rather than its bytes."""
+
+    __tablename__ = "revoked_tokens"
+
+    jti: Mapped[str] = mapped_column(Text, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reason: Mapped[str | None] = mapped_column(Text)

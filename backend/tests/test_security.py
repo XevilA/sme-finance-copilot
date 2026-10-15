@@ -156,7 +156,12 @@ def test_malformed_tokens_are_rejected_without_parsing_them():
 
 
 def test_token_lifetime_is_clamped():
-    """A token nobody can revoke must not live for months."""
+    """Still clamped now that tokens can be revoked.
+
+    The clamp was introduced because nothing could take a token back. Since
+    app/token_revocation.py exists it is no longer the only control, but it is
+    kept: revocation needs someone to notice and act, and expiry does not.
+    """
     os.environ["AUTH_TOKEN_TTL_SECONDS"] = "99999999"
     assert token_ttl_seconds() <= 7 * 24 * 60 * 60
     os.environ["AUTH_TOKEN_TTL_SECONDS"] = "1"

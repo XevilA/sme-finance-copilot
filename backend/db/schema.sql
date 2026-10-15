@@ -543,6 +543,35 @@ CREATE TABLE IF NOT EXISTS auth_throttle (
 );
 CREATE INDEX IF NOT EXISTS auth_throttle_blocked_idx ON auth_throttle (blocked_until);
 
+-- 23. Token revocation -------------------------------------------------------
+-- A signed token is valid until it expires unless something says otherwise.
+-- Two mechanisms, because they answer different questions.
+--
+-- revoked_tokens is the denylist for one session: "log this device out". It
+-- stores the token's own id, never the token, because the id alone cannot be
+-- turned back into a credential without the signing secret. A row is dead once
+-- the token it names would have expired anyway, which is what expires_at is
+-- for - see app/token_revocation.py::purge_expired.
+--
+-- users.tokens_valid_from is the cutoff for a whole account: "this account is
+-- compromised, kill everything". A denylist cannot serve that case, because
+-- the stolen token is precisely the one nobody has to list. A token issued at
+-- or before the cutoff is refused.
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+    jti             TEXT        PRIMARY KEY,
+    user_id         UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    -- The token's own exp, so the row can be pruned without reading the token.
+    expires_at      TIMESTAMPTZ NOT NULL,
+    revoked_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reason          TEXT
+);
+CREATE INDEX IF NOT EXISTS revoked_tokens_expires_idx ON revoked_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS revoked_tokens_user_idx ON revoked_tokens (user_id);
+
+-- NULL means no cutoff, which is a different statement from a cutoff at the
+-- epoch and needs no backfill on an existing table.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_from TIMESTAMPTZ;
+
 -- updated_at triggers --------------------------------------------------------
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
 BEGIN

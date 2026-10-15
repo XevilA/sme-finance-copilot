@@ -19,6 +19,12 @@ dependency. bcrypt or argon2 would be equally fine but would add one.
 The signing secret is never defaulted. Without AUTH_SECRET no token can be
 issued or accepted, because a known default secret is the same as no signature
 at all.
+
+**Revocation lives elsewhere.** Every token carries a `jti`, which is what makes
+one revocable, but whether it has been revoked is a fact in the database and
+this module deliberately imports nothing from it: signing and verifying stay
+pure and testable without a connection. The decision is in
+app/token_revocation.py and is applied by app/rbac.py.
 """
 
 import base64
@@ -44,7 +50,15 @@ SALT_BYTES = 16
 MIN_SECRET_LENGTH = 32
 DEFAULT_TTL_SECONDS = 12 * 60 * 60
 
-TOKEN_VERSION = "v1"
+# v2 added `jti`. v1 tokens are refused rather than tolerated: a token with no
+# id cannot be named in a revocation list, which is the one property this
+# version exists to provide. The upgrade is therefore itself a revocation of
+# every token outstanding at the time of deployment, which is the correct
+# direction for a change that exists to make tokens revocable.
+TOKEN_VERSION = "v2"
+# 16 bytes of urlsafe base64. Random, not derived from the user or the time, so
+# the id identifies the session without describing it.
+JTI_BYTES = 16
 
 
 class AuthConfigError(RuntimeError):
@@ -75,7 +89,9 @@ def token_ttl_seconds() -> int:
     raw = os.getenv("AUTH_TOKEN_TTL_SECONDS", "").strip()
     if not raw.isdigit():
         return DEFAULT_TTL_SECONDS
-    # Clamp: a token that lives for months is a credential nobody can revoke.
+    # Clamp kept at seven days even though tokens can now be revoked
+    # (app/token_revocation.py). Revocation needs someone to notice and act;
+    # expiry does not. The two are layers, not alternatives.
     return max(60, min(int(raw), 7 * 24 * 60 * 60))
 
 
@@ -136,6 +152,9 @@ def issue_token(
     expires = now + (ttl_seconds or token_ttl_seconds())
     payload = {
         "v": TOKEN_VERSION,
+        # Names this one session so it can be revoked without touching the
+        # other tokens the same user holds.
+        "jti": secrets.token_urlsafe(JTI_BYTES),
         "sub": user_id,
         "email": email,
         "role": role,
@@ -175,6 +194,12 @@ def read_token(token: str) -> dict:
     if not isinstance(payload, dict) or payload.get("v") != TOKEN_VERSION:
         raise TokenError("unsupported version")
     if not payload.get("sub") or not payload.get("role"):
+        raise TokenError("incomplete")
+    # Without an id the token could never appear in a revocation list, so it is
+    # refused here rather than accepted as permanently irrevocable.
+    if not isinstance(payload.get("jti"), str) or not payload["jti"]:
+        raise TokenError("incomplete")
+    if not isinstance(payload.get("iat"), int):
         raise TokenError("incomplete")
 
     expires = payload.get("exp")

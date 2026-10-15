@@ -17,6 +17,10 @@ Enforcement is off by default. The deployed frontend calls these routes with no
 headers at all, so turning enforcement on without a plan would start rejecting
 the UI that works today. Set RBAC_ENFORCED=true to switch it on, which is a
 deliberate, reversible step.
+
+A token that verifies is not necessarily one that is still wanted, so every
+resolved token is also checked against app/token_revocation.py. A revoked token
+is refused with the same 401 as a forged or expired one.
 """
 
 import os
@@ -29,6 +33,7 @@ from sqlalchemy import select
 from .db import DB_ENABLED, session_scope
 from .models import User
 from .security import AuthConfigError, TokenError, read_token, secret_configured
+from .token_revocation import is_revoked
 
 RBAC_ENFORCED = os.getenv("RBAC_ENFORCED", "false").strip().lower() == "true"
 # Escape hatch for local development only: accepts an unauthenticated
@@ -52,6 +57,12 @@ class Principal:
     # How identity was established: "token", "dev_header", or None when
     # enforcement is off and nothing was checked.
     method: str | None = None
+    # Present only when identity came from a token. The credential-management
+    # routes need them to revoke the exact session that called them.
+    user_id: uuid.UUID | None = None
+    jti: str | None = None
+    issued_at: int | None = None
+    expires_at: int | None = None
 
     @property
     def is_anonymous(self) -> bool:
@@ -91,29 +102,87 @@ async def resolve_principal(
 
     bearer = _bearer(authorization)
     if bearer:
-        try:
-            payload = read_token(bearer)
-        except AuthConfigError as exc:
-            # A misconfigured server must not look like a rejected caller.
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except TokenError:
-            # One answer for malformed, wrongly signed and expired alike, so a
-            # caller cannot probe which part of the token was wrong.
-            raise HTTPException(status_code=401, detail="Invalid or expired token") from None
-        email = str(payload["email"]).strip().lower()
-        method = "token"
-    elif AUTH_DEV_HEADER and x_user_email:
-        email = x_user_email.strip().lower()
-        method = "dev_header"
-    else:
+        return await _from_token(bearer)
+
+    if AUTH_DEV_HEADER and x_user_email:
+        user = await _load_active_user(x_user_email.strip().lower())
+        return Principal(user.email, user.role, user.sme_id, user.investor_id,
+                         enforced=True, method="dev_header", user_id=user.id)
+
+    raise HTTPException(
+        status_code=401,
+        detail="Authorization: Bearer <token> is required; obtain one from POST /api/auth/login",
+    )
+
+
+async def require_authenticated(
+    authorization: str | None = Header(default=None),
+) -> Principal:
+    """Identity for the routes that manage credentials themselves.
+
+    Two differences from `resolve_principal`, both because these routes act on
+    a credential rather than read data with one:
+
+    - **It verifies a token whether or not RBAC_ENFORCED is on.** Enforcement
+      is off by default in this project, so the permissive principal would make
+      revoking somebody's sessions an unauthenticated call.
+    - **It never accepts AUTH_DEV_HEADER.** The escape hatch exists to read demo
+      data without a login; handing it the power to revoke credentials would
+      make a convenience into a way in.
+    """
+    if not DB_ENABLED:
+        raise HTTPException(status_code=503, detail="Managing credentials requires DATABASE_URL")
+
+    bearer = _bearer(authorization)
+    if not bearer:
         raise HTTPException(
             status_code=401,
             detail="Authorization: Bearer <token> is required; obtain one from POST /api/auth/login",
         )
+    return await _from_token(bearer)
 
-    # The token says who the caller is; the database still decides what they are
-    # now, so a deactivated account or a changed role takes effect immediately
-    # instead of living until the token expires.
+
+async def _from_token(bearer: str) -> Principal:
+    """Verifies the token, resolves the account, and refuses a revoked one."""
+    try:
+        payload = read_token(bearer)
+    except AuthConfigError as exc:
+        # A misconfigured server must not look like a rejected caller.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TokenError:
+        # One answer for malformed, wrongly signed and expired alike, so a
+        # caller cannot probe which part of the token was wrong.
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from None
+
+    user = await _load_active_user(str(payload["email"]).strip().lower())
+
+    # Authentic is not the same as still wanted. Checked in the same session as
+    # the user row, because the account-wide cutoff is a column on it.
+    async with session_scope() as session:
+        revoked = await is_revoked(
+            session,
+            jti=payload["jti"],
+            issued_at=payload["iat"],
+            tokens_valid_from=user.tokens_valid_from,
+        )
+    if revoked:
+        # Deliberately the same answer as an expired or forged token: whether a
+        # token was revoked is not something a caller needs told apart.
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return Principal(
+        user.email, user.role, user.sme_id, user.investor_id,
+        enforced=True, method="token", user_id=user.id,
+        jti=payload["jti"], issued_at=payload["iat"], expires_at=payload["exp"],
+    )
+
+
+async def _load_active_user(email: str) -> User:
+    """The token says who the caller is; the database decides what they are now.
+
+    A deactivated account or a changed role therefore takes effect immediately
+    rather than living until the token expires.
+    """
     async with session_scope() as session:
         user = await session.scalar(select(User).where(User.email == email))
 
@@ -121,8 +190,7 @@ async def resolve_principal(
         # Same answer for unknown and deactivated, so the response does not
         # confirm which addresses exist.
         raise HTTPException(status_code=403, detail="Unknown or inactive user")
-
-    return Principal(user.email, user.role, user.sme_id, user.investor_id, enforced=True, method=method)
+    return user
 
 
 def _bearer(header: str | None) -> str | None:

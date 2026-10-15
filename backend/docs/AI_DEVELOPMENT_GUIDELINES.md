@@ -36,8 +36,8 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 (commit `4d7b4da`) · **396 tests ผ่าน + 2 skip** (มี PostgreSQL) ·
-> **31 API routes** · **26 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
+> อัปเดต 2026-10-15 (commit `f54ec8f`+) · **419 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
+> **34 API routes** · **27 ตารางฐานข้อมูล** · frontend ไม่ถูกแตะ (`1955 modules`, asset hash เดิม)
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
 
@@ -56,7 +56,7 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 396 ผ่าน + 2 skip (2 skip คือ ยังไม่ตั้ง DEMO_LOGIN_PASSWORD)
+python -m pytest -c backend/pytest.ini -q    # 419 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -93,9 +93,10 @@ python -m pytest -c backend/pytest.ini -q    # 396 ผ่าน + 2 skip (2 skip
 
 | Module | สถานะ | หมายเหตุ |
 | --- | --- | --- |
-| 8 · Database schema | ✅ | 26 ตาราง ครอบคลุม Users, SME Profiles, Investors, Projects, Analysis Results · `schema.sql` และ seed ทั้งสองไฟล์รันซ้ำได้ |
-| 8 · RESTful API | ✅ | 31 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
+| 8 · Database schema | ✅ | 27 ตาราง ครอบคลุม Users, SME Profiles, Investors, Projects, Analysis Results · `schema.sql` และ seed ทั้งสองไฟล์รันซ้ำได้ |
+| 8 · RESTful API | ✅ | 34 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
 | 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
+| 8 · เพิกถอน token | ✅ | `revoked_tokens` เพิกถอนรายเซสชัน · `users.tokens_valid_from` เพิกถอนทั้งบัญชี · `POST /api/auth/logout`, `/auth/revoke-all`, `/auth/revoke` (admin) |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
 | Frontend Integration | ✅ โค้ด / ⏳ รอ deploy | 16/16 contract ตอบ 200 + `src/services/api.ts` · เว็บยังเป็น mock จนกว่า backend จะขึ้น host |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
@@ -172,7 +173,17 @@ python -m pytest -c backend/pytest.ini -q    # 396 ผ่าน + 2 skip (2 skip
 
 ยังไม่จำเป็นต่อเดโม แต่**อย่าข้าม**ถ้าจะใช้กับข้อมูลลูกค้าจริง
 
-- **ไม่มีการเพิกถอน token** ก่อนหมดอายุ จึง clamp อายุไว้ไม่เกิน 7 วัน
+- **เพิกถอน token ได้แล้ว** (`token_revocation.py`) · ยังคง clamp อายุไว้ 7 วัน
+  **โดยเจตนา** เพราะการเพิกถอนต้องมีคนสังเกตและสั่ง แต่การหมดอายุไม่ต้อง —
+  เป็นสองชั้น ไม่ใช่ทางเลือกแทนกัน
+  - `POST /api/auth/logout` เพิกถอนเฉพาะ token ที่ใช้เรียก
+  - `POST /api/auth/revoke-all` เพิกถอนทุก token ของบัญชีตัวเอง (กรณี token ถูกขโมย)
+  - `POST /api/auth/revoke` `{email}` เพิกถอนทุก token ของบัญชีอื่น · **admin เท่านั้น**
+  - ทั้งสามเส้นตรวจ token เสมอแม้ `RBAC_ENFORCED=false` และ**ไม่รับ `AUTH_DEV_HEADER`**
+  - บัญชี `admin@example.test` ที่ seed ไว้**ยังไม่มีรหัสผ่าน** · ถ้าจะใช้
+    `/auth/revoke` ต้องตั้งก่อนด้วย `python backend/scripts/set_password.py admin@example.test`
+  - แถวใน `revoked_tokens` ตายเองเมื่อ token หมดอายุ · ล้างด้วย
+    `token_revocation.purge_expired()` ซึ่งเป็นงาน maintenance **ไม่ได้ผูกกับ request**
 - **`AUTH_DEV_HEADER` ต้องเป็น `false`** บนทุกเครื่องที่เข้าถึงได้จากภายนอก ·
   ตรวจที่ `/health` → `auth.devHeaderAccepted`
 - **ข้อมูลเดโมเป็นข้อมูลสังเคราะห์** · เกรดและการจับคู่แหล่งทุนเป็นนโยบายเดโม

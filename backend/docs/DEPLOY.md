@@ -258,7 +258,9 @@ python backend/scripts/set_password.py fund@example.test
 DEMO_LOGIN_PASSWORD='<รหัสที่ตั้ง>' python -m pytest -c backend/pytest.ini -q
 ```
 
-372 ผ่านเมื่อมีรหัส · 370 ผ่าน + 2 skip เมื่อไม่มี
+**419 ผ่าน + 3 skip** เมื่อไม่ตั้ง `DEMO_LOGIN_PASSWORD` (วัดจริงแล้ว) ·
+ตั้งรหัสแล้วจะเหลือ skip 1 ตัว คือเคสที่ยืนยันพฤติกรรมตอน *ไม่มี* `DATABASE_URL`
+จึงถูกข้ามเสมอเมื่อมี DB
 
 ### สิ่งที่ auth นี้ทำและไม่ทำ
 
@@ -268,9 +270,17 @@ DEMO_LOGIN_PASSWORD='<รหัสที่ตั้ง>' python -m pytest -c ba
 ไม่ใช่จาก token** จึงปิดบัญชีหรือเปลี่ยน role แล้วมีผลทันที และ token ที่อ้างว่าเป็น
 `admin` ก็ยกระดับตัวเองไม่ได้
 
-**ยังไม่ทำ:** ไม่มี refresh token · ไม่มี blacklist เพิกถอน token ก่อนหมดอายุ
-(จึง clamp อายุไว้ไม่เกิน 7 วัน) · ไม่มี rate limit ที่หน้า login
-(ควรเพิ่มก่อนเปิด public) · ไม่มีการจำกัดจำนวนครั้งที่ลองผิด
+**เพิ่มเข้ามาหลังเขียนหัวข้อนี้ครั้งแรก:**
+
+- **จำกัดจำนวนครั้งที่ลองผิด** · `auth_throttle` ในฐานข้อมูล จึงมีผลข้าม replica
+  และอยู่รอด restart · ค่าเริ่มต้น 8 ครั้งใน 15 นาที แล้วล็อก 15 นาที
+  (`AUTH_MAX_ATTEMPTS`, `AUTH_ATTEMPT_WINDOW_SECONDS`, `AUTH_BLOCK_SECONDS`)
+- **เพิกถอน token ก่อนหมดอายุ** · `revoked_tokens` รายเซสชัน และ
+  `users.tokens_valid_from` ทั้งบัญชี · `POST /api/auth/logout`,
+  `/auth/revoke-all`, และ `/auth/revoke` สำหรับ admin · อายุ token ยัง clamp
+  ไว้ 7 วัน **โดยเจตนา** เป็นชั้นที่สอง ไม่ใช่เพราะเพิกถอนไม่ได้
+
+**ยังไม่ทำ:** ไม่มี refresh token — client ต้อง login ใหม่เมื่อ token หมดอายุ
 ---
 
 ## 🧪 เช็กลิสต์ก่อนทีม frontend มาทดสอบ
