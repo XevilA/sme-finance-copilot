@@ -1,42 +1,26 @@
-# สถานะส่ง tester หลังต่อ Import
+# สถานะก่อนส่ง tester — ตรวจจริง 2026-10-16
 
-ตรวจ 2026-10-15 Asia/Bangkok จาก checkout ต่อจาก `dde929e` · ใช้ข้อมูลสังเคราะห์เท่านั้น ·
-อ่านข้อจำกัดก่อนอ้างว่า “ครบทุกฟีเจอร์บนเว็บ”
+ฐานงาน `269e3d2` บน main · ขอบเขต src 5 ไฟล์ตามคำอนุญาตล่าสุด · รายละเอียดการเปลี่ยน
+และการตัดสินใจอยู่ใน CODEX_HANDOFF.md รอบ 2026-10-16 · ไม่มีผล deploy ใหม่
 
-## สิ่งที่ทำและวัดแล้ว
-
-| ส่วน | ผลจริง |
+| ผลวัด | ค่า |
 | --- | --- |
-| นำเข้า XLSX | template จาก HTTP ประมาณ 5,781 bytes → `/api/v1/upload?persist=false` → เกรด B; fileStored=false; ไฟล์เสีย 422 |
-| Manual / Math | validate flat → calculate wrapped → analyze wrapped; liquidity 2.0000, เกรด B / 75.00 ของตัวอย่าง |
-| Analyst | ข้อเท็จจริงและ views มาจากผลคำนวณเดียวกัน; ไม่เรียก LLM อัตโนมัติ |
-| Forecast | Rung ณ snapshot 2026-09-30 และยืนยันถึง 2026-12-29: ต่ำสุด 29,700 เริ่มต่ำกว่าเงินสำรอง 2026-10-18 |
-| Funding | Rung ขอทุนจากส่วนขาดจริง 45,000; หนี้และทุนแยกกัน |
-| SWARM | synthetic 40 ชิ้น/วัน × 10 วัน × 70 บาท = ต้นทุน 28,000; persist=false |
-| Simulator | synthetic revenue_change_pct=0.10 เปลี่ยนรายได้ 250,000 → 275,000 |
-| ข่าว | HTTP ตอบ unavailable, provider_gate_closed, บทความ 0; ไม่เปิด gate ฝืนเพื่อทดสอบข่าวซ้ำ |
-| Infrastructure | /health ok, persistence=true; 34 routes หลัก, 27 ตาราง; 16 read contracts ผ่าน HTTP และมี source |
-| Browser | manual และ file picker ผ่านถึง Overview: รายได้ 250,000 ค่าใช้จ่าย 200,000 กำไร 50,000 เงินสด 80,000 |
-| Drag/drop | event handler จริงผ่าน regression พร้อมกันส่งซ้ำ/กรณี error; ยังไม่ได้ลากไฟล์จาก OS ผ่าน browser automation |
+| pytest กับ PostgreSQL | 494 passed / 3 skipped |
+| pytest ไม่มี DATABASE_URL | 394 passed / 103 skipped |
+| targeted order/persistence หลังแก้สุดท้าย | 23 passed |
+| final Overview/import/order contracts | 39 passed |
+| เส้นทาง /api/* ไม่รวม v1 aliases | 36 (+ 4 v1-only และ /health) |
+| DB / frontend GET contracts | 27 tables / 16 ผ่าน HTTP |
+| frontend build | 1955 modules / CSS index-DEindwiw.css / JS index-CBenrrOQ.js |
 
-Backend **482 ผ่าน + 3 skip** กับ PostgreSQL; **383 ผ่าน + 102 skip** ไม่มี DB ·
-ยังมี Starlette/httpx warning หนึ่งรายการ · ไม่แก้ assertion เดิมให้เบาลงหรือเขียน test เดิมใหม่
-
-Frontend build **1955 modules** · CSS **index-DEindwiw.css** คงเดิม ·
-JS **index-E6xWZDJT.js** · มี warning JS เกิน 500 kB · invariant checks เดิมผ่าน
-
-## เปิดทดสอบใน cmd.exe
-
-หน้าต่างแรก:
+## เริ่มใน cmd.exe
 
 ```bat
 docker compose -f backend/docker-compose.yml up -d
 backend\run.cmd
 ```
 
-ตรวจพอร์ตก่อนเปิด server ซ้ำ · ไม่ลบ volume หรือ reset ข้อมูลเดโม
-
-หน้าต่างที่สอง (ค่า VITE ใช้เฉพาะ process นี้ ไม่ใช่ secret):
+เปิดอีก terminal ที่ repo root:
 
 ```bat
 set "VITE_USE_MOCK=false"
@@ -44,52 +28,65 @@ set "VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1"
 pnpm exec vite --host localhost --port 5173 --strictPort
 ```
 
-เปิด `http://localhost:5173` · `.env` ที่ตรวจครั้งนี้อนุญาต origin นี้ แต่ไม่อนุญาต
-localhost:3000 ดังนั้นใช้คำสั่งข้างบนโดยไม่เปลี่ยน config ของทีม · ถ้า tester ใช้ origin
-อื่น ให้ทีมตรวจ CORS_ORIGINS ที่ backend ก่อน · คง RBAC_ENFORCED=false / AUTH_DEV_HEADER=false
-
-Regression ที่รันซ้ำได้:
+ใช้ localhost:5173 ให้ตรง CORS ใน backend\.env · ห้ามใส่ key backend ใน VITE_* ·
+ถ้ารัน pytest พร้อม Vite ให้ใช้ basetemp ใต้ node_modules/.cache (สร้าง parent ก่อน)
+เพราะ Vite watcher เคย crash จาก pytest temp ใต้ backend/uploads ที่ถูกล้างระหว่างรัน
 
 ```bat
-backend\.venv\Scripts\python.exe -m pytest -c backend/pytest.ini -q --basetemp=backend/uploads/pytest-temp
-backend\.venv\Scripts\python.exe backend/scripts/verify_tester_flow.py
+if not exist node_modules\.cache mkdir node_modules\.cache
+backend\.venv\Scripts\python.exe -m pytest -c backend/pytest.ini -q --basetemp=node_modules/.cache/pytest-tester
 node scripts/test-import-wiring.mjs
-pnpm run build
-pnpm run test:invariants
+node scripts/test-page-wiring.mjs
+backend\.venv\Scripts\python.exe backend/scripts/verify_tester_flow.py
 ```
 
-`verify_tester_flow.py --news` เพิ่มการเรียกข่าวผ่าน gate หนึ่งครั้ง ไม่มี force/retry ·
-ไม่จำเป็นต้องเรียกซ้ำเพียงเพื่อยืนยัน network เดิม · ผลวัด local อยู่ใน
-`backend/uploads/tester-readiness-verification.json` ซึ่ง Git ละเว้น
+## สิ่งที่ทดสอบผ่านหน้าเว็บได้
 
-## ฟอร์มและผลของผู้ใช้
+1. Import: ดาวน์โหลด template / เลือก .xlsx ไม่เกิน 5 MiB → validate → analyze → Overview.
+   Template สังเคราะห์ให้รายได้ 250,000 ค่าใช้จ่าย 200,000 กำไร 50,000 เงินสด 80,000
+   หลังสำรอง 50,000 margin 20% และ badge simulated · หมวดกรอกเองรับ 38 top-level
+   FinancialInput fields รวม loan; ไม่ส่ง optional ว่างเป็นศูนย์ · balance mismatch แจ้ง error
+2. Overview ใช้ค่าจาก response เดียวกัน รวมผลต่างงวดก่อน/unknown · ร่างฟอร์มอยู่ sessionStorage
+   แต่ผลสำเร็จอยู่เฉพาะแท็บจน reload; ไม่ผูกชื่อร้าน free text กับ SME ใน DB
+3. Simulator: baseline จาก order ที่เก็บใน DB แยกจากงบ import · สี่ controls POST จริง:
+   ขาย 120 / ต้นทุน 50 / มัดจำ 50% / เครดิต 10 ได้กำไรออเดอร์ 945,000,
+   เงินสดต่ำสุดของร้านที่รับงาน 1,200,000, ขาดกำลังผลิต 550 ต่อวัน · save แล้วมี simulationId
+   และเก็บ full baseline/scenario/results + project association · ยังไม่มี UI โหลดแผนที่บันทึก
+   กลับมา · เครดิต 366 ปฏิเสธ/save ปิด; 1.1% ได้ min cash 542,820
+4. SWARM: Radar Scan คำนวณข้อเสนอจริง; ตาราง/โควตาแสดงตาม engine · รอบนี้ได้ 450/1,000
+   ไม่ใช่ 6 ร้าน/ร้านละ 50 · สองร้านอาหารติดรถ required ที่ยัง offered · modal swap ไม่มีร้าน
+   ผ่านเงื่อนไขแล้วปิดปุ่ม · ไม่อ้างว่าทดสอบ swap สำเร็จกับร้านจริงซึ่งยังไม่มีผู้สมัครพร้อม
 
-- รองรับ FinancialInput ครบ **38 ฟิลด์: 7 required + 31 optional** รวม loan แบบ nested ·
-  จำนวนเงินส่งเป็นสตริง จำนวนหน่วย/งวดส่งเป็น integer · ช่องว่างถูกละ ไม่แทนด้วยศูนย์
-- ร่างอยู่ใน sessionStorage ของแท็บ; ผลที่คำนวณสำเร็จอยู่ในหน่วยความจำและผูก inputHash ·
-  Overview/Health/Cost/AI panel ใช้ผลนี้จนมีผลใหม่หรือ reload · ไม่ส่งงบไปเป็นร้านล่าสุดร่วมกัน
-- `/analyze` เพิ่ม shop_name optional และ views แบบ additive · ไม่เปลี่ยน body รูปเดิม:
-  `/inputs/manual` flat, `/calculate` / `/analyze` wrapped · use_llm=false ใน Import
-- ไม่มี SME identity จากข้อความชื่อร้าน จึงไม่บันทึก financial record ลงร้านเดโม ·
-  ไม่มีข้อมูลวันที่รับจ่าย/expense history ของร้านใหม่ให้ยืนยัน จึงประกาศ missing ตามจริง
-- Mock mode ยังเปิดเว็บจาก fixtures ได้โดยไม่ต่อ backend แต่ปุ่มคำนวณ/อัปโหลดแจ้งว่า
-  ต้องตั้งโหมด backend จริง ไม่แสดงความสำเร็จจาก fixture
+POST ใหม่ `/api/v1/simulate/order` รับ `{baseline: SwarmRequest, scenario: {unit_price,
+cost_per_unit, deposit_ratio, payment_terms_days}, persist:false, context_missing:[]}`.
+เงิน/rate เป็น decimal strings, เครดิต integer · cost_per_unit=null คงแต่ละร้าน; override
+คือสมมติฐานต้นทุนเดียวกันทุกร้าน · `/simulate` เดิมไม่เปลี่ยน · GET `/simulator/context`
+ให้ machine fields และ resource dependencies ของ project เดียวกัน ไม่ parse จาก display copy
 
-## สิ่งที่ต้องแก้ก่อนอ้างว่าเว็บใช้ข้อมูลจริงครบ
+ยอด Simulator/SWARM เป็นกำไรออเดอร์ก่อนค่าใช้จ่ายอื่นและ cash schedule เฉพาะออเดอร์ ·
+minimumShopCash คือร้านที่เงินต่ำสุด ไม่บวกเงินข้ามร้าน · เครดิตเทอมอาจไม่เปลี่ยน cash trough
+เมื่อยังรับเงินหลังผลิตครบ แต่วันรับเงิน/ระยะวงจรเปลี่ยน · ไม่ใช่ forecast ทั้งกิจการ 90 วัน
 
-1. **ต้องขยายสิทธิ์ไฟล์ที่สามก่อน:** OverviewPage.tsx ยังฝังตัวเลข −5,000, 36,200,
-   10,000 และ badge actual แม้ข้อมูลที่ส่งเป็น simulated · browser ยืนยันความขัดแย้งแล้ว ·
-   ภาพอยู่ใน `backend/uploads/import-browser-verification.png` · ไม่แก้ไฟล์นี้เอง
-2. SimulatorPage.tsx ยังใช้สูตรในหน้า; SwarmPage.tsx ยังมีปุ่มจำลองแทน POST ·
-   การต่อ Import และการที่ API ตอบ 200 ไม่ได้ทำให้ action ในสองหน้านี้กลายเป็น engine จริง
-3. Import ยังมีข้อความเดิมเรื่อง XLS/CSV/25MB และ column mapping ซึ่งขัดกับ parser จริง ·
-   การเลือกไฟล์/error ยึด XLSX template และ 5MiB แล้ว แต่คำสั่งห้ามเปลี่ยน copy ยังคงอยู่
-4. หมวดสต็อกยังไม่มีฟิลด์ inventory ใน FinancialInput; ไม่มีการประดิษฐ์ DIO หรือยอดสต็อก
-5. Railway และ Vercel env ยังต้องทีมดำเนินการ ไม่มีผลตรวจ deploy ใหม่ในรอบนี้ ·
-   ข่าวสดและ published_at/dedup กับบทความจริงยังไม่ยืนยัน
-6. พิกัดร้านยังไม่ทราบ ไม่เดาจากจังหวัด · resource eligibility ยังไม่ใช่การจองกำลังตามเวลา
+## ยังไม่พร้อมอ้างว่าใช้ทั้งเว็บครบ
 
-ตั้งรหัสสุ่มให้ admin@example.test ใน local DB แล้ว อ่านกลับยืนยันว่ามี hash ·
-credential อยู่เฉพาะ `backend/uploads/admin-tester-credentials.txt` ที่ Git ละเว้น ·
-AUTH_SECRET ยังไม่ตั้ง จึงยังไม่ได้ยืนยัน admin login/revoke บน server ปัจจุบัน ·
-ไม่ใส่ credential ในเอกสารนี้หรือ commit
+- โครงการ DB 1,000/วัน 30 วัน · project ยังไม่เก็บ required_business_types / radius /
+  buyer coordinates / collection schedule จึงส่ง missing และยังรับรองความเหมาะสมของ
+  Sahai ซึ่งเป็น packaging ไม่ได้ · ต้องเก็บ requirements จริงก่อนรับออเดอร์อาหาร
+- SWARM เป็น preview persist=false ไม่จองงาน ไม่จองรถ ไม่เขียนทับ allocations/resources ·
+  รายละเอียดเงินรายร้านยังอ่านข้อมูลที่บันทึกไว้ ไม่ใช่ preview · ต้องยืนยันทรัพยากรจริงก่อน
+- HeroAssembly / ChaosPlayback / AppShell/sidebar และหน้าที่ไม่ได้อนุญาตยังมีฉากสาธิต ·
+  Chaos Play ไม่ได้เรียก engine และปุ่มแผนสำรองใน child ยังเป็นการนำทาง/แจ้งเตือนสาธิต ·
+  Import Column Mapping เป็นตัวอย่าง ไม่มี auto mapping; inventory ยังไม่มี schema
+- Drag/drop ผ่าน handler regression; รอบนี้ browser ตรวจ file chooser ไม่ได้ลากจาก OS
+- ทีมยังต้องสร้าง Railway service และตั้ง Vercel VITE_API_BASE_URL / VITE_USE_MOCK=false
+  พร้อม redeploy · ข่าวสดยังไม่ยืนยัน/TLS เดิม ไม่ retry provider รอบนี้ · ไม่ยิง paid LLM
+- AUTH_SECRET ยังไม่ตั้ง, enforcement=false/devHeader=false สำหรับ tester · credential
+  admin อยู่เฉพาะ ignored uploads ไม่มีค่าใน repo หรือเอกสาร · ยังไม่อ้างว่า login/admin revoke
+  ผ่าน HTTP ด้วยบัญชีนี้ · ดู DEPLOY.md ก่อนใช้ข้อมูลจริง
+
+Mock mode อ่าน fixtures/ฉากได้; การคำนวณ/อัปโหลด/save ไม่ปลอมความสำเร็จ ต้องเชื่อม backend
+จริงก่อน · CSS hash เดิมและ style-expression guard ทั้ง 4 หน้าเทียบฐาน 269e3d2 ผ่าน
+
+Browser ของ production mock bundle ผ่าน: Simulator แสดงผลยังไม่มีข้อมูล/save ปิด และ
+SWARM Radar แจ้งว่าต้องต่อ backend · mock fixtures เดิมยังมี order ราคา 85 แต่ proposal
+รายรับ 240,000 ซึ่งไม่ตรงกับ 3,000 × 85 = 255,000; อย่าใช้ mock ยืนยันตัวเลขการเงิน

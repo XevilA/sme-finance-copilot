@@ -8,6 +8,16 @@ of the lane split today. The UI rules below still apply in full.
 Base commit: `82a355f` on `main`. Working tree was clean and in sync with origin
 when this was written.
 
+> **Authorization amendment, 2026-10-16:** The user explicitly answered
+> "อนุญาต" to adding wiring in OverviewPage.tsx, SimulatorPage.tsx and SwarmPage.tsx,
+> plus correcting Import file type/size copy. The allowed src paths are now exactly
+> src/api/client.ts; src/features/import/ImportPage.tsx;
+> src/features/overview/OverviewPage.tsx; src/features/simulator/SimulatorPage.tsx;
+> src/features/swarm/SwarmPage.tsx. Preserve all styling/layout/structure/routing.
+> This supersedes the two-path limit in section 4, which records the original brief.
+> Current measured results and unresolved UI demo components: CODEX_HANDOFF.md,
+> 2026-10-16 section. All figures at 82a355f below remain historical.
+
 ---
 
 ## 1. Read these first, in this order

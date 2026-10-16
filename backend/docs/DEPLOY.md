@@ -1,5 +1,12 @@
 # คู่มือ Deploy backend ขึ้น Railway
 
+> ล่าสุด 2026-10-16: wiring ครบ 5 ไฟล์ที่อนุญาต · **494/3 tests มี DB**,
+> **394/103 ไม่มี DB**, **36 API routes**, **27 tables** · build 1955 modules,
+> CSS `index-DEindwiw.css`, JS `index-CBenrrOQ.js` · ดู `TESTER_READINESS_CURRENT.md`
+> สำหรับเงื่อนไข order-only Simulator และ SWARM preview; ยังมีส่วนสาธิตนอกขอบเขต
+> และยังไม่มีผล deploy ใหม่ · ข้อความ/ตัวเลขก่อนหน้านี้ด้านล่างเป็นประวัติเดิม
+
+
 > สถานะ tester หลัง Import wiring: ดู `TESTER_READINESS_CURRENT.md` ·
 > วัดล่าสุด **482 ผ่าน + 3 skip**, ไม่มี DB **383 ผ่าน + 102 skip** ·
 > `provider_fetch_state` และ `auth_throttle` ข้าม replica มีแล้ว; ข้อความ “ยังไม่มี”

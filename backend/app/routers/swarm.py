@@ -119,4 +119,4 @@ async def get_swarm(order_ref: str) -> dict:
         project = await load_swarm_project(session, order_ref)
     if project is None:
         raise HTTPException(status_code=404, detail="Unknown order_ref")
-    return {"data": project, "kind": "actual", "status": "ok", "missing": []}
+    return {"data": project, "kind": "actual", "source": "database", "status": "ok", "missing": []}

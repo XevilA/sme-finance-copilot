@@ -1,9 +1,10 @@
 # SME SWARM: Finance Copilot - ข้อตกลงและแนวทางการพัฒนาสำหรับ AI
 
 ## ⚠️ 1. กฎเหล็กขั้นเด็ดขาด (เพื่อประหยัด Token และป้องกันระบบพัง)
-> ข้อยกเว้นงานวันนี้ตาม `CODEX_ASSIGNMENT.md`: CODEX ดูแลทั้งสอง lane และแก้เฉพาะ
-> `src/api/client.ts` / `src/features/import/ImportPage.tsx` เพื่อ wiring กับเพิ่มช่องรับข้อมูล
-> โดยคงดีไซน์และข้อความเดิม · ไฟล์ที่สามยังต้องขอขยายขอบเขต
+> ข้อยกเว้น 2026-10-16 ตามคำอนุญาตผู้ใช้: CODEX ดูแลทั้งสอง lane และแก้ wiring
+> ได้เฉพาะ client.ts, ImportPage.tsx, OverviewPage.tsx, SimulatorPage.tsx, SwarmPage.tsx ·
+> Import แก้ copy ชนิด/ขนาดไฟล์ได้ · คง CSS/Tailwind/layout/structure/routing เดิม
+> ข้อยกเว้นนี้มาก่อนกฎ frontend ทั่วไปด้านล่าง; ไฟล์นอกห้ารายการยังไม่อนุญาต
 
 - **ห้ามแก้ไข FRONTEND เด็ดขาด:** หน้าเว็บ (UI) เสร็จสมบูรณ์แล้ว 100% **ห้าม** แก้ไข React components, CSS, Tailwind classes หรือโครงสร้างหน้าเว็บใดๆ ทั้งสิ้น[cite: 1]
 - **การประหยัด TOKEN (Speed Mode):** เราอยู่ในช่วง Hackathon 48 ชั่วโมง ให้สร้างเฉพาะโค้ดที่พร้อมใช้งานจริงบน Production เท่านั้น ห้ามพิมพ์ข้อความเกริ่นนำ ห้ามอธิบายยืดเยื้อ และห้ามพิมพ์คำขอโทษ[cite: 1]
@@ -40,10 +41,10 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-15 (ต่อจาก `dde929e`) · **482 tests ผ่าน + 3 skip** (มี PostgreSQL) ·
-> ไม่มี DB: **383 ผ่าน + 102 skip** · **34 API routes** · **27 ตารางฐานข้อมูล** ·
-> wiring เฉพาะสองไฟล์ที่อนุญาต: `1955 modules`, CSS `index-DEindwiw.css` คงเดิม,
-> JS `index-E6xWZDJT.js` · มีคำเตือน bundle JS เกิน 500 kB และ Starlette/httpx เดิม
+> อัปเดต 2026-10-16 จาก `269e3d2` · **494 tests ผ่าน + 3 skip** มี PostgreSQL ·
+> ไม่มี DB **394 ผ่าน + 103 skip** · **36 API routes**, **27 ตาราง** ·
+> wiring frontend 5 ไฟล์: **1955 modules**, CSS `index-DEindwiw.css` คงเดิม,
+> JS `index-CBenrrOQ.js` · มี warning bundle >500kB และ Starlette/httpx เดิม
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
 
@@ -62,7 +63,7 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 482 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
+python -m pytest -c backend/pytest.ini -q    # 494 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
@@ -103,11 +104,11 @@ python -m pytest -c backend/pytest.ini -q    # 482 ผ่าน + 3 skip (ยั
 | Module | สถานะ | หมายเหตุ |
 | --- | --- | --- |
 | 8 · Database schema | ✅ | 27 ตาราง ครอบคลุม Users, SME Profiles, Investors, Projects, Analysis Results · `schema.sql` และ seed ทั้งสองไฟล์รันซ้ำได้ |
-| 8 · RESTful API | ✅ | 34 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
+| 8 · RESTful API | ✅ | 36 routes · เสิร์ฟทั้ง `/api/*` และ `/api/v1/*` |
 | 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
 | 8 · เพิกถอน token | ✅ | `revoked_tokens` เพิกถอนรายเซสชัน · `users.tokens_valid_from` เพิกถอนทั้งบัญชี · `POST /api/auth/logout`, `/auth/revoke-all`, `/auth/revoke` (admin) |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
-| Frontend Integration | ✅ Import wiring / ⏳ ยังไม่ครบทุกหน้า | manual/upload/analyze ต่อจริงในสองไฟล์ที่อนุญาต · ผล Overview/Health/Cost/AI มาจากคำขอเดียวกันในแท็บ · `src/services/api.ts` ไม่ถูกกู้คืน · 16 GET contracts ผ่าน HTTP แต่ยังมีข้อความ/สูตรคงที่ในหน้าอื่น ดู §4 |
+| Frontend Integration | ✅ 5-file wiring / ⏳ ยังมีส่วนสาธิต | Import/Overview/order Simulator/SWARM ต่อจริงตามสิทธิ์ล่าสุด · ผล Overview/Health/Cost/AI มาจากคำขอเดียวกันในแท็บ · `src/services/api.ts` ไม่ถูกกู้คืน · 16 GET contracts ผ่าน HTTP แต่ยังมีข้อความ/สูตรคงที่ในหน้าอื่น ดู §4 |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
 | ตารางภาระแบบระบุวันที่ | ✅ | `receivables`, `payables`, `expense_transactions`, `allocation_resources` · ต่อ `project_cash_events()` ของ CODEX เข้า `/api/forecast` แล้ว |
 | ข้อมูลเสริมเข้าการวิเคราะห์ | ✅ | ส่ง `forecast` + `expense_history` ของ SME เดียวกันเข้า `build_analysis` ทั้งสี่จุด · ความครบของตารางมาจาก `schedule_complete_through` ของผู้เรียก · sub-status ถูกยกขึ้น `missing` ของ envelope |
@@ -120,22 +121,20 @@ python -m pytest -c backend/pytest.ini -q    # 482 ผ่าน + 3 skip (ยั
 
 เรียงตามผลกระทบ · แต่ละข้อบอกชัดว่า **ใครทำ** และ **ขั้นถัดไปคืออะไร**
 
-**ผลตรวจ CODEX รอบ wiring:** manual และ file picker ผ่าน browser จริงที่ `localhost:5173`
-ถึงผลรายได้ 250,000 / ค่าใช้จ่าย 200,000 / กำไร 50,000 / เงินสด 80,000 ของตัวอย่าง ·
-drag/drop ผ่าน handler regression ไม่ได้ทดสอบลากจาก OS ผ่าน browser จริง ·
-HTTP ทั้งแปดโมดูลตรวจแล้ว ข่าวคืน gate ปิด/unavailable บทความ 0 รายการ ·
-รายละเอียดและคำสั่ง tester อยู่ใน `TESTER_READINESS_CURRENT.md`
+**ผลตรวจ wiring 2026-10-16:** Import → Overview ยอดจริงและ badge ถูกต้อง; Simulator
+POST สี่ controls และ save ลง DB/อ่านกลับจริง; SWARM Radar POST และเคสไม่มีร้านสำรอง
+ปิดปุ่มแล้ว · 494/3 DB, 394/103 ไม่มี DB · 36 routes / 27 tables / 16 GET contracts ·
+รายละเอียด request shapes/ขอบเขตและคำสั่งอยู่ใน `TESTER_READINESS_CURRENT.md`
 
-**บล็อกความถูกต้องของเว็บ — รอขยายสิทธิ์ไฟล์ที่สาม:** `OverviewPage.tsx` ยังฝังเงินหลัง
-สำรอง −5,000 และข้อความกำไร 36,200 / เงินสด 10,000 รวมทั้ง badge actual แม้คำขอเป็น
-simulated · browser ยืนยันว่าขัดกับยอดใหม่จาก API · `SimulatorPage.tsx` และ
-`SwarmPage.tsx` ยังมีสูตร/ปุ่มที่ไม่ได้ POST ไป engine · ไม่สามารถอ้างว่าทั้งแปดฟีเจอร์
-ใช้ผ่านเว็บครบได้ด้วยสิทธิ์แก้เพียงสองไฟล์ · ไม่แก้ข้ามขอบเขตเอง
+**ข้อจำกัดที่ยังบล็อกความครบทั้งเว็บ:** HeroAssembly / ChaosPlayback / AppShell/sidebar
+และหน้าอื่นนอก 5 ไฟล์ยังมีส่วนสาธิต · Chaos Play ไม่ใช่ simulation POST · Column Mapping
+ใน Import ยังเป็นตัวอย่าง ไม่ใช่ auto mapping · ห้ามอ้างว่าทุกปุ่มในเว็บต่อจริงแล้ว
 
-**ข้อจำกัดข้อความหน้า Import:** ข้อความเดิมระบุ XLS/CSV/25MB และ column mapping
-แต่ backend รองรับ template XLSX ไม่เกิน 5MiB ไม่มี mapping อัตโนมัติ · file picker/error
-ใช้ข้อจำกัดจริงแล้ว · ไม่แก้ copy ที่ผู้ใช้สั่งคงไว้ · หมวดสต็อกไม่มีฟิลด์ inventory ใน
-FinancialInput จึงไม่เพิ่มตัวเลขที่ engine ไม่รองรับ
+**ข้อมูลก่อนยืนยัน SWARM:** DB มี order 1,000/วัน 30 วัน; รถ required ยังไม่พร้อมสำหรับ
+สองร้านอาหาร จัดสรรเบื้องต้นได้ 450 ขาด 550 · ร้านที่ได้งานเป็น packaging แต่ project
+ยังไม่เก็บ required_business_types จึงรับรองความเหมาะสมไม่ได้ · ต้องเก็บ constraints/
+collection schedule/พิกัดจริงและยืนยันทรัพยากรก่อนรับงาน · ไม่เดาหรือเปลี่ยน offered เป็น
+confirmed เอง · preview ไม่จองงานและไม่เขียนทับ allocation_resources
 
 ### 🔴 บล็อกการเดโมเว็บจริง
 
@@ -170,7 +169,7 @@ FinancialInput จึงไม่เพิ่มตัวเลขที่ engi
 ตรวจ resources ที่ส่งมาแบบ inline แต่ไม่ได้โหลด forecast/expense history หรือสร้าง
 analysis findings ของ Plan A/B · หากจะเพิ่ม ให้กำหนดวิธีปรับ cash events ตาม scenario
 และต่อข้อมูล SME เดียวกันก่อน ห้ามนำ forecast ของ baseline ไปยืนยันผล scenario ·
-ไม่ใช่งานแก้ Core ที่ CODEX ควรทำข้ามบทบาท
+ไม่ได้รวมใน order-only wiring รอบนี้ แม้ข้อจำกัด lane ถูกยกเว้นวันนี้
 
 **4. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
 
@@ -209,6 +208,6 @@ analysis findings ของ Plan A/B · หากจะเพิ่ม ให้
 
 1. **เว็บจริงกับ repo ไม่ตรงกัน** — bundle บน Vercel ใหญ่กว่าที่ repo build ได้
    (JS +48.6 kB, CSS +21.6 kB) และ UI เวอร์ชันนั้นไม่มีอยู่ใน git
-2. **"โครงการล่าสุด"** ที่ `/api/v1/order`, `/projects`, `/swarm/proposal` ใช้
-   คือสิ่งที่ถูกเขียนล่าสุด **รวมออเดอร์ที่เทสต์สร้าง** ·
-   ตอนเดโมให้ส่ง `?order_ref=PO-STP-2026-091` หรือรันออเดอร์จริงเป็นตัวสุดท้าย
+2. **"โครงการล่าสุด"** ใช้ `ACTIVE_PROJECT_ORDER`: start_date desc nulls last ก่อน
+   updated_at/created_at · ไม่ใช่เขียนล่าสุดอย่างเดียว และหน้าเว็บไม่ได้เลือก order_ref
+   จาก query · รอบนี้ /simulator/context ใช้เกณฑ์เดียวกัน ไม่สร้างออเดอร์ทดแทนเพื่อเดโม

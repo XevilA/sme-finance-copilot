@@ -23,22 +23,28 @@ export const OverviewPage: React.FC = () => {
   const { setCurrentPage, setAIPanelOpen, activeEvidenceTargetId } = useAppStore();
   const [dataEnvelope, setDataEnvelope] = useState<Envelope<BusinessOverview> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const amount = (value: number | null | undefined) => value == null ? "ยังไม่มีข้อมูล" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+  const change = (value: number | null | undefined) => value == null ? "ยังไม่มีข้อมูลเทียบงวดก่อน" : `${value > 0 ? "+" : ""}฿${amount(value)} เทียบงวดก่อน`;
   const [selectedMetric, setSelectedMetric] = useState<"cash" | "profit" | "revenue" | "expense">("cash");
 
   const loadData = () => {
     setLoading(true);
+    setError("");
     apiClient
       .getOverview()
       .then((res) => {
         setDataEnvelope(res);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => { setError(err.message); setLoading(false); });
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  if (!loading && error) return <StateRenderer currentMode="error" errorMessage={error} onRetry={loadData}>{null}</StateRenderer>;
 
   if (loading || !dataEnvelope) {
     return (
@@ -55,6 +61,7 @@ export const OverviewPage: React.FC = () => {
   }
 
   const { data, kind, asOf, analyzedAt } = dataEnvelope;
+  const margin = (data as BusinessOverview & { netProfitMargin?: number }).netProfitMargin;
 
   return (
     <StateRenderer
@@ -118,14 +125,14 @@ export const OverviewPage: React.FC = () => {
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
               <span>รายได้รวม</span>
-              <DataKindBadge kind="actual" size="sm" />
+              <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-ink tabular-nums">
-              ฿{data.revenue.toLocaleString()}
+              ฿{amount(data.revenue)}
             </div>
             <div className="text-[11px] text-emerald-600 flex items-center gap-1 mt-1 font-medium">
               <TrendingUp className="w-3 h-3" />
-              <span>+฿{data.lastPeriodDiff.revenue.toLocaleString()} vs เดือนก่อน</span>
+              <span>{change(data.lastPeriodDiff.revenue)}</span>
             </div>
           </div>
 
@@ -140,14 +147,14 @@ export const OverviewPage: React.FC = () => {
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
               <span>ค่าใช้จ่ายรวม</span>
-              <DataKindBadge kind="actual" size="sm" />
+              <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-ink tabular-nums">
-              ฿{data.expense.toLocaleString()}
+              ฿{amount(data.expense)}
             </div>
             <div className="text-[11px] text-amber-600 flex items-center gap-1 mt-1 font-medium">
               <TrendingUp className="w-3 h-3" />
-              <span>+฿{data.lastPeriodDiff.expense.toLocaleString()} ต้นทุนเพิ่ม</span>
+              <span>{change(data.lastPeriodDiff.expense)}</span>
             </div>
           </div>
 
@@ -165,13 +172,13 @@ export const OverviewPage: React.FC = () => {
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
               <span className="font-semibold text-brand">กำไรสุทธิทางบัญชี</span>
-              <DataKindBadge kind="actual" size="sm" />
+              <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-brand tabular-nums">
-              ฿{data.netProfit.toLocaleString()}
+              ฿{amount(data.netProfit)}
             </div>
             <div className="text-[10px] text-slate-500 mt-1">
-              อัตรากำไรสุทธิ 24.4% (ดีมาก)
+              อัตรากำไรสุทธิ {margin == null ? "ยังไม่มีข้อมูล" : `${amount(margin)}%`}
             </div>
           </div>
 
@@ -188,15 +195,15 @@ export const OverviewPage: React.FC = () => {
             }`}
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-              <span className="font-semibold text-ink">เงินสดคงเหลือจริง</span>
-              <DataKindBadge kind="actual" size="sm" />
+              <span className="font-semibold text-ink">{kind === "actual" ? "เงินสดคงเหลือจริง" : "เงินสดตามข้อมูลที่ระบุ"}</span>
+              <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-attention-dark tabular-nums">
-              ฿{data.cashBalance.toLocaleString()}
+              ฿{amount(data.cashBalance)}
             </div>
             <div className="text-[11px] text-danger flex items-center gap-1 mt-1 font-medium">
               <TrendingDown className="w-3 h-3" />
-              <span>-฿6,200 (เงินสดตึงตัว)</span>
+              <span>{change(data.lastPeriodDiff.cashBalance)}</span>
             </div>
           </div>
 
@@ -207,13 +214,13 @@ export const OverviewPage: React.FC = () => {
           >
             <div className="flex items-center justify-between text-xs text-danger mb-1">
               <span className="font-bold">เงินที่ใช้ได้หลังกันสำรอง</span>
-              <DataKindBadge kind="forecast" size="sm" />
+              <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-danger tabular-nums">
-              -฿5,000
+              ฿{amount(data.usableCashAfterReserve)}
             </div>
             <div className="text-[10px] text-danger font-medium mt-1">
-              ต่ำกว่าสำรอง ฿15,000 บาท
+              เงินสำรองที่ระบุ ฿{amount(data.reserveThreshold)}
             </div>
           </div>
         </div>
@@ -226,7 +233,7 @@ export const OverviewPage: React.FC = () => {
             </div>
             <div>
               <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
-                ข้อเท็จจริงสำคัญ: ทำไมมีกำไร ฿36,200 แต่เงินสดเหลือเพียง ฿10,000?
+                กำไรทางบัญชี ฿{amount(data.netProfit)} · เงินสดคงเหลือ ฿{amount(data.cashBalance)}
               </h4>
               <p className="text-xs text-ink-muted leading-relaxed mt-0.5">
                 {data.cashVsProfitInsight}
@@ -250,7 +257,7 @@ export const OverviewPage: React.FC = () => {
             <h3 className="text-sm font-display font-bold text-ink flex items-center gap-1.5">
               <span>เรื่องที่ควรทำต่อเพื่อรักษาสภาพคล่อง</span>
               <span className="text-[10px] bg-slate-100 text-ink-muted px-2 py-0.5 rounded-chip font-normal">
-                4 รายการแนะนำ
+                {data.actionableItems.length} รายการแนะนำ
               </span>
             </h3>
           </div>
@@ -322,7 +329,7 @@ export const OverviewPage: React.FC = () => {
               ดูว่าเงินร้านเป็นอย่างไร
             </h4>
             <p className="text-[11px] text-ink-muted">
-              นำเข้าไฟล์ Excel/CSV หรือกรอกแบบฟอร์ม 8 หมวดเพื่อตรวจสุขภาพร้าน
+              นำเข้าไฟล์ Excel (.xlsx) หรือกรอกแบบฟอร์ม 8 หมวดเพื่อตรวจสุขภาพร้าน
             </p>
           </div>
 
@@ -337,7 +344,7 @@ export const OverviewPage: React.FC = () => {
               รวมทีมรับงานใหญ่ (SME SWARM)
             </h4>
             <p className="text-[11px] text-ink-muted">
-              เปิดฉากคำสั่งซื้ออาหาร 300 กล่อง/วัน และแบ่งงาน 6 ร้านค้า
+              เปิดคำสั่งซื้อและคำนวณการแบ่งงานตามข้อมูลร้านที่มี
             </p>
           </div>
 

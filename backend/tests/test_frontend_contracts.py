@@ -78,7 +78,7 @@ def test_overview_declares_the_series_it_cannot_produce():
     assert "weekly_cash_movements" in body["missing"]
     # One demo statement has no prior period, so the diff must be declared.
     assert "previous_period_statement" in body["missing"]
-    assert data_all_zero(body["data"]["lastPeriodDiff"])
+    assert all(value is None for value in body["data"]["lastPeriodDiff"].values())
 
 
 def data_all_zero(diff: dict) -> bool:

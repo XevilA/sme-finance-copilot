@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { apiClient } from "@/api/client";
+import { apiClient, OrderContext } from "@/api/client";
 import { SwarmOrder, SwarmProposal, Shop, StuckReasonType } from "@/api/contracts/types";
 import { ShopCard } from "@/components/signature/ShopCard";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
@@ -34,8 +34,6 @@ export const SwarmPage: React.FC = () => {
     setSelectedShopId,
     setAIPanelOpen,
     isReducedMotion,
-    swappedShops,
-    swapShop,
     addToast,
   } = useAppStore();
 
@@ -43,6 +41,23 @@ export const SwarmPage: React.FC = () => {
   const [proposal, setProposal] = useState<SwarmProposal | null>(null);
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [context, setContext] = useState<OrderContext | null>(null);
+  const [catalogue, setCatalogue] = useState<Shop[]>([]);
+  const [eligibility, setEligibility] = useState<Record<string, { eligible: boolean; reasons: string[] }>>({});
+  const busy = useRef(false);
+  const amount = (value: number) => value.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+  const applyProposal = (result: Awaited<ReturnType<typeof apiClient.assembleSwarm>>, pool: Shop[]) => {
+    setProposal(result.data); setEligibility(result.audit.eligibility);
+    setShops(pool.map((shop) => {
+      const allocation = result.data.shops.find((item) => item.shopId === shop.id);
+      const assessment = result.audit.eligibility[shop.id];
+      return { ...shop, workingCapitalNeeded: allocation?.workingCapitalNeeded ?? 0,
+        fundingGap: allocation?.fundingGap ?? 0,
+        status: assessment?.eligible === false ? "blocked" : result.missing?.length && allocation?.status === "ready" ? "review" : allocation?.status || "review",
+        statusNote: assessment?.reasons.join("; ") || (allocation ? "ข้อเสนอที่คำนวณใหม่ ยังไม่จองโควตา" : "ยังไม่ได้รับส่วนแบ่งออเดอร์นี้") };
+    }));
+  };
 
   // S2 Swarm Assembly Animation State
   const [isAssembling, setIsAssembling] = useState(false);
@@ -59,46 +74,48 @@ export const SwarmPage: React.FC = () => {
   const [swappingShopId, setSwappingShopId] = useState<string | null>(null);
 
   const loadData = () => {
-    setLoading(true);
-    Promise.all([apiClient.getOrder(), apiClient.getSwarmProposal(), apiClient.getShops()])
-      .then(([orderRes, propRes, shopsRes]) => {
-        setOrder(orderRes.data);
-        setProposal(propRes.data);
-        setShops(shopsRes.data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    setLoading(true); setError("");
+    if (apiClient.isDemoMode()) {
+      Promise.all([apiClient.getOrder(), apiClient.getShops(), apiClient.getSwarmProposal()])
+        .then(([orderRes, shopsRes, proposalRes]) => {
+          setOrder(orderRes.data); setShops(shopsRes.data); setCatalogue(shopsRes.data); setProposal(proposalRes.data);
+        }).catch((err) => setError(err.message)).finally(() => setLoading(false));
+      return;
+    }
+    Promise.all([apiClient.getOrder(), apiClient.getShops(), apiClient.getOrderContext()])
+      .then(async ([orderRes, shopsRes, contextRes]) => {
+        const result = await apiClient.assembleSwarm(contextRes.data);
+        setOrder(orderRes.data); setContext(contextRes.data); setCatalogue(shopsRes.data);
+        applyProposal(result, shopsRes.data);
+      }).catch((err) => setError(err.message)).finally(() => setLoading(false));
   };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Trigger S2 Radar Scan & Orbit Assembly
+  useEffect(loadData, []);
+  const assemble = async (next: OrderContext, message: string) => {
+    if (busy.current) return;
+    busy.current = true; setIsAssembling(true); setScanPulse(true);
+    try {
+      const result = await apiClient.assembleSwarm(next);
+      setContext(next); applyProposal(result, catalogue.filter((shop) => next.shops.some((row) => row.shop_id === shop.id)));
+      setSwappingShopId(null);
+      addToast({ type: "success", title: message, message: `จัดสรร ${result.data.totalCapacityAssigned} ต่อวัน · ขาดกำลังผลิต ${result.data.deficitBoxesPerDay} · ทุนที่ขาด ฿${amount(result.data.totalFundingGap)} ยังไม่จองโควตาหรือทรัพยากร` });
+    } catch (err) { addToast({ type: "error", title: "คำนวณไม่สำเร็จ", message: (err as Error).message }); }
+    finally { busy.current = false; setIsAssembling(false); setScanPulse(false); }
+  };
   const handleTriggerSwarmAssembly = () => {
-    setIsAssembling(true);
-    setScanPulse(true);
-    setTimeout(() => setScanPulse(false), 2400);
-    setTimeout(() => {
-      setIsAssembling(false);
-      addToast({
-        type: "success",
-        title: "จัดสรรทีม 6 ร้านค้าเสร็จสมบูรณ์",
-        message: "ระบบคำนวณและล็อกโควตาร้านละ 50 กล่อง รวม 300 กล่อง/วัน บนวงโคจรเรียบร้อย",
-      });
-    }, 1200);
+    if (context) void assemble(context, "คำนวณข้อเสนอทีมแล้ว");
+    else addToast({ type: "error", title: "ยังเป็นโหมดตัวอย่าง", message: "ตั้ง VITE_USE_MOCK=false และเชื่อมต่อ backend ก่อนคำนวณทีมจริง" });
   };
-
-  // Perform Swap with Fallback Shop
-  const handleConfirmSwap = (oldShopId: string, newShopName: string) => {
-    swapShop(oldShopId, "shop-backup-1");
-    setSwappingShopId(null);
-    addToast({
-      type: "success",
-      title: "สลับร้านค้าสำเร็จ",
-      message: `เปลี่ยนเป็น '${newShopName}' เรียบร้อยแล้ว แผนเงินถูกคำนวณใหม่`,
-    });
+  const assignedIds = new Set(proposal?.shops.map((shop) => shop.shopId) || []);
+  const replacement = catalogue.find((shop) => !assignedIds.has(shop.id) && shop.id !== swappingShopId && eligibility[shop.id]?.eligible && shop.capacityAvailable > 0);
+  const handleConfirmSwap = (oldShopId: string) => {
+    if (!context || !replacement || busy.current) return;
+    // Recompute the existing team with exactly the named replacement, retaining
+    // its real resource dependencies and capacity constraints.
+    const ids = new Set([...assignedIds].filter((id) => id !== oldShopId));
+    ids.add(replacement.id);
+    void assemble({ ...context, shops: context.shops.filter((shop) => ids.has(shop.shop_id)) }, "คำนวณทีมหลังสลับร้านแล้ว");
   };
+  if (!loading && error) return <StateRenderer currentMode="error" errorMessage={error} onRetry={loadData}>{null}</StateRenderer>;
 
   if (loading || !order || !proposal) {
     return (
@@ -116,6 +133,9 @@ export const SwarmPage: React.FC = () => {
   // Calculate if shops have funding gaps
   const shortageCount = proposal.shops.filter((s) => s.fundingGap > 0).length;
   const isDeficit = proposal.deficitBoxesPerDay > 0;
+  const blockedResources = [...new Set(context?.shops.flatMap((shop) => (shop.resources || [])
+    .filter((resource) => resource.required && (!resource.available || resource.status !== "confirmed"))
+    .map((resource) => resource.title)) || [])];
 
   // Node angles around orbit (6 positions: 0, 60, 120, 180, 240, 300 deg)
   const nodePositions = [
@@ -148,7 +168,7 @@ export const SwarmPage: React.FC = () => {
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-slate-400">
-              ห้องควบคุมการจัดสรรคำสั่งซื้อขนาดใหญ่ กระจายโควตาสู่ 6 ร้านค้ารายย่อย พร้อมตรวจความพร้อมเงินทุนหมุนเวียน
+              ห้องควบคุมการจัดสรรคำสั่งซื้อขนาดใหญ่ ตรวจผู้สมัคร {shops.length} ร้าน · ข้อเสนอเบื้องต้น ยังไม่ยืนยันประเภทงานและระยะทาง
             </p>
           </div>
 
@@ -178,7 +198,7 @@ export const SwarmPage: React.FC = () => {
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>การ์ดทีม 6 ร้าน</span>
+                <span>การ์ดผู้สมัคร {shops.length} ร้าน</span>
               </button>
             </div>
 
@@ -186,6 +206,7 @@ export const SwarmPage: React.FC = () => {
             <button
               type="button"
               onClick={handleTriggerSwarmAssembly}
+              disabled={isAssembling}
               className="px-4 py-2 bg-gradient-to-r from-brand via-purple-500 to-teal-400 hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
               <Sparkles className={`w-4 h-4 ${scanPulse ? "animate-spin" : ""}`} />
@@ -283,13 +304,13 @@ export const SwarmPage: React.FC = () => {
               </div>
               <div>
                 <div className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>ตรวจพบจุดติด: ขาดเงินทุนหมุนเวียน 2 ร้าน (รวม ฿29,500)</span>
+                  <span>ตรวจพบจุดติด: ขาดเงินทุน {shortageCount} ร้าน (รวม ฿{amount(proposal.totalFundingGap)})</span>
                   <span className="text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-mono">
-                    Day 1–3 วัตถุดิบ
+                    เฉพาะออเดอร์นี้
                   </span>
                 </div>
                 <p className="text-[11px] text-rose-300/90 mt-0.5">
-                  <strong>ร้านบ้านข้าวหอม</strong> (ขาด ฿14,000) และ <strong>เจ๊ดาวแกงปักษ์ใต้</strong> (ขาด ฿15,500) ไม่มีสภาพคล่องพอสำหรับสำรองซื้อวัตถุดิบช่วงเปิดโครงการ
+                  <strong>{shortageCount} ร้านต้องเติมทุน</strong> {proposal.stuckReasons.map((reason) => reason.message).join(" · ")} · <strong>ขาดกำลังผลิต {proposal.deficitBoxesPerDay} ต่อวัน</strong>
                 </p>
               </div>
             </div>
@@ -342,7 +363,7 @@ export const SwarmPage: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">ระยะเวลา:</span>
-                  <span className="font-medium text-white font-mono">{order.days} วัน (รวม 3,000 กล่อง)</span>
+                  <span className="font-medium text-white font-mono">{order.days} วัน (รวม {amount(order.quantityPerDay * order.days)} กล่อง)</span>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -383,16 +404,16 @@ export const SwarmPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="font-bold text-white">รถขนส่งควบคุมความเย็นรวม</span>
-                    <div className="text-[11px] text-slate-400">Chilled Logistics Van</div>
+                    <div className="text-[11px] text-slate-400">{blockedResources.length ? `ยังไม่พร้อม: ${blockedResources.join(" · ")}` : "ยังไม่ยืนยันการจองรถ"}</div>
                   </div>
                 </div>
                 <span className="text-teal-400 font-bold font-mono text-[11px] bg-teal-950/80 px-2 py-0.5 rounded-full border border-teal-800">
-                  แชร์ร่วม 6 ร้าน
+                  {proposal.shops.length} ร้านรับงาน
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 border-t border-slate-800 pt-2 flex items-center justify-between">
-                <span>รับของ: <strong>10:00 น.</strong></span>
-                <span>ส่งถึงศูนย์ประชุม: <strong>11:00 น.</strong></span>
+                <span>รับของ: <strong>ยังไม่ระบุเวลา</strong></span>
+                <span>ส่งถึงศูนย์ประชุม: <strong>ยังไม่ระบุเวลา</strong></span>
               </div>
             </div>
           </div>
@@ -427,7 +448,7 @@ export const SwarmPage: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-slate-400 text-[11px] font-mono">
-                    รัศมีทำการ: 3.8 กม. รอบศูนย์กระจายสินค้า
+                    ยังไม่มีพิกัดผู้ว่าจ้างและเกณฑ์ระยะทาง
                   </span>
                 </div>
 
@@ -478,12 +499,12 @@ export const SwarmPage: React.FC = () => {
                       <div className="absolute -inset-3 rounded-full bg-gradient-to-r from-brand to-teal-400 opacity-40 blur-md group-hover:opacity-75 transition-opacity animate-pulse" />
                       <div className="w-20 h-20 rounded-full bg-[#101C3E] border-2 border-teal-400/80 flex flex-col items-center justify-center p-1.5 shadow-2xl relative z-10">
                         <span className="text-[10px] text-teal-300 font-bold leading-none">ORDER</span>
-                        <span className="font-mono font-extrabold text-white text-sm leading-tight">300</span>
+                        <span className="font-mono font-extrabold text-white text-sm leading-tight">{order.quantityPerDay}</span>
                         <span className="text-[9px] text-slate-300 leading-none">กล่อง/วัน</span>
                       </div>
                     </div>
                     <span className="mt-1.5 px-2 py-0.5 rounded-full bg-teal-950/80 border border-teal-600/80 text-[10px] text-teal-300 font-bold">
-                      บจก. สยามเทคโนพาร์ค
+                      {order.buyerName}
                     </span>
                   </div>
 
@@ -533,7 +554,7 @@ export const SwarmPage: React.FC = () => {
                               {shop.name}
                             </div>
                             <div className="flex items-center gap-1 text-[10px]">
-                              <span className="text-teal-400 font-mono font-bold">50 กล่อง</span>
+                              <span className="text-teal-400 font-mono font-bold">{proposal.shops.find((item) => item.shopId === shop.id)?.shareBoxesPerDay ?? 0} กล่อง</span>
                               {isStuck && (
                                 <span className="text-rose-400 font-bold font-mono">
                                   ขาด ฿{(shop.fundingGap / 1000).toFixed(1)}k
@@ -556,7 +577,7 @@ export const SwarmPage: React.FC = () => {
                       onClick={() => setViewMode("roster")}
                       className="text-teal-300 hover:text-white flex items-center gap-0.5 text-xs font-semibold"
                     >
-                      <span>ดูการ์ดทั้ง 6 ร้าน</span>
+                      <span>ดูการ์ดทั้ง {shops.length} ร้าน</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -586,7 +607,7 @@ export const SwarmPage: React.FC = () => {
                             {isStuck ? (
                               <span className="text-rose-400 font-bold">ขาด ฿{shop.fundingGap.toLocaleString()}</span>
                             ) : (
-                              <span>50 กล่อง/วัน</span>
+                              <span>{proposal.shops.find((item) => item.shopId === shop.id)?.shareBoxesPerDay ?? 0} กล่อง/วัน</span>
                             )}
                           </div>
                         </button>
@@ -601,10 +622,10 @@ export const SwarmPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs px-1">
                   <span className="font-bold text-white flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-teal-400" />
-                    <span>ทีมผู้ผลิต 6 ร้านค้า (โควตาร้านละ 50 กล่อง)</span>
+                    <span>รับงาน {proposal.shops.length} ร้าน จากผู้สมัคร {shops.length} ร้าน</span>
                   </span>
                   <span className="text-slate-400 text-[11px]">
-                    รัศมีเฉลี่ย 3.8 กม. จากศูนย์กระจายสินค้า
+                    ยังไม่มีข้อมูลระยะทางที่ยืนยันได้
                   </span>
                 </div>
 
@@ -668,30 +689,30 @@ export const SwarmPage: React.FC = () => {
                 <div className="mt-1.5 flex items-center justify-between text-[11px]">
                   <span className="text-emerald-400 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>ครบ 100% (300 กล่อง)</span>
+                    <span>จัดสรร {amount(proposal.totalCapacityAssigned)} กล่อง</span>
                   </span>
-                  <span className="text-slate-400 font-mono">ร้านละ 50 กล่อง</span>
+                  <span className="text-slate-400 font-mono">ยังขาด {amount(proposal.deficitBoxesPerDay)} กล่อง/วัน</span>
                 </div>
               </div>
 
               {/* Financial Settlement Breakdown */}
               <div className="space-y-2.5 border-t border-slate-800 pt-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">รายรับรวม (6 ร้าน):</span>
+                  <span className="text-slate-400">รายรับรวม ({proposal.shops.length} ร้าน):</span>
                   <span className="font-bold font-mono text-white">
                     ฿{proposal.totalRevenue.toLocaleString()}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">ต้นทุนรวม (6 ร้าน):</span>
+                  <span className="text-slate-400">ต้นทุนรวม ({proposal.shops.length} ร้าน):</span>
                   <span className="font-medium font-mono text-slate-300">
                     ฿{proposal.totalCost.toLocaleString()}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between border-t border-dashed border-slate-800 pt-2.5">
-                  <span className="font-bold text-teal-300">กำไรสุทธิรวมของทีม:</span>
+                  <span className="font-bold text-teal-300">กำไรออเดอร์ก่อนค่าใช้จ่ายอื่น:</span>
                   <span className="font-extrabold font-mono text-teal-300 text-sm">
                     ฿{proposal.totalProfit.toLocaleString()}
                   </span>
@@ -707,7 +728,7 @@ export const SwarmPage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-rose-300/80 leading-relaxed">
-                  ขาดเงินหมุนเวียน 2 ร้าน (บ้านข้าวหอม ฿14k + เจ๊ดาว ฿15.5k) สำหรับซื้อวัตถุดิบช่วง Day 1–3
+                  ร้านที่รับงานขาดทุนหมุนเวียน {shortageCount} ร้าน · ข้อเสนอคำนวณเฉพาะออเดอร์ ยังไม่รวมภาระอื่นของกิจการ
                 </p>
                 <button
                   type="button"
@@ -724,16 +745,16 @@ export const SwarmPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">สถานะความพร้อม:</span>
                   <span className="font-bold text-amber-300 bg-amber-950/70 px-2 py-0.5 rounded-full border border-amber-800/80">
-                    รอเติมทุน 2 ร้าน
+                    {proposal.status === "ready" ? "ต้องตรวจเงื่อนไขก่อนรับงาน" : proposal.status} · ต้องเติมทุน {shortageCount} ร้าน
                   </span>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setCurrentPage("shop-finance")}
+                  onClick={() => { const id = proposal.shops[0]?.shopId; if (id) { setSelectedShopId(id); setCurrentPage("shop-finance", { shopId: id }); } }}
                   className="w-full py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-glow-primary cursor-pointer"
                 >
-                  <span>ดูแผนเงินและลงนามรายร้าน</span>
+                  <span>ดูข้อมูลการเงินรายร้านที่บันทึกไว้</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -765,25 +786,26 @@ export const SwarmPage: React.FC = () => {
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                ร้านสำรองที่ผ่านเกณฑ์สุขอนามัยและพร้อมเข้าแทนที่โควตา 50 กล่อง/วัน ทันที:
+                ผู้สมัครสำรองจากข้อมูลจริง ต้องคำนวณการจัดสรรใหม่ก่อนรับงาน:
               </p>
 
               <div className="p-4 rounded-xl border border-teal-500/40 bg-teal-950/30 space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="font-bold text-xs text-white">ครัวร่มไทร ข้าวราดแกง (ร้านสำรองอันดับ 1)</div>
+                  <div className="font-bold text-xs text-white">{replacement?.name || "ไม่มีร้านสำรองที่ผ่านเงื่อนไขที่ทราบ"}</div>
                   <span className="text-[10px] text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-800 font-bold">
-                    สภาพคล่องพร้อม
+                    {replacement ? "รอคำนวณ" : "ไม่มีผู้สมัคร"}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  กำลังผลิตว่าง 60 กล่อง/วัน · ต้นทุน 55 ฿/กล่อง · เงินสดสำรอง ฿40,000
+                  {replacement ? `กำลังผลิตว่าง ${replacement.capacityAvailable} · ต้นทุน ฿${replacement.costPerUnit} · เงินสด ฿${amount(replacement.currentCash)}` : "กรุณาเพิ่มข้อมูลร้านที่มีคุณสมบัติเหมาะสมก่อน"}
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleConfirmSwap(swappingShopId, "ครัวร่มไทร ข้าวราดแกง")}
+                  onClick={() => handleConfirmSwap(swappingShopId)}
+                  disabled={!replacement || isAssembling}
                   className="w-full py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all mt-2 shadow-lg cursor-pointer"
                 >
-                  ยืนยันสลับเข้าร่วมทีม
+                  คำนวณทีมหลังสลับร้าน
                 </button>
               </div>
             </div>

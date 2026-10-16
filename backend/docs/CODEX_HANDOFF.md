@@ -1,5 +1,76 @@
 # การส่งมอบงานของ CODEX
 
+## รอบ CODEX 2026-10-16 — Overview, order Simulator และ SWARM wiring
+
+- ฐาน `269e3d2` · ผู้ใช้อนุญาตเพิ่ม OverviewPage.tsx / SimulatorPage.tsx / SwarmPage.tsx
+  และข้อความชนิด/ขนาดไฟล์ใน Import · frontend รวม 5 ไฟล์ที่อนุญาตเท่านั้น ·
+  style-expression guard เทียบกับฐานผ่านทุกหน้า ไม่เปลี่ยน CSS/Tailwind/layout/routing
+- Overview ใช้ยอด เงินสำรอง อัตรากำไร badge และรายการแนะนำจากผลจริง · unknown เป็น null
+  รวมผลต่างงวดก่อน ไม่เดาศูนย์ · **เขียน assertion เดิมของ previous-period diff ใหม่เป็น null
+  โดยเจตนา** เพราะพฤติกรรมเดิมแสดงค่าที่ไม่มีหลักฐานเป็นศูนย์ ไม่ใช่ลดความเข้มของเทสต์
+- เพิ่ม GET `/api[/v1]/simulator/context`: order และ candidate shops แบบ machine fields
+  จาก DB, Decimal เป็น string, resource dependencies กรอง project_id เดียวกัน ·
+  ข้อจำกัดที่ schema ยังไม่เก็บประกาศ missing ไม่อ่านเครดิต/มัดจำย้อนจากข้อความแสดงผล
+- เพิ่ม POST `/api[/v1]/simulate/order` แยกจาก statement `/simulate` เดิม:
+  body `{baseline: SwarmRequest, scenario: {unit_price, cost_per_unit, deposit_ratio,
+  payment_terms_days}, persist: false, context_missing: []}` · เงินเป็น decimal strings,
+  payment_terms_days เป็น integer · cost_per_unit=null คงต้นทุนแต่ละร้าน; กำหนดค่าเมื่อใด
+  ใช้ค่านั้นกับผู้สมัครทุกร้านและจัดสรรใหม่ · ไม่เปลี่ยนสัญญา endpoint เดิม
+- ใช้ finite-order schedule ของ engine คำนวณเงินสดต่ำสุดของ **ร้านที่ต่ำที่สุด** ไม่รวมเงิน
+  ข้ามร้าน และไม่อ้างว่าเป็น forecast เงินสดทั้งกิจการหรือกำไรสุทธิหลังค่าใช้จ่ายอื่น ·
+  เครดิตเทอมเลื่อนวันรับเงิน/ความยาววงจร แต่ไม่จำเป็นต้องเปลี่ยนยอด cash trough เมื่อ
+  รับเงินหลังผลิตครบอยู่แล้ว · ไม่มีการสร้าง series 90 วันจากยอดรวม
+- Simulator debounce 300ms, ละทิ้งผลตอบกลับที่ล้าสมัย, ปิด save ระหว่างคำนวณ/เมื่อ input
+  ไม่ผ่าน · save POST จริง เก็บ full baseline/scenario/results ใน simulations และผูก project
+  ถ้าพบ order_ref · ไม่มีหน้าเรียกแผนที่บันทึกกลับมาใน UI รอบนี้ แต่ข้อมูล replay อยู่ครบ
+- SWARM ปุ่ม Radar POST จริงและแสดง quota/deficit/cost/profit/funding gap จาก engine ·
+  swap ใช้ผู้สมัครสำรองจริงที่ยังไม่รับงาน ส่งทีมเดิมพร้อมร้านทดแทนที่เลือกให้คำนวณใหม่ ·
+  ไม่มีผู้สมัครที่ผ่านเงื่อนไขก็ปิดปุ่ม ไม่สร้างชื่อร้านสำรองขึ้นเอง · ใช้ persist=false ทั้งคู่
+  จึงไม่ลบ allocations/allocation_resources เดิม ไม่จองงาน ไม่เปลี่ยนสถานะทรัพยากร
+- ลิงก์การเงินจาก SWARM เปิดข้อมูลรายร้าน **ที่บันทึกไว้** ไม่ใช่บันทึกข้อเสนอ preview ·
+  ShopFinancePage อยู่นอกสิทธิ์รอบนี้ · GET swarm ที่บันทึกเพิ่ม source=database
+- Import ระบุ `.XLSX ตาม Template ไม่เกิน 5 MiB` ตรง parser · ส่วน Column Mapping
+  ยังเป็นตัวอย่างเดิม ไม่มี auto mapping; สิทธิ์ copy เพิ่มครอบคลุมชนิด/ขนาดไฟล์เท่านั้น
+- Full pytest: **494 ผ่าน + 3 skip** กับ PostgreSQL (34.15s), **394 ผ่าน + 103 skip**
+  ไม่มี DB (20.10s) · targeted persistence/order หลังแก้สุดท้าย **23 ผ่าน** · เพิ่ม 12 cases ·
+  warning Starlette/httpx เดิม · แก้ setup basetemp ให้มี parent ก่อนทดสอบ ไม่มี assertion ถูกลด
+- Final Overview/import/order contract tests after exact-decimal margin update: **39 passed**.
+- Build **1955 modules · CSS index-DEindwiw.css คงเดิม · JS index-CBenrrOQ.js** ·
+  JS >500kB warning เดิม · invariants / test-import-wiring / test-page-wiring ผ่าน
+- HTTP จริง: **36 routes** (+ aliases และ 4 v1-only), **27 ตาราง**, **16 read contracts** ·
+  Rung gap 45,000 / forecast ต่ำสุด 29,700 เริ่มขาด 2026-10-18 · ไม่ยิง LLM เสียเงินหรือ force ข่าว
+- Browser จริง: template upload → Overview 250,000 / 200,000 / 50,000 / 80,000,
+  ใช้ได้หลังสำรอง 50,000, margin 20%, badge simulated · Simulator ปรับครบ 4 ค่าและ save
+  แล้วอ่าน row กลับจาก PostgreSQLตรงกัน; credit 366 ถูกปฏิเสธและ save ปิด · เปอร์เซ็นต์ 1.1
+  คำนวณ min cash 542,820; มัดจำ 50%, ราคา 120, ต้นทุน 50, credit 10 ได้กำไรออเดอร์
+  945,000 / min shop cash 1,200,000 / deficit 550 ต่อวัน · หลักฐานภาพอยู่ใน ignored uploads
+- Docker เดิมเปิดไม่ได้เพราะ stale zero-byte engine.sock · เก็บ directory IPC เดิมชื่อ
+  `%LOCALAPPDATA%\docker-secrets-engine.codex-backup-20261016` แล้วให้ Docker สร้างใหม่ ·
+  ไม่ reset/reseed/ลบ volume ฐานข้อมูล · Docker/Postgres และ server กลับมาทำงานแล้ว
+
+- Browser production mock mode: Simulator renders demo playback with no fabricated A/B result;
+  save disabled and SWARM Radar reports backend configuration required. Legacy mock fixture
+  order price 85 and proposal revenue 240,000 do not reconcile (3,000 × 85 = 255,000);
+  fixtures are outside permitted source paths and are not valid financial acceptance data.
+
+### สิ่งที่ยังไม่ทำและต้องไม่อ้างว่าเสร็จ
+
+- ออเดอร์ DB จริงคือ 1,000/วัน 30 วัน ไม่ใช่ฉากตัวอย่าง 300/วัน 6 ร้าน · Baan Suan และ
+  Rung ติดรถ required ที่ยัง offered/available=false; จัดสรรเบื้องต้นให้ Sahai 450 และขาด
+  550 · **Sahai เป็น packaging และ project ยังไม่เก็บ required_business_types** จึงไม่ใช่
+  การยืนยันว่าเหมาะผลิตอาหาร · UI/metadata แจ้งเกณฑ์ธุรกิจและระยะทางยังไม่ยืนยัน
+- ทีมต้องระบุ constraints และวันรับเงินที่ยืนยันจริงก่อนรับงาน; ยังไม่มีพิกัดผู้ว่าจ้าง/
+  ร้านหรือ radius ไม่เติมจากจังหวัด และไม่ยืนยันรถแทนเจ้าของ · context ประกาศ missing
+- HeroAssembly.tsx, ChaosPlayback.tsx, AppShell/sidebar และหน้ารายอื่นยังมีฉาก/ปุ่มสาธิต
+  นอก 5 ไฟล์ที่อนุญาต · Chaos Play เป็น playback ไม่ได้เรียก what-if engine ·
+  ยังไม่อ้างว่าเว็บทั้งระบบหรือทุกปุ่มต่อ backend ครบแล้ว · อย่าทดสอบ signing จากฉากสาธิต
+- Railway service + Vercel 2 env/redeploy ยังต้องทีม; ไม่ deploy หรือเปลี่ยนบัญชีเอง ·
+  ข่าวสดยังไม่ยืนยัน ไม่ได้ retry TLS รอบนี้ · AUTH_SECRET ยังไม่ตั้ง ใช้ auth tester เดิม
+- ผล import อยู่เฉพาะแท็บ ไม่มี SME identity จากชื่อ free text; reload กลับ stored baseline ·
+  simulator ใช้ order ใน DB แยกจากงบที่ import โดยแสดงขอบเขตเฉพาะออเดอร์ชัดเจน
+
+---
+
 ## รอบล่าสุด: Import wiring ทั้งสอง lane และข้อจำกัดก่อนส่ง tester — 2026-10-15
 
 ฐานเริ่ม `dde929e` บน main สะอาดและตรงกับ GitHub · อ่าน CODEX_ASSIGNMENT ครบแล้ว ·

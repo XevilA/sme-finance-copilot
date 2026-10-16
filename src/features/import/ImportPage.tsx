@@ -153,7 +153,7 @@ export const ImportPage: React.FC = () => {
             <DataKindBadge kind="actual" size="md" />
           </div>
           <p className="text-xs text-ink-muted mt-0.5">
-            อัปโหลดไฟล์สเปรดชีต Excel/CSV หรือกรอกแบบฟอร์ม 8 หมวดเพื่อสร้างฐานข้อมูลจริง
+            อัปโหลดไฟล์สเปรดชีต Excel (.xlsx) หรือกรอกแบบฟอร์ม 8 หมวดเพื่อสร้างฐานข้อมูลจริง
           </p>
         </div>
 
@@ -200,7 +200,7 @@ export const ImportPage: React.FC = () => {
                 ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์
               </h3>
               <p className="text-xs text-ink-muted mt-0.5">
-                รองรับไฟล์ .XLSX, .XLS, .CSV ขนาดไม่เกิน 25MB
+                รองรับไฟล์ .XLSX ตาม Template ขนาดไม่เกิน 5 MiB
               </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">

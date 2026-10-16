@@ -147,18 +147,24 @@ def business_overview(
     expense = metric_number(business_metrics, "total_cost")
     net_profit = metric_number(business_metrics, "net_profit")
     cash = input_number(payload, "cash_balance")
-    reserve = input_number(payload, "minimum_cash_reserve") or 0.0
+    reserve = input_number(payload, "minimum_cash_reserve")
     net_cash_flow = metric_number(metrics, "net_cash_flow")
 
-    for name, value in (("revenue", revenue), ("total_cost", expense), ("net_profit", net_profit)):
+    for name, value in (("revenue", revenue), ("total_cost", expense), ("net_profit", net_profit),
+                        ("cash_balance", cash), ("minimum_cash_reserve", reserve)):
         if value is None:
             missing.append(name)
 
-    usable = None if cash is None else cash - reserve
+    usable = None if cash is None or reserve is None else cash - reserve
+    margin = None if net_profit is None or not revenue else float(
+        (Decimal(str(business_metrics["net_profit"]["value"])) / Decimal(str(payload["revenue"])) * 100)
+        .quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    if margin is None:
+        missing.append("net_profit_margin")
 
     # Period-on-period difference only when a previous statement exists.
     if previous is None:
-        last_period_diff = {"revenue": 0, "expense": 0, "netProfit": 0, "cashBalance": 0}
+        last_period_diff = {"revenue": None, "expense": None, "netProfit": None, "cashBalance": None}
         missing.append("previous_period_statement")
     else:
         prior = previous["payload"]
@@ -168,11 +174,12 @@ def business_overview(
         prior_profit = metric_number(prior_computed, "net_profit")
         prior_cash = input_number(prior, "cash_balance")
         last_period_diff = {
-            "revenue": 0 if None in (revenue, prior_revenue) else round(revenue - prior_revenue, 2),
-            "expense": 0 if None in (expense, prior_expense) else round(expense - prior_expense, 2),
-            "netProfit": 0 if None in (net_profit, prior_profit) else round(net_profit - prior_profit, 2),
-            "cashBalance": 0 if None in (cash, prior_cash) else round(cash - prior_cash, 2),
+            "revenue": None if None in (revenue, prior_revenue) else round(revenue - prior_revenue, 2),
+            "expense": None if None in (expense, prior_expense) else round(expense - prior_expense, 2),
+            "netProfit": None if None in (net_profit, prior_profit) else round(net_profit - prior_profit, 2),
+            "cashBalance": None if None in (cash, prior_cash) else round(cash - prior_cash, 2),
         }
+        missing += [f"previous_period_{key}" for key, value in last_period_diff.items() if value is None]
 
     # Stated as a comparison of two computed figures, with no causal claim -
     # the backend cannot see why cash and profit diverged.
@@ -182,9 +189,11 @@ def business_overview(
         gap = net_profit - net_cash_flow
         reserve_note = (
             f"ต่ำกว่าเงินสำรอง {thb(reserve)} บาท"
-            if cash is not None and cash < reserve
+            if cash is not None and reserve is not None and cash < reserve
             else f"สูงกว่าเงินสำรอง {thb(reserve)} บาท"
         )
+        if cash is None or reserve is None:
+            reserve_note = "ยังไม่มีข้อมูลเงินสดหรือเงินสำรองครบ"
         insight = (
             f"กำไรสุทธิตามบัญชี {thb(net_profit)} บาท แต่กระแสเงินสดสุทธิ {thb(net_cash_flow)} บาท "
             f"ต่างกัน {thb(abs(gap))} บาท เงินสดคงเหลือ {thb(cash)} บาท ({reserve_note}) "
@@ -197,11 +206,12 @@ def business_overview(
 
     overview = {
         "shopName": shop_name or "ชุดข้อมูลตัวอย่าง (ยังไม่ผูกกับร้านจริง)",
-        "revenue": revenue or 0,
-        "expense": expense or 0,
-        "netProfit": net_profit or 0,
-        "cashBalance": cash or 0,
-        "usableCashAfterReserve": usable or 0,
+        "revenue": revenue,
+        "expense": expense,
+        "netProfit": net_profit,
+        "netProfitMargin": margin,
+        "cashBalance": cash,
+        "usableCashAfterReserve": usable,
         "reserveThreshold": reserve,
         "period": f"{payload['period_start']} – {payload['period_end']}",
         "lastPeriodDiff": last_period_diff,

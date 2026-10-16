@@ -46,6 +46,7 @@ def test_manual_validation_calculation_and_analysis_use_the_same_statement():
     assert body["views"]["overview"]["data"]["shopName"] == "ร้านที่ผู้ใช้กรอก"
     assert body["views"]["overview"]["data"]["revenue"] == 250000
     assert body["views"]["overview"]["data"]["netProfit"] == 50000
+    assert body["views"]["overview"]["data"]["netProfitMargin"] == 20
     assert body["views"]["overview"]["data"]["cashBalance"] == 80000
     for view in body["views"].values():
         assert view["source"] == "supplied_input"

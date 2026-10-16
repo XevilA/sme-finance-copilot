@@ -71,6 +71,19 @@ export type AnalysisResult = Sourced<{
 
 // Accepted results belong to this browser tab, never to a server-global SME.
 let acceptedAnalysis: AnalysisResult | null = null;
+const orderContextMissing = new Map<string, string[]>();
+
+export type OrderContext = {
+  order_ref: string; buyer_name: string; target_capacity: string; unit: string;
+  unit_price: string; duration_days: number; payment_terms_days: number; deposit_ratio: string;
+  shops: { shop_id: string; name: string; cost_per_unit: string; capacity_total: string;
+    capacity_used: string; cash_balance: string; minimum_cash_reserve: string;
+    resources?: { title: string; status: string; available: boolean; required: boolean }[] | null; [key: string]: unknown }[];
+  [key: string]: unknown;
+};
+export type OrderScenario = { unit_price: string; cost_per_unit: string | null; deposit_ratio: string; payment_terms_days: number };
+export type OrderComparison = Sourced<{ planA: SwarmProposal & { minimumShopCash: string | null };
+  planB: SwarmProposal & { minimumShopCash: string | null }; scope: string }> & { persisted: boolean; simulationId: string | null };
 
 function requireBackend() {
   if (USE_MOCK) {
@@ -88,7 +101,7 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
       const detail = body?.detail;
       const message = Array.isArray(detail)
         ? detail.map((item: { loc?: string[]; msg?: string }) => `${item.loc?.join(".") || "input"}: ${item.msg || "Invalid input"}`).join("; ")
-        : typeof detail === "string" ? detail : `HTTP ${response.status}`;
+        : typeof detail === "string" ? detail : detail?.message || `HTTP ${response.status}`;
       throw new Error(message);
     }
     if (!body || typeof body !== "object") throw new Error("Backend ไม่ได้ส่ง JSON ที่ถูกต้อง");
@@ -129,6 +142,24 @@ function wrapEnvelope<T>(
 
 // API Client implementation
 export const apiClient = {
+  isDemoMode: () => USE_MOCK,
+  async getOrderContext(): Promise<Sourced<OrderContext>> {
+    requireBackend();
+    const result = await requestJson<Sourced<OrderContext>>("/simulator/context");
+    orderContextMissing.set(result.data.order_ref, result.missing || []);
+    return result;
+  },
+
+  async simulateOrder(baseline: OrderContext, scenario: OrderScenario, persist = false): Promise<OrderComparison> {
+    return postJson("/simulate/order", { baseline, scenario, persist, context_missing: orderContextMissing.get(baseline.order_ref) || [] });
+  },
+
+  async assembleSwarm(context: OrderContext): Promise<Sourced<SwarmProposal> & { audit: { eligibility: Record<string, { eligible: boolean; reasons: string[] }> } }> {
+    const result = await postJson<Sourced<SwarmProposal> & { audit: { eligibility: Record<string, { eligible: boolean; reasons: string[] }> } }>("/swarm", { ...context, persist: false });
+    result.missing = [...new Set([...(result.missing || []), ...(orderContextMissing.get(context.order_ref) || [])])];
+    if (result.missing.length) result.status = "insufficient_data";
+    return result;
+  },
   async validateManual(input: FinancialInput): Promise<{ data: FinancialInput; balanceSheetValid: boolean; source: string }> {
     return postJson("/inputs/manual", input);
   },
@@ -180,8 +211,7 @@ export const apiClient = {
         ]
       );
     }
-    const res = await fetch(`${BASE_URL}/overview`);
-    return res.json();
+    return requestJson(`/overview`);
   },
 
   async getCashflowTimeline(): Promise<Envelope<CashflowDay[]>> {
@@ -197,8 +227,7 @@ export const apiClient = {
         ]
       );
     }
-    const res = await fetch(`${BASE_URL}/cashflow/timeline`);
-    return res.json();
+    return requestJson(`/cashflow/timeline`);
   },
 
   async getShops(): Promise<Envelope<Shop[]>> {
@@ -206,8 +235,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockShops, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/shops`);
-    return res.json();
+    return requestJson(`/shops`);
   },
 
   async getOrder(): Promise<Envelope<SwarmOrder>> {
@@ -215,8 +243,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockOrder, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/order`);
-    return res.json();
+    return requestJson(`/order`);
   },
 
   async getSwarmProposal(): Promise<Envelope<SwarmProposal>> {
@@ -224,8 +251,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockSwarmProposal, "forecast", "ok");
     }
-    const res = await fetch(`${BASE_URL}/swarm/proposal`);
-    return res.json();
+    return requestJson(`/swarm/proposal`);
   },
 
   async getShopFinance(shopId: string): Promise<Envelope<ShopFinance | null>> {
@@ -234,8 +260,7 @@ export const apiClient = {
       const shop = mockShopFinances[shopId] || null;
       return wrapEnvelope(shop, "forecast", shop ? "ok" : "insufficient_data");
     }
-    const res = await fetch(`${BASE_URL}/shops/${shopId}/finance`);
-    return res.json();
+    return requestJson(`/shops/${shopId}/finance`);
   },
 
   async getFundingOptions(): Promise<Envelope<FundingOption[]>> {
@@ -243,8 +268,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockFundingOptions, "forecast", "ok");
     }
-    const res = await fetch(`${BASE_URL}/funding/options`);
-    return res.json();
+    return requestJson(`/funding/options`);
   },
 
   async getUnlockResources(): Promise<Envelope<UnlockResource[]>> {
@@ -252,8 +276,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockUnlockResources, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/unlock/resources`);
-    return res.json();
+    return requestJson(`/unlock/resources`);
   },
 
   async getChaosScenarios(): Promise<Envelope<ChaosScenario[]>> {
@@ -261,8 +284,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockChaosScenarios, "simulated", "ok");
     }
-    const res = await fetch(`${BASE_URL}/simulator/chaos`);
-    return res.json();
+    return requestJson(`/simulator/chaos`);
   },
 
   async getHealthIndicators(): Promise<Envelope<HealthIndicator[]>> {
@@ -276,8 +298,7 @@ export const apiClient = {
         ["มูลค่าสินค้าคงเหลือของสด (ส่งผลต่อ DIO)"]
       );
     }
-    const res = await fetch(`${BASE_URL}/health/indicators`);
-    return res.json();
+    return requestJson(`/health/indicators`);
   },
 
   async getCostBreakdown(): Promise<Envelope<CostBreakdown>> {
@@ -286,8 +307,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockCostBreakdown, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/cost/breakdown`);
-    return res.json();
+    return requestJson(`/cost/breakdown`);
   },
 
   async getProductSales(): Promise<Envelope<ProductSales[]>> {
@@ -295,8 +315,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockProductSales, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/sales/products`);
-    return res.json();
+    return requestJson(`/sales/products`);
   },
 
   async getChannelSales(): Promise<Envelope<ChannelSales[]>> {
@@ -304,8 +323,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockChannelSales, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/sales/channels`);
-    return res.json();
+    return requestJson(`/sales/channels`);
   },
 
   async getFunderProjects(): Promise<Envelope<FunderProject[]>> {
@@ -313,8 +331,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockFunderProjects, "forecast", "ok");
     }
-    const res = await fetch(`${BASE_URL}/funder/projects`);
-    return res.json();
+    return requestJson(`/funder/projects`);
   },
 
   async getProjectRecords(): Promise<Envelope<ProjectRecord[]>> {
@@ -322,8 +339,7 @@ export const apiClient = {
       await simulateLatency();
       return wrapEnvelope(mockProjectRecords, "actual", "ok");
     }
-    const res = await fetch(`${BASE_URL}/projects`);
-    return res.json();
+    return requestJson(`/projects`);
   },
 
   async getAIExplanation(pageId: string): Promise<Envelope<AIResponse>> {
@@ -337,8 +353,7 @@ export const apiClient = {
       const explanation = mockAIExplanations[pageId] || mockAIExplanations.overview;
       return wrapEnvelope(explanation, "forecast", "ok");
     }
-    const res = await fetch(`${BASE_URL}/ai/explain?page=${pageId}`);
-    return res.json();
+    return requestJson(`/ai/explain?page=${pageId}`);
   },
 };
 
