@@ -91,9 +91,13 @@ async def cashflow_timeline(sme_id: str | None = Query(default=None)) -> dict:
     if not DB_ENABLED:
         return offline([])
     owner = parse_uuid(sme_id)
+    if sme_id is not None and owner is None:
+        raise HTTPException(422, "sme_id must be a UUID")
     async with session_scope() as session:
-        events = await catalog.load_cash_events(session, owner)
         shops = await catalog.load_shops(session)
+        if owner is None and shops:
+            owner = parse_uuid(shops[0]["id"])
+        events = await catalog.load_cash_events(session, owner) if owner is not None else []
 
     opening = 0.0
     reserve = 0.0
@@ -102,16 +106,13 @@ async def cashflow_timeline(sme_id: str | None = Query(default=None)) -> dict:
         if match:
             opening = match["currentCash"]
             reserve = match["minimumCashReserve"]
-    elif shops:
-        opening = shops[0]["currentCash"]
-        reserve = shops[0]["minimumCashReserve"]
 
     data, missing = adapters_catalog.cashflow_timeline(events, opening, reserve)
-    if owner is None:
-        missing = [*missing, "sme_id_not_supplied_opening_cash_is_first_shop"]
+    if sme_id is None:
+        missing = [*missing, "sme_id_not_supplied_default_sme_selected"]
     return adapters.envelope(
         data, "forecast", missing, data[-1]["date"] if data else "",
-        source="stored_record" if data else "none",
+        source="stored_record" if data else "none", smeId=str(owner) if owner else None,
     )
 
 
@@ -133,6 +134,8 @@ async def funding_options(
     if not DB_ENABLED:
         return offline([])
     owner = parse_uuid(sme_id)
+    if sme_id is not None and owner is None:
+        raise HTTPException(422, "sme_id must be a UUID")
     async with session_scope() as session:
         products = await catalog.load_funding_products(session)
         shops = await catalog.load_shops(session)

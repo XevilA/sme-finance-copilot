@@ -42,18 +42,21 @@ async def upload(file: UploadFile = File(...), sme_id: str | None = None, persis
     digest = hashlib.sha256(content).hexdigest()
 
     if size > MAX_UPLOAD_BYTES:
-        await record_rejection(sme_id, filename, size, digest, "Workbook exceeds 5 MiB")
+        if persist:
+            await record_rejection(sme_id, filename, size, digest, "Workbook exceeds 5 MiB")
         raise HTTPException(status_code=413, detail="Workbook exceeds 5 MiB")
 
     try:
         data: FinancialInput = await run_in_threadpool(parse_excel, content, filename)
     except ExtractionError as exc:
-        await record_rejection(sme_id, filename, size, digest, str(exc))
+        if persist:
+            await record_rejection(sme_id, filename, size, digest, str(exc))
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValidationError as exc:
         # Never echo raw financial values back in an error body.
         errors = exc.errors(include_context=False, include_input=False)
-        await record_rejection(sme_id, filename, size, digest, "Input contract validation failed")
+        if persist:
+            await record_rejection(sme_id, filename, size, digest, "Input contract validation failed")
         raise HTTPException(status_code=422, detail=errors) from exc
 
     computed = await run_in_threadpool(calculate_financials, data)

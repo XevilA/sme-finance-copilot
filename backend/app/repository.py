@@ -9,7 +9,7 @@ from sqlalchemy import case, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .models import FinancialRecord, Simulation, SmeProfile, SwarmAllocation, SwarmProject, UploadEvent
+from .models import AllocationResource, FinancialRecord, Simulation, SmeProfile, SwarmAllocation, SwarmProject, UploadEvent
 
 
 def parse_uuid(value: str | None) -> uuid.UUID | None:
@@ -54,7 +54,7 @@ async def save_swarm_proposal(
     request_payload: dict,
     proposal: dict,
 ) -> uuid.UUID | None:
-    """Upserts the project by order_ref and replaces its allocation set."""
+    """Upsert allocations without deleting dependencies of retained shops."""
     if session is None:
         return None
 
@@ -80,27 +80,52 @@ async def save_swarm_proposal(
     project.duration_days = int(request_payload["duration_days"])
     project.payment_terms_days = int(request_payload["payment_terms_days"])
     project.deposit_ratio = Decimal(str(request_payload["deposit_ratio"]))
+    if "production_start" in request_payload.get("_provided", []):
+        project.start_date = request_payload.get("production_start")
+    constraint_keys = {"required_business_types", "buyer_coordinates", "max_distance_km", "collection_schedule"}
+    supplied = constraint_keys.intersection(request_payload.get("_provided", []))
+    if supplied:
+        from fastapi.encoders import jsonable_encoder
+        project.constraints = {**(project.constraints or {}), **{
+            key: jsonable_encoder(request_payload[key]) for key in supplied
+        }}
     project.status = proposal["status"]
     await session.flush()
 
-    await session.execute(delete(SwarmAllocation).where(SwarmAllocation.project_id == project.id))
-    await session.flush()
+    retained = {shop_ids[shop["shopId"]] for shop in proposal["shops"] if shop_ids[shop["shopId"]] in known}
+    await session.execute(delete(SwarmAllocation).where(
+        SwarmAllocation.project_id == project.id, SwarmAllocation.sme_id.not_in(retained),
+    ))
+    existing = {row.sme_id: row for row in (await session.scalars(
+        select(SwarmAllocation).where(SwarmAllocation.project_id == project.id)
+    )).all()}
+    request_shops = {row["shop_id"]: row for row in request_payload["shops"]}
 
     for shop in proposal["shops"]:
         sme_id = shop_ids[shop["shopId"]]
         if sme_id not in known:
             continue
-        session.add(SwarmAllocation(
-            project_id=project.id,
-            sme_id=sme_id,
-            assigned_role=shop["assignedRole"],
-            share_per_day=Decimal(str(shop["shareBoxesPerDay"])),
-            working_capital_needed=Decimal(str(shop["workingCapitalNeeded"])),
-            current_cash=Decimal(str(shop["currentCash"])),
-            funding_gap=Decimal(str(shop["fundingGap"])),
-            status=shop["status"],
-            version=proposal["version"],
-        ))
+        row = existing.get(sme_id)
+        if row is None:
+            row = SwarmAllocation(project_id=project.id, sme_id=sme_id)
+            session.add(row)
+        for key, value in {
+            "assigned_role": shop["assignedRole"], "share_per_day": Decimal(str(shop["shareBoxesPerDay"])),
+            "working_capital_needed": Decimal(str(shop["workingCapitalNeeded"])),
+            "current_cash": Decimal(str(shop["currentCash"])), "funding_gap": Decimal(str(shop["fundingGap"])),
+            "status": shop["status"], "version": proposal["version"],
+        }.items():
+            setattr(row, key, value)
+        dependencies = request_shops[shop["shopId"]].get("resources")
+        if dependencies is not None:
+            row.resources_known = True
+            await session.flush()
+            await session.execute(delete(AllocationResource).where(AllocationResource.allocation_id == row.id))
+            for dependency in dependencies:
+                session.add(AllocationResource(
+                    allocation_id=row.id, resource_id=parse_uuid(dependency["resource_id"]),
+                    required=dependency["required"], note=dependency.get("note"),
+                ))
     return project.id
 
 
@@ -146,6 +171,8 @@ async def load_swarm_project(session: AsyncSession | None, order_ref: str) -> di
             for allocation in project.allocations
         ],
         "updatedAt": project.updated_at.isoformat() if project.updated_at else None,
+        "constraints": project.constraints,
+        "productionStart": project.start_date.isoformat() if project.start_date else None,
     }
 
 
@@ -332,6 +359,8 @@ async def save_simulation(
     results: dict,
     project_id: uuid.UUID | None = None,
     base_record_id: uuid.UUID | None = None,
+    replay_version: str | None = None,
+    context: dict | None = None,
 ) -> uuid.UUID | None:
     if session is None:
         return None
@@ -344,6 +373,8 @@ async def save_simulation(
         scenario_key=scenario_key,
         params=params,
         results=results,
+        replay_version=replay_version,
+        context=context,
     )
     session.add(simulation)
     await session.flush()

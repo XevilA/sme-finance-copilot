@@ -1,6 +1,7 @@
 """Read-only evaluations of an explicit imported statement. No seed fallback."""
 
-from fastapi import APIRouter, HTTPException
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from .. import adapters, adapters_catalog, catalog
@@ -10,6 +11,8 @@ from ..finance import calculate_financials
 from ..grading import grade_financials
 from ..matching import match_funding, match_investors
 from ..schemas import PositiveMoney
+from ..project_context import OrderConstraints, constraint_gaps, selected_project
+from ..rbac import Principal, resolve_principal
 
 router = APIRouter(tags=["contextual-evaluation"])
 
@@ -75,4 +78,35 @@ def capabilities() -> dict:
         "reportExport": {"available": False, "reason": "export_contract_required"},
         "resourceReservation": {"available": False, "reason": "quantity_and_time_contract_required"},
         "orderPreview": {"available": True, "endpoint": "/api/v1/simulate/order"},
+        "orderResourceOutage": {"available": True, "endpoint": "/api/v1/simulate/order", "scope": "order_only"},
+        "savedSimulationReplay": {"available": True, "endpoint": "/api/v1/simulations/{id}/replay"},
+        "arbitraryChaosEffects": {"available": False, "reason": "Only explicit price, cost, deposit, terms, shop removal and resource outage inputs are supported"},
     }, "source": "runtime_contract", "status": "ok", "missing": []}
+
+
+@router.post("/projects/{project_id}/constraints")
+async def store_constraints(project_id: uuid.UUID, request: OrderConstraints,
+                            principal: Principal = Depends(resolve_principal)) -> dict:
+    if not DB_ENABLED:
+        raise HTTPException(503, "Stored constraints require DATABASE_URL")
+    if not principal.may("admin", "analyst"):
+        raise HTTPException(403, "Only staff may update order requirements")
+    values = request.model_dump(mode="json", exclude_unset=True)
+    async with session_scope() as session:
+        project = await selected_project(session, project_id)
+        # Replace the explicit constraint snapshot, including unknown/null.
+        project.constraints = values
+        await session.flush()
+    return adapters.envelope(values, "actual", constraint_gaps(values), "",
+                             source="database", projectId=str(project_id), persisted=True,
+                             rbacEnforced=principal.enforced)
+
+
+@router.get("/projects/{project_id}/constraints")
+async def read_constraints(project_id: uuid.UUID) -> dict:
+    if not DB_ENABLED:
+        raise HTTPException(503, "Stored constraints require DATABASE_URL")
+    async with session_scope() as session:
+        project = await selected_project(session, project_id)
+    return adapters.envelope(project.constraints, "actual", constraint_gaps(project.constraints), "",
+                             source="database", projectId=str(project_id))

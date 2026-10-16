@@ -260,6 +260,13 @@ ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS roi_estimate_pct    NUMERIC(
 ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS duration_months     SMALLINT CHECK (duration_months > 0);
 ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS fund_purpose        TEXT;
 ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS evidence_level      TEXT;
+-- Explicit constraints: SQL NULL / missing JSON key means unknown. [] means
+-- explicitly no business-type restriction; max_distance_km:null means no limit
+-- only when that key was supplied. Existing projects are never backfilled.
+ALTER TABLE swarm_projects ADD COLUMN IF NOT EXISTS constraints JSONB;
+ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS resources_known BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE simulations ADD COLUMN IF NOT EXISTS replay_version TEXT;
+ALTER TABLE simulations ADD COLUMN IF NOT EXISTS context JSONB;
 
 -- Per-shop cost lines and sign-off, which the shop finance screen itemises.
 ALTER TABLE swarm_allocations ADD COLUMN IF NOT EXISTS selling_price_per_unit NUMERIC(20,2) CHECK (selling_price_per_unit >= 0);

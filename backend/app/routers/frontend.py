@@ -60,6 +60,8 @@ class Resolved:
 
 async def resolve(sme_id: str | None) -> Resolved:
     owner = parse_uuid(sme_id)
+    if sme_id is not None and owner is None:
+        raise HTTPException(422, "sme_id must be a UUID")
     if owner is not None:
         if not DB_ENABLED:
             raise HTTPException(status_code=503, detail="sme_id requires DATABASE_URL")

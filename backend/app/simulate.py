@@ -21,6 +21,8 @@ from .finance import calculate_business_metrics, calculate_financials
 from .grading import grade_financials
 from .schemas import FinancialInput, LoanTerms, PositiveMoney, StrictModel, parse_decimal
 from .swarm import ShopCapacity, SwarmRequest, allocate, money
+from .context import StatementRequest
+from .analysis import build_analysis
 
 ZERO = Decimal("0")
 ONE = Decimal("1")
@@ -60,11 +62,9 @@ class Scenario(StrictModel):
     add_shops: list[ShopCapacity] = Field(default_factory=list, max_length=200)
 
 
-class SimulateRequest(StrictModel):
-    sme_id: str | None = None
+class SimulateRequest(StatementRequest):
     persist: bool = True
     scenario_key: str = "what_if"
-    input: FinancialInput
     scenario: Scenario
     swarm: SwarmRequest | None = None
 
@@ -191,12 +191,20 @@ def scenario_swarm(request: SwarmRequest, scenario: Scenario) -> SwarmRequest:
 
 
 def build_plan(label: str, data: FinancialInput, swarm: SwarmRequest | None) -> dict:
+    from .adapters import with_context_gaps
+    analysis = with_context_gaps(build_analysis(data), None)
+    # Observation time belongs to the response envelope, not a deterministic
+    # plan payload that is hashed and reproduced during replay.
+    analysis.pop("analyzedAt", None)
     plan = {
         "label": label,
         "input": data.model_dump(mode="json"),
         "metrics": calculate_financials(data)["data"],
         "businessMetrics": calculate_business_metrics(data),
         "grading": grade_financials(data),
+        # Each plan explains its own recomputed statement. A baseline forecast
+        # is never relabelled as scenario evidence.
+        "analysis": analysis,
     }
     if swarm is not None:
         plan["swarm"] = allocate(swarm)["data"]

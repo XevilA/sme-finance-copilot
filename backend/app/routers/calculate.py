@@ -10,14 +10,13 @@ from ..finance import calculate_business_metrics, calculate_financials
 from ..grading import grade_financials
 from ..repository import parse_uuid, save_financial_record
 from ..schemas import FinancialInput, StrictModel
+from ..context import StatementRequest, metadata
 
 router = APIRouter(tags=["calculate"])
 
 
-class CalculateRequest(StrictModel):
-    sme_id: str | None = None
+class CalculateRequest(StatementRequest):
     persist: bool = True
-    input: FinancialInput
 
 
 async def run_and_store(data: FinancialInput, sme_id: str | None, persist: bool, source: str) -> dict:
@@ -43,7 +42,9 @@ async def run_and_store(data: FinancialInput, sme_id: str | None, persist: bool,
 
 @router.post("/calculate")
 async def calculate(request: CalculateRequest) -> dict:
-    return await run_and_store(request.input, request.sme_id, request.persist, "manual")
+    result = await run_and_store(request.input, str(request.sme_id) if request.sme_id else None, request.persist, "manual")
+    result.update(metadata(request))
+    return result
 
 
 @router.post("/calculate/excel")

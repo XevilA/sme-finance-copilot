@@ -1,6 +1,7 @@
 """Order-only comparisons. Never infer a business cash forecast from totals."""
 
 from decimal import Decimal, localcontext
+import uuid
 
 from pydantic import Field
 
@@ -14,6 +15,8 @@ class OrderScenario(StrictModel):
     cost_per_unit: PositiveMoney | None = None
     deposit_ratio: Rate
     payment_terms_days: int = Field(strict=True, ge=0, le=365)
+    remove_shops: list[str] = Field(default_factory=list, max_length=200)
+    unavailable_resource_ids: list[str] = Field(default_factory=list, max_length=200)
 
 
 class OrderSimulationRequest(StrictModel):
@@ -21,6 +24,13 @@ class OrderSimulationRequest(StrictModel):
     scenario: OrderScenario
     persist: bool = False
     context_missing: list[str] = Field(default_factory=list, max_length=200)
+    project_id: uuid.UUID | None = None
+    sme_id: uuid.UUID | None = None
+    input_revision: str | None = Field(default=None, min_length=1, max_length=100)
+    input_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
+ORDER_ENGINE = "order-what-if/v2"
 
 
 def order_plan(request: SwarmRequest) -> dict:
@@ -52,6 +62,18 @@ def simulate_order(request: OrderSimulationRequest) -> dict:
         context.prec = 50
         payload = request.baseline.model_dump(mode="json")
         changes = request.scenario.model_dump(mode="json")
+        known_shops = {shop["shop_id"] for shop in payload["shops"]}
+        known_resources = {resource["resource_id"] for shop in payload["shops"] for resource in shop["resources"] or []}
+        if set(changes["remove_shops"]) - known_shops:
+            raise ValueError("remove_shops contains an unknown candidate")
+        if set(changes["unavailable_resource_ids"]) - known_resources:
+            raise ValueError("unavailable_resource_ids contains an unknown dependency")
+        payload["shops"] = [shop for shop in payload["shops"] if shop["shop_id"] not in changes["remove_shops"]]
+        for shop in payload["shops"]:
+            for resource in shop["resources"] or []:
+                if resource["resource_id"] in changes["unavailable_resource_ids"]:
+                    resource["available"] = False
+                    resource["status"] = "unavailable"
         payload.update({key: changes[key] for key in ("unit_price", "deposit_ratio", "payment_terms_days")})
         if changes["cost_per_unit"] is not None:
             for shop in payload["shops"]:
@@ -67,7 +89,9 @@ def simulate_order(request: OrderSimulationRequest) -> dict:
                  "scenario": changes, "scope": "order_only",
                  "assumptions": ["Only this order's production costs, deposit and collections are modeled.",
                                  "Minimum cash is the lowest individual assigned shop balance; no inter-shop transfers.",
-                                 "A cost override applies to every candidate shop; allocation is recomputed."]},
+                                 "A cost override applies to every candidate shop; allocation is recomputed.",
+                                 "Resource outage changes Plan B availability only; no confirmation or reservation."]},
+        "engine": ORDER_ENGINE,
         "kind": "simulated", "source": "supplied_input", "missing": missing,
         "status": "insufficient_data" if missing else plan_b["status"],
         "asOf": plan_b["asOf"], "analyzedAt": plan_b["analyzedAt"], "unit": "THB",

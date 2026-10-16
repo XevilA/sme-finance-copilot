@@ -58,9 +58,82 @@ resources. Coverage remains an explicit caller assertion; unknown horizons null.
 CORS now accepts `Authorization, Content-Type` for each configured origin only;
 unlisted origins remain rejected. Auth enforcement settings are unchanged.
 
-New saved-plan / resource-scenario contracts are **not implemented in block 1**;
-use the later verified block section when published. Legacy GET analysis views
-still use stored context and are not a substitute for accepted imported views.
+Legacy GET analysis views use stored context and are not a substitute for
+accepted imported views. Their historical expense observation window can differ
+from the statement period; imported flows use POST analyze's bounded context.
+
+## Backend integration block 2 — implemented and verified 2026-10-17
+
+| Endpoint | Exact request | Result / errors |
+| --- | --- | --- |
+| POST `/calculate` | Existing JSON plus `project_id?`, `input_revision?`, `expected_input_hash?`, `schedule_complete_through?` | context/inputHash returned. Existing compute-only behavior for unknown SME is retained: persisted=false. |
+| GET `/simulator/context` | query `project_id=<UUID>` and/or `order_ref=<string>`; omit both only for legacy active default | Existing `data:SwarmRequest` plus top-level projectId, constraints, contextHash. Named absent project 404; mismatched selectors 404. |
+| GET `/projects/{project_id}/constraints` | UUID path | `data:null` for unknown snapshot, or exact explicit object. missing describes unknown fields. |
+| POST `/projects/{project_id}/constraints` | JSON constraint snapshot (example below) | Replace snapshot, persisted=true; no allocation/reservation. Staff only when RBAC enforced; 403 other roles, 404 unknown project, 422 invalid input. |
+| POST `/swarm` | Existing JSON plus optional `project_id`, `input_revision`, `input_hash` | project_id/order_ref mismatch 409; stored constraints apply when omitted by client. Preview persist=false never writes. Supplied resource state differing from DB rejected with 409 when persisting. |
+| POST `/simulate/order` | `{baseline:SwarmRequest, scenario:OrderScenario, persist:false, context_missing:[], project_id?, sme_id?, input_revision?, input_hash?}` | Existing Plan A/B + engine=order-what-if/v2 and context. Linked input_hash is a reference to imported analysis, not a claim that order baseline equals a financial statement. |
+| POST `/simulate` | Existing statement JSON plus StatementRequest context fields | Full request/results/plan analyses/version saved, rather than delta only. Both plans have rules findings based on their own recomputed statement; dated forecast/expense evidence remains missing. |
+| GET `/simulations` | **query scope required:** project_id, sme_id or order_ref. Multiple selectors intersect. limit integer 1..100, default 30 | `data:[{simulationId,smeId,projectId,scenarioKey,createdAt,engine,context,replayAvailable}]` newest first. |
+| GET `/simulations/{simulation_id}` | UUID path + **same query scope** | `data:{...summary,request,results,resultHash}`; wrong context 404, omitted scope 422. |
+| POST `/simulations/{simulation_id}/replay` | UUID path + **query** scope; optional query input_revision/input_hash to compare active context. **No JSON body.** | data includes reproduced, savedResultHash, recomputedResultHash, savedEngine/currentEngine, contextDifferences, context, results, replaySource=saved_snapshot. persisted=false always. |
+
+All paths above have `/api` and `/api/v1` prefixes. Saved storage disabled => 503.
+Saved read/list/replay honor SME ownership when enforcement is on; unscoped project
+plans require staff. Normal demo enforcement remains off. Project ID is a context
+selector, not an authentication mechanism or approval of suitability.
+
+Synthetic constraint snapshot (real requirements must come from the owner):
+
+```json
+{"required_business_types":["synthetic_food"],"max_distance_km":null,"collection_schedule":[{"day_index":7,"fraction":"1"}]}
+```
+
+SQL NULL / omitted key / required_business_types:null is unknown; explicit []
+means no type restriction. Omitted max_distance_km is unknown; explicit null
+means no distance limit. Non-null radius requires buyer_coordinates with decimal
+latitude/longitude. Collection fractions must sum to one for the invoice balance.
+`collection_schedule:null` remains unknown and uses the engine's explicitly
+conditional settlement assumption, not an asserted real payment date.
+No existing project or offered resource is backfilled/confirmed by migration.
+Retained allocations keep their resource links; resources_known records an
+explicit dependency-free list, distinct from unknown dependencies.
+
+OrderScenario keeps four existing required/optional controls and adds optional
+`remove_shops:string[]` and `unavailable_resource_ids:string[]`. Example:
+
+```json
+{"unit_price":"100","cost_per_unit":null,"deposit_ratio":"0","payment_terms_days":5,"remove_shops":[],"unavailable_resource_ids":["synthetic-machine"]}
+```
+
+Only IDs present in baseline may be removed/disabled (422 otherwise). Required
+resource outage excludes affected shops; preference outage is reported without
+inventing additional cost/delay. Unknown resources never become confirmed.
+Removing every candidate returns 422 because the engine needs a nonempty
+candidate set. Unsupported narrative Chaos, automatic contingency costs,
+reservation and resource-capacity scheduling stay unavailable via /capabilities.
+
+Replay uses the saved complete snapshot, not current DB values. Exact deterministic
+result equality yields reproduced=true. Live order changes, engine version or
+caller-supplied revision/hash differences yield status=stale and explicit
+contextDifferences, even when the snapshot reproduces. Legacy partial saves are
+readable with replayAvailable=false; replay returns 409. No migration invents
+missing historical input/audit/version. Stored results include both order audits
+or both statement metrics/grading/findings. Observation timestamps belong to the
+response envelope and are excluded from deterministic statement-plan payloads.
+
+Validation evidence: 535 passed / 3 skipped with PostgreSQL, 421 / 117 without DB
+(this block's measured run). Real HTTP + DB read-back passed through
+`backend/scripts/verify_backend_demo.py`: template import, persisted calculation,
+shared input hash, B/75 matching, own dated forecast 70,000 minimum / 85,000 at 90
+days, food-only allocation, resource outage, save/list/read/replay, 404/422 cases.
+Fixtures are isolated synthetic UUIDs and cleaned after the run.
+
+GET cashflow/timeline no longer combines all SMEs' events with one shop's opening
+cash: legacy default selects one SME and returns smeId + missing default selection.
+Use forecast/preview for imported closing cash/date and explicit coverage.
+Malformed named SME identifiers no longer silently fall back to a demo answer.
+Upload persist=false now suppresses rejection-event writes too; persist=true
+continues to record rejected upload metadata as before.
 
 อัปเดต 2026-10-16 · ตรวจ source `48d9385` + validation regression repair ในรอบนี้ และ HTTP จริง · base URL `/api/v1`.
 นี่คือ contract ที่มีอยู่ ไม่ใช่ design wishlist. รายการ `/import/upload`, `/import/validate`,

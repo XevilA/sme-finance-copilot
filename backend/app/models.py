@@ -101,6 +101,7 @@ class SwarmProject(Base):
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
     payment_terms_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     deposit_ratio: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False, default=0)
+    constraints: Mapped[dict | None] = mapped_column(JSONB)
     deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
     code: Mapped[str | None] = mapped_column(Text)
@@ -131,6 +132,7 @@ class SwarmAllocation(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("swarm_projects.id", ondelete="CASCADE"), nullable=False)
     sme_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sme_profiles.id", ondelete="CASCADE"), nullable=False)
     assigned_role: Mapped[str] = mapped_column(Text, nullable=False)
+    resources_known: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     share_per_day: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     working_capital_needed: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     current_cash: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
@@ -200,6 +202,8 @@ class Simulation(Base):
     severity: Mapped[str | None] = mapped_column(Text)
     params: Mapped[dict] = mapped_column(JSONB, nullable=False)
     results: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    replay_version: Mapped[str | None] = mapped_column(Text)
+    context: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

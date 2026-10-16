@@ -3,11 +3,10 @@
 import hashlib
 import json
 import uuid
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import HTTPException
 from pydantic import Field, model_validator
-from sqlalchemy import select
 
 from . import catalog
 from .db import DB_ENABLED, session_scope

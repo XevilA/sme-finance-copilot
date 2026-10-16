@@ -217,7 +217,13 @@ async def load_shop_resources(
         )
     ).all()
 
-    grouped: dict = {}
+    # An explicitly recorded dependency-free allocation is known empty.
+    from .models import SwarmAllocation
+    empty_ids = (await session.scalars(select(SwarmAllocation.sme_id).where(
+        SwarmAllocation.project_id == project_id, SwarmAllocation.sme_id.in_(sme_ids),
+        SwarmAllocation.resources_known.is_(True),
+    ))).all()
+    grouped: dict = {str(shop_id): [] for shop_id in empty_ids}
     for sme_id, resource_id, title, category, status, required, note, owner in rows:
         grouped.setdefault(str(sme_id), []).append({
             "resource_id": str(resource_id),
