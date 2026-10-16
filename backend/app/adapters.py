@@ -295,11 +295,11 @@ def cost_breakdown(payload: dict, business_metrics: dict) -> tuple[dict, list[st
 
     return {
         "categories": categories,
-        "costPerUnit": cost_per_unit or 0,
-        "profitPerUnit": profit_per_unit or 0,
-        "breakevenUnits": int(breakeven) if breakeven is not None else 0,
-        "currentMonthlyFixedCost": monthly_fixed or 0,
-        "currentMonthlyVariableCost": monthly_variable or 0,
+        "costPerUnit": cost_per_unit,
+        "profitPerUnit": profit_per_unit,
+        "breakevenUnits": int(breakeven) if breakeven is not None else None,
+        "currentMonthlyFixedCost": monthly_fixed,
+        "currentMonthlyVariableCost": monthly_variable,
         "investmentPlans": [],
     }, missing
 

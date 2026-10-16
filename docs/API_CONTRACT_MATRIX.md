@@ -1,5 +1,67 @@
 # API Contract Matrix — Backend / AI ↔ Frontend
 
+## Backend integration block 1 — implemented 2026-10-17
+
+Branch `codex/demo-backend`, based on `5422af8`. This section supersedes legacy
+notes below for the listed endpoints. Frontend is owned by Claude on
+`codex/demo-frontend`; no `src/**` changes are included in this backend block.
+
+**Breaking correction:** all five Cost scalars (`costPerUnit`, `profitPerUnit`,
+`breakevenUnits`, `currentMonthlyFixedCost`, `currentMonthlyVariableCost`) are
+`number | null`. Known zero remains 0. Unknown is null + missing, never a zero
+placeholder. Consumers must render null without invoking `.toFixed()` on it.
+
+| Implemented endpoint | Request location | Result / identity / errors |
+| --- | --- | --- |
+| POST `/api/v1/analyze` | JSON `{input, shop_name?, use_llm?, sme_id?, project_id?, input_revision?, expected_input_hash?, schedule_complete_through?}` | Existing analysis + views; context on every view; forecast view added. Stateless, no write. Expense observations bounded by input.period_end. |
+| POST `/api/v1/funding/evaluate` | JSON `{input, amount?, sector?, sme_id?, project_id?, input_revision?, expected_input_hash?}` | `data:{requestedAmount:string|null, notRequired:boolean|null, grade, gradeScore, funding:[], investors:[], options:[]}`; supplied statement determines grade/DSCR, never stored seed statement. persist=false always. |
+| POST `/api/v1/forecast/preview` | JSON `{input, sme_id?, project_id?, input_revision?, expected_input_hash?, schedule_complete_through?}` | Forecast continued from input cash_balance/period_end using dated rows of exactly this SME/project. No projection write. Without SME: data=null, missing=[cash_forecast], insufficient_data. |
+| GET `/api/v1/capabilities` | no body/query | Explicit unavailable business transactions and available preview endpoints. |
+
+These routes also exist under `/api`. Existing `POST /match-funding` remains a
+legacy **query-parameter** API against stored statements. Imported workflows must
+use `/funding/evaluate`, not GET funding/options or legacy match-funding.
+No application, signing, information-request, PDF/export or reservation operation
+is implemented. Keep those actions unavailable according to `/capabilities`.
+
+`input` is the normalized FinancialInput contract (39 fields). Synthetic full
+example: `backend/examples/analysis_input.json`; minimum valid request:
+
+```json
+{"input":{"currency":"THB","kind":"simulated","period_start":"2026-09-01","period_end":"2026-09-30","assets":"100000","liabilities":"60000","equity":"40000"},"input_revision":"synthetic-r1"}
+```
+
+Send the same normalized input and revision to analysis, funding and forecast.
+`amount` is a decimal string. If omitted funding uses **this input's computed
+funding_gap** only; unknown gap returns requestedAmount=null + requested_amount
+missing, no candidates. Explicit zero returns notRequired=true, no candidates.
+Sector is supplied explicitly; omission leaves investor sector evidence missing.
+DB catalogue required for funding (503 without DATABASE_URL).
+
+Every contextual response includes:
+
+```json
+{"source":"supplied_input","inputHash":"<sha256 normalized input>","contextHash":"<sha256 context plus consumed evidence>","context":{"smeId":null,"projectId":null,"inputRevision":"synthetic-r1","inputHash":"<same hash>","periodStart":"2026-09-01","periodEnd":"2026-09-30","scheduleCompleteThrough":null}}
+```
+
+`input_revision` is an opaque client revision, not authentication. Return values
+must be discarded if their revision/hash differs from the active draft.
+`expected_input_hash` is optional optimistic validation: mismatched or malformed
+hash => 422; it is not a credential. Use the hash returned by analyze, since
+normalization adds optional null fields. Do not compare contextHash across
+different operations: each operation consumes a different evidence set.
+UUID identities: malformed 422, unknown 404, named identity without DB 503.
+An absent identity stays null, never inferred from a shop name or default SME.
+Project scope filters dated events; it does not prove order membership or reserve
+resources. Coverage remains an explicit caller assertion; unknown horizons null.
+
+CORS now accepts `Authorization, Content-Type` for each configured origin only;
+unlisted origins remain rejected. Auth enforcement settings are unchanged.
+
+New saved-plan / resource-scenario contracts are **not implemented in block 1**;
+use the later verified block section when published. Legacy GET analysis views
+still use stored context and are not a substitute for accepted imported views.
+
 อัปเดต 2026-10-16 · ตรวจ source `48d9385` + validation regression repair ในรอบนี้ และ HTTP จริง · base URL `/api/v1`.
 นี่คือ contract ที่มีอยู่ ไม่ใช่ design wishlist. รายการ `/import/upload`, `/import/validate`,
 `/import/confirm` เดิมไม่มี route จริง ให้ใช้ upload/manual/analyze ด้านล่าง.

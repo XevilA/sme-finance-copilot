@@ -30,6 +30,7 @@ from .routers import auth as auth_router
 from .routers import simulate as simulate_router
 from .routers import swarm as swarm_router
 from .routers import upload as upload_router
+from .routers import contextual as contextual_router
 from .schemas import FinancialInput
 
 
@@ -54,7 +55,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="SME SWARM Finance Engine", version="0.3.0", lifespan=lifespan)
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,https://sme-finance-copilot.vercel.app")
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in origins.split(",") if origin.strip()],
-                   allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type", "Authorization"])
 
 
 # Mounted twice on purpose: /api/* is the backend contract agreed for this
@@ -66,7 +67,7 @@ for router in (frontend_router.router, catalog_router.router,
                calculate_router.router, swarm_router.router,
                analyze_router.router, upload_router.router, simulate_router.router,
                match_funding_router.router, insights_router.router,
-               auth_router.router):
+               auth_router.router, contextual_router.router):
     app.include_router(router, prefix="/api")
     app.include_router(router, prefix="/api/v1", include_in_schema=False)
 

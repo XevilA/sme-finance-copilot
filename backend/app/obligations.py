@@ -88,15 +88,17 @@ async def load_obligations(session: AsyncSession | None, sme_id: uuid.UUID) -> d
 
 
 async def load_expense_history(
-    session: AsyncSession | None, sme_id: uuid.UUID, limit: int = 500
+    session: AsyncSession | None, sme_id: uuid.UUID, limit: int = 500, *, through: date | None = None
 ) -> list[dict] | None:
     """Dated expenses, newest first. None when nothing was queried."""
     if session is None:
         return None
+    query = select(ExpenseTransaction).where(ExpenseTransaction.sme_id == sme_id)
+    if through is not None:
+        query = query.where(ExpenseTransaction.transaction_date <= through)
     rows = (
         await session.scalars(
-            select(ExpenseTransaction)
-            .where(ExpenseTransaction.sme_id == sme_id)
+            query
             .order_by(ExpenseTransaction.transaction_date.desc())
             .limit(limit)
         )

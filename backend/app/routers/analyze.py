@@ -26,19 +26,17 @@ from ..forecasting import forecast_cashflow
 from ..obligations import load_expense_history
 from ..repository import parse_uuid
 from ..schemas import FinancialInput, StrictModel
+from ..context import StatementRequest, metadata, scoped_evidence
 
 router = APIRouter(tags=["analyze"])
 
 
-class AnalyzeRequest(StrictModel):
-    input: FinancialInput
+class AnalyzeRequest(StatementRequest):
     shop_name: str | None = Field(default=None, max_length=200)
     use_llm: Annotated[bool, Field(strict=True)] = False
     # Which stored SME this statement belongs to. With it, the SME's own expense
     # history and cash events are loaded as analysis context; without it neither
     # is queried, and the response says so rather than calling them empty.
-    sme_id: str | None = None
-    schedule_complete_through: date | None = None
 
 
 async def analysis_context(
@@ -74,8 +72,11 @@ async def analyze_input(
     data: FinancialInput, use_llm: bool, sme_id: str | None = None,
     schedule_complete_through: date | None = None,
     shop_name: str | None = None,
+    context_request: StatementRequest | None = None,
 ) -> dict:
-    forecast, history = await analysis_context(data, sme_id, schedule_complete_through)
+    if context_request is None:
+        context_request = StatementRequest(input=data, sme_id=sme_id, schedule_complete_through=schedule_complete_through)
+    forecast, history = await scoped_evidence(context_request)
     result = await run_in_threadpool(
         lambda: build_analysis(data, forecast=forecast, expense_history=history)
     )
@@ -85,7 +86,14 @@ async def analyze_input(
     # comparison that came back insufficient cannot ride out under `ok`.
     result = adapters.with_context_gaps(result, forecast)
     result["source"] = "supplied_input"
+    result.update(metadata(context_request, evidence={"forecast": forecast, "expenses": history}))
     result["views"] = adapters.analysis_views(result, shop_name)
+    for view in result["views"].values():
+        view.update({key: result[key] for key in ("context", "contextHash")})
+    result["views"]["forecast"] = adapters.envelope(
+        forecast, "forecast", forecast["missing"] if forecast else ["cash_forecast"],
+        data.period_end.isoformat(), source="supplied_input", **metadata(context_request, evidence={"forecast": forecast}),
+    )
     return result
 
 
@@ -93,7 +101,7 @@ async def analyze_input(
 async def analyze(request: AnalyzeRequest):
     return await analyze_input(
         request.input, request.use_llm, request.sme_id, request.schedule_complete_through,
-        request.shop_name,
+        request.shop_name, context_request=request,
     )
 
 

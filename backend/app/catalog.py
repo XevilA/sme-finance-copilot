@@ -255,12 +255,14 @@ async def load_shop_allocation(
     }
 
 
-async def load_cash_events(session: AsyncSession | None, sme_id: uuid.UUID | None) -> list[dict]:
+async def load_cash_events(session: AsyncSession | None, sme_id: uuid.UUID | None, *, project_id: uuid.UUID | None = None) -> list[dict]:
     if session is None:
         return []
     query = select(CashEvent).order_by(CashEvent.event_date, CashEvent.day_index)
     if sme_id is not None:
         query = query.where(CashEvent.sme_id == sme_id)
+    if project_id is not None:
+        query = query.where(CashEvent.project_id == project_id)
     return [cash_event_row(event) for event in (await session.scalars(query)).all()]
 
 
