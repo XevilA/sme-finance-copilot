@@ -1,14 +1,16 @@
 # สถานะก่อนส่ง tester — ตรวจจริง 2026-10-16
 
-ฐานงาน `269e3d2` บน main · ขอบเขต src 5 ไฟล์ตามคำอนุญาตล่าสุด · รายละเอียดการเปลี่ยน
-และการตัดสินใจอยู่ใน CODEX_HANDOFF.md รอบ 2026-10-16 · ไม่มีผล deploy ใหม่
+ตรวจซ้ำ runtime source `48d9385` + validation regression repair ในรอบนี้ · ทีมอนุญาต frontend wiring ทุกไฟล์ที่จำเป็น
+โดยคง UI เดิมแล้ว. ข้อจำกัดห้าไฟล์ในรอบเก่าเป็นประวัติ ไม่ใช่ข้อห้ามปัจจุบัน.
+แผนส่งต่อ backend/AI, owner และ acceptance อยู่ใน FRONTEND_INTEGRATION_HANDOFF.md.
+รอบนี้แก้เอกสารและ validation regression; ไม่มี src/UI หรือ deployment ใหม่
 
 | ผลวัด | ค่า |
 | --- | --- |
-| pytest กับ PostgreSQL | 494 passed / 3 skipped |
-| pytest ไม่มี DATABASE_URL | 394 passed / 103 skipped |
-| targeted order/persistence หลังแก้สุดท้าย | 23 passed |
-| final Overview/import/order contracts | 39 passed |
+| pytest กับ PostgreSQL | 510 passed / 3 skipped |
+| pytest ไม่มี DATABASE_URL | 410 passed / 103 skipped |
+| targeted validation/Excel/AI หลังแก้สุดท้าย | 49 passed |
+| regression tests เพิ่ม / tests เดิม | 16 เพิ่ม / ไม่ลด assertion เดิม |
 | เส้นทาง /api/* ไม่รวม v1 aliases | 36 (+ 4 v1-only และ /health) |
 | DB / frontend GET contracts | 27 tables / 16 ผ่าน HTTP |
 | frontend build | 1955 modules / CSS index-DEindwiw.css / JS index-CBenrrOQ.js |
@@ -40,7 +42,7 @@ node scripts/test-page-wiring.mjs
 backend\.venv\Scripts\python.exe backend/scripts/verify_tester_flow.py
 ```
 
-## สิ่งที่ทดสอบผ่านหน้าเว็บได้
+## Browser flows ที่เคยตรวจที่ `4d39680` (รอบนี้ไม่ได้รัน browser ซ้ำ)
 
 1. Import: ดาวน์โหลด template / เลือก .xlsx ไม่เกิน 5 MiB → validate → analyze → Overview.
    Template สังเคราะห์ให้รายได้ 250,000 ค่าใช้จ่าย 200,000 กำไร 50,000 เงินสด 80,000
@@ -74,7 +76,7 @@ minimumShopCash คือร้านที่เงินต่ำสุด ไ
   Sahai ซึ่งเป็น packaging ไม่ได้ · ต้องเก็บ requirements จริงก่อนรับออเดอร์อาหาร
 - SWARM เป็น preview persist=false ไม่จองงาน ไม่จองรถ ไม่เขียนทับ allocations/resources ·
   รายละเอียดเงินรายร้านยังอ่านข้อมูลที่บันทึกไว้ ไม่ใช่ preview · ต้องยืนยันทรัพยากรจริงก่อน
-- HeroAssembly / ChaosPlayback / AppShell/sidebar และหน้าที่ไม่ได้อนุญาตยังมีฉากสาธิต ·
+- HeroAssembly / ChaosPlayback / AppShell/sidebar และหน้าที่ยังไม่ต่อ operation ยังมีฉากสาธิต ·
   Chaos Play ไม่ได้เรียก engine และปุ่มแผนสำรองใน child ยังเป็นการนำทาง/แจ้งเตือนสาธิต ·
   Import Column Mapping เป็นตัวอย่าง ไม่มี auto mapping; inventory ยังไม่มี schema
 - Drag/drop ผ่าน handler regression; รอบนี้ browser ตรวจ file chooser ไม่ได้ลากจาก OS
@@ -90,3 +92,22 @@ Mock mode อ่าน fixtures/ฉากได้; การคำนวณ/อ
 Browser ของ production mock bundle ผ่าน: Simulator แสดงผลยังไม่มีข้อมูล/save ปิด และ
 SWARM Radar แจ้งว่าต้องต่อ backend · mock fixtures เดิมยังมี order ราคา 85 แต่ proposal
 รายรับ 240,000 ซึ่งไม่ตรงกับ 3,000 × 85 = 255,000; อย่าใช้ mock ยืนยันตัวเลขการเงิน
+
+## ผล audit และสิ่งที่ต้องปิดก่อนส่ง frontend team
+
+Full tests/build/HTTP/client scripts ตรวจซ้ำผ่านตามตัวเลขในตาราง. Server/Docker ตอนเริ่ม
+ไม่เปิด จึงเปิด services เดิมก่อนตรวจ; ไม่ใช่การ deploy ใหม่. source/types/handlers อ่านแล้ว
+พบ gap ที่ยังไม่ได้ implement ในรอบเอกสารนี้:
+
+- shared SME/project/input revision ยังไม่ครบทุกหน้า; accepted import ไม่ได้กลายเป็น DB
+  identity หรือ forecast ทุกหน้า และการแก้ draft ยังไม่ invalidate accepted snapshot
+- Envelope/types ยังไม่ sync source และ Overview nullable/margin ทั้งหมด
+- Cost view ยังมี zero placeholders สำหรับ unavailable metrics; minimal analyze จริงคืน
+  costPerUnit/profitPerUnit/breakevenUnits=0 พร้อม missing. ต้องแก้ adapter/type/consumer คู่กัน
+- CORS รับเพียง Content-Type; auth preflight ขอ Authorization จาก localhost:5173
+  ได้ HTTP400 Disallowed CORS headers. ต้องแก้ backend ก่อนต่อ browser token
+- apply/sign/info request/export และ resource/Chaos บาง handlers ยังเป็น local/toast;
+  Saved simulation มี save แล้วแต่ยังไม่มี API สำหรับ read/list/replay
+
+สิทธิ์ frontend wiring มีแล้ว งานเหล่านี้เป็น backend/integration backlog ไม่ใช่งานที่หยุด
+เพราะ “แตะ frontend ไม่ได้”. งาน presentation/design ส่ง frontend team หลัง contract พร้อม

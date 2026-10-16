@@ -1,366 +1,148 @@
-# คู่มือ Deploy backend ขึ้น Railway
+# Deploy และ pre-test handoff — Backend / AI
 
-> ล่าสุด 2026-10-16: wiring ครบ 5 ไฟล์ที่อนุญาต · **494/3 tests มี DB**,
-> **394/103 ไม่มี DB**, **36 API routes**, **27 tables** · build 1955 modules,
-> CSS `index-DEindwiw.css`, JS `index-CBenrrOQ.js` · ดู `TESTER_READINESS_CURRENT.md`
-> สำหรับเงื่อนไข order-only Simulator และ SWARM preview; ยังมีส่วนสาธิตนอกขอบเขต
-> และยังไม่มีผล deploy ใหม่ · ข้อความ/ตัวเลขก่อนหน้านี้ด้านล่างเป็นประวัติเดิม
+อัปเดต 2026-10-16 · runtime source `48d9385` + validation regression repair ในรอบนี้ · config: `backend/Dockerfile`,
+`backend/railway.json`, `backend/app/bootstrap.py` · ทีมยังต้องสร้าง host/service และตั้ง env.
+รอบนี้ตรวจ local API/PostgreSQL/tests/frontend build ไม่ได้ build image หรือ deploy ใหม่.
+ประวัติผล container/provider เดิมอยู่ใน Git/progress/LIVE_PROVIDER_VERIFICATION.md
 
+## 1. เริ่มทดสอบในเครื่อง — cmd.exe
 
-> สถานะ tester หลัง Import wiring: ดู `TESTER_READINESS_CURRENT.md` ·
-> วัดล่าสุด **482 ผ่าน + 3 skip**, ไม่มี DB **383 ผ่าน + 102 skip** ·
-> `provider_fetch_state` และ `auth_throttle` ข้าม replica มีแล้ว; ข้อความ “ยังไม่มี”
-> ในประวัติด้านล่างล้าสมัย · สองไฟล์ Import ต่อจริงแล้ว แต่ยังมีค่าคงที่ในหน้าอื่น
-> จึงยังไม่ใช่เว็บที่ต่อครบทุก action · บนเครื่องนี้ใช้ `pnpm exec vite --host localhost
-> --port 5173 --strictPort` เพราะ CORS_ORIGINS ใน .env ไม่อนุญาต default 3000
+ที่ `D:\code-project\sme-finance-copilot`:
 
-ทุกขั้นในเอกสารนี้ทดสอบจริงแล้วด้วยการ build image และรัน container เทียบกับ
-PostgreSQL จริง โดยส่ง `DATABASE_URL` รูปแบบเดียวกับที่ Railway ให้ ·
-สิ่งที่ยังไม่ได้ทำคือการกดสร้าง service บนบัญชี Railway ซึ่งต้องใช้บัญชีของทีม
-
----
-
-## สรุปก่อนเริ่ม
-
-| สิ่งที่เตรียมไว้แล้ว | ไฟล์ |
-| --- | --- |
-| Image ของ backend | `backend/Dockerfile` |
-| ค่า deploy (health check, restart policy) | `backend/railway.json` |
-| กันไฟล์ที่ไม่ควรเข้า image | `backend/.dockerignore` |
-| Apply schema/seed ตอน startup | `backend/app/bootstrap.py` |
-| รองรับ `DATABASE_URL` ที่ Railway ให้ | `backend/app/db.py` → `normalise_database_url()` |
-| กัน backend ขึ้น Vercel | `.vercelignore` |
-
-**สิ่งที่คุณต้องทำเอง:** สร้าง project บน Railway ต่อ GitHub repo
-เพิ่ม PostgreSQL แล้วตั้งค่า environment variable
-
----
-
-## 2 เรื่องที่พบตอนทดสอบ และแก้ไปแล้ว
-
-ถ้าไม่เจอก่อน การ deploy ครั้งแรกจะพังทั้งสองครั้ง
-
-**1. `DATABASE_URL` ที่ Railway ให้ ใช้กับ async engine ไม่ได้**
-
-Railway (และ Render, Fly, Heroku) ให้ค่ามาเป็น `postgresql://...`
-ซึ่ง SQLAlchemy จะ map ไปที่ driver แบบ synchronous แล้ว async engine จะปฏิเสธ ·
-`normalise_database_url()` เปลี่ยนให้เป็น `postgresql+asyncpg://` เอง
-และย้าย `sslmode` จาก query string ไปเป็น connect argument `ssl` ของ asyncpg
-(asyncpg ไม่รับ `sslmode` เป็น query parameter)
-
-**คุณจึงวาง `DATABASE_URL` ที่ Railway ให้ได้ตรง ๆ ไม่ต้องแก้มือ**
-
-**2. `requirements.lock.txt` ขาด `greenlet`**
-
-container import SQLAlchemy asyncio ไม่ผ่านเลย:
-
-```
-ImportError: The SQLAlchemy asyncio module requires that the Python
-'greenlet' library is installed.
-```
-
-ในเครื่องไม่พบปัญหาเพราะ venv มี greenlet ติดมาก่อนแล้ว · ตอนนี้ pin ไว้ใน lock
-และมีเทสต์ `test_every_runtime_import_is_pinned` กันไม่ให้หายอีก
-
----
-
-## ขั้นตอน
-
-### 1. สร้าง project และต่อ repo
-
-1. เข้า Railway → **New Project** → **Deploy from GitHub repo**
-2. เลือก `XevilA/sme-finance-copilot`
-3. ที่ service settings ตั้ง **Root Directory = `backend`**
-
-   ⚠️ **ข้อนี้สำคัญ** · repo root เป็น Vite frontend ถ้าไม่ตั้ง Railway
-   จะพยายาม build frontend เป็น backend · `backend/Dockerfile` ถูกออกแบบให้
-   build context เป็นโฟลเดอร์ `backend` เท่านั้น
-
-4. Railway จะเจอ `Dockerfile` และใช้มันเองตาม `railway.json`
-
-### 2. เพิ่ม PostgreSQL
-
-ใน project เดียวกัน: **New** → **Database** → **Add PostgreSQL**
-
-Railway จะสร้างตัวแปร `DATABASE_URL` ให้อัตโนมัติ
-
-### 3. ตั้ง environment variable ที่ service ของ backend
-
-| ตัวแปร | ค่า | หมายเหตุ |
-| --- | --- | --- |
-| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | อ้างอิงจาก service Postgres · Railway แทนค่าให้เอง |
-| `DB_BOOTSTRAP` | `schema+seed` | **ครั้งแรกเท่านั้น** เพื่อโหลด schema + ข้อมูลเดโม |
-| `DB_POOL` | `queue` | instance อยู่ยาว จึงใช้ pool จริงได้ |
-| `CORS_ORIGINS` | `https://sme-finance-copilot.vercel.app` | ใส่โดเมน frontend ให้ครบ คั่นด้วย comma |
-| `OPENAI_API_KEY` | *(key ของคุณ)* | optional · ถ้าไม่ใส่ `aiMode` จะเป็น `rules` |
-| `OPENAI_MODEL` | *(ชื่อโมเดล)* | ต้องใส่คู่กับ key |
-
-**`PORT` ไม่ต้องตั้ง** Railway กำหนดให้เอง และ Dockerfile bind `${PORT:-8000}` อยู่แล้ว
-
-**หลัง deploy สำเร็จครั้งแรก ให้เปลี่ยน `DB_BOOTSTRAP` เป็น `schema`**
-ไม่งั้นทุกครั้งที่ deploy จะรัน seed ซ้ำ (ซึ่ง idempotent ไม่เสียหาย แต่เปลืองเวลา startup)
-
-### 4. ตรวจว่าขึ้นจริง
-
-```bash
-curl https://<your-service>.up.railway.app/health
-```
-
-ควรได้:
-
-```json
-{
-  "status": "ok",
-  "service": "sme-swarm-finance-engine",
-  "version": "0.3.0",
-  "persistence": true,
-  "bootstrap": {"mode": "schema+seed", "applied": ["schema.sql", "seed.sql"]}
-}
-```
-
-**ถ้า `persistence` เป็น `false`** → `DATABASE_URL` ไม่ถึง service
-**ถ้า `bootstrap.error` มีค่า** → ต่อ DB ได้แต่ apply schema ไม่ผ่าน อ่าน error นั้น
-**ถ้า `bootstrap.applied` ว่างและ skipped บอกว่า another instance holds the lock**
-→ ปกติ มี instance อื่นทำไปแล้ว
-
-จากนั้นตรวจ endpoint จริง (UUID เดโมคงที่):
-
-```bash
-curl "https://<your-service>.up.railway.app/api/v1/overview?sme_id=11111111-1111-4111-8111-111111111111"
-curl "https://<your-service>.up.railway.app/api/v1/shops"
-```
-
-เปิด API docs ที่ `https://<your-service>.up.railway.app/docs`
-
-### 5. ปลด frontend จากโหมด mock
-
-หลัง backend ขึ้นแล้ว ไปที่ Vercel → project settings → Environment Variables:
-
-| ตัวแปร | ค่า |
-| --- | --- |
-| `VITE_API_BASE_URL` | `https://<your-service>.up.railway.app/api/v1` |
-| `VITE_USE_MOCK` | `false` |
-
-แล้ว redeploy
-
-⚠️ **ชื่อตัวแปรคือ `VITE_API_BASE_URL`** ตามที่ `src/api/client.ts` อ่าน ·
-`VITE_API_BASE_URL` กับ `VITE_USE_MOCK` คือสองตัวที่ต้องตั้ง **ไม่มีตัวที่สาม** ·
-(เดิมมี `src/services/api.ts` ที่อ่าน `VITE_BACKEND_URL` แยกกัน แต่ไฟล์นั้น
-**ถูกลบไปแล้วใน `44db2f2`** จึงไม่ต้องตั้ง `VITE_BACKEND_URL` อีก)
-
-⚠️ **ห้ามใส่ `OPENAI_API_KEY` ในตัวแปรที่ขึ้นต้นด้วย `VITE_`**
-ทุกอย่างที่ขึ้นต้นด้วย `VITE_` ถูกฝังลง bundle ที่ใครก็เปิดอ่านได้
-
----
-
-## ทดสอบในเครื่องก่อน deploy
-
-ทำแบบนี้ได้ผลเหมือน Railway เพราะใช้ `DATABASE_URL` รูปแบบเดียวกัน:
-
-```bash
+```bat
 docker compose -f backend/docker-compose.yml up -d
-docker build -t sme-backend:test backend
-docker run --rm -p 8010:8000 --network backend_default \
-  -e DATABASE_URL="postgresql://postgres:postgres@sme_swarm_db:5432/sme_swarm" \
-  -e DB_BOOTSTRAP="schema+seed" -e DB_POOL="queue" \
-  sme-backend:test
-curl http://127.0.0.1:8010/health
+backend\run.cmd
 ```
 
-ผลที่ได้ตอนทดสอบ: bootstrap apply `schema.sql` และ `seed.sql` สำเร็จ
-และ `/api/v1/overview`, `/api/v1/shops`, `/api/v1/funding/options`,
-`/api/forecast` ตอบ 200 ทั้งหมด
+อีก terminal ที่ repo root:
 
----
-
-## เรื่องที่ควรรู้
-
-**ข้อมูลเดโมเป็นข้อมูลสังเคราะห์** `DB_BOOTSTRAP=schema+seed` จะใส่ SME 3 ร้าน
-พร้อมงบการเงิน 2 ชุด (เกรด A และ D) ข่าว/ทรัพยากร/ฉากทัศน์ตัวอย่าง ·
-ทุกแถวติดป้ายว่าเป็นข้อมูลตัวอย่าง **อย่าใช้กับข้อมูลลูกค้าจริง**
-
-**Authentication มีแล้วแต่ปิดเป็นค่าเริ่มต้น** token เซ็นด้วย HMAC-SHA256 และรหัสผ่าน
-hash ด้วย scrypt (ดูหัวข้อ "เปิด Authentication" ด้านล่าง) · ค่าเริ่มต้นคือ
-`RBAC_ENFORCED=false` เพื่อให้ frontend ที่ใช้งานอยู่ไม่พัง ซึ่งหมายความว่า
-**ตอนนี้ยังไม่มีการตรวจสิทธิ์ใด ๆ** · ก่อนเปิดให้ข้อมูลการเงินจริง ต้อง
-เปิด `RBAC_ENFORCED=true` และเพิ่ม rate limit ที่หน้า login ·
-`CORS_ORIGINS` ไม่ใช่การยืนยันตัวตน
-
-**GDELT อาจยังดึงข่าวไม่ได้** จากเครื่องนี้ TLS handshake timeout
-(ดู `LIVE_PROVIDER_VERIFICATION.md`) · บน Railway อาจผ่าน เพราะ egress ต่างกัน ·
-ลองเช็คหลัง deploy: `curl "https://<service>/api/industry/trends?sector=food_processing"`
-ถ้า `status` เป็น `ok` แปลว่าเน็ตของ Railway ใช้ได้
-
-**ยังไม่มีการจำกัดอัตราคำขอข้าม instance** `railway.json` ตั้ง `numReplicas: 1`
-ไว้ด้วยเหตุนี้ · ถ้าจะเพิ่ม replica ต้องทำตาราง `industry_news_fetch_state` ก่อน
-ไม่งั้นหลาย instance จะยิง GDELT พร้อมกันแล้วโดน 429
-
----
-
-## เปิด Authentication
-
-ค่าเริ่มต้นคือ **ปิด** เพื่อให้ frontend ที่ใช้งานอยู่ไม่พัง · ลำดับการเปิด:
-
-### 1. สร้าง secret สำหรับเซ็น token
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
+```bat
+set "VITE_USE_MOCK=false"
+set "VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1"
+pnpm exec vite --host localhost --port 5173 --strictPort
 ```
 
-ใส่เป็น `AUTH_SECRET` บน Railway · **ต้องยาวอย่างน้อย 32 ตัวอักษร**
-ถ้าไม่ตั้ง ระบบจะออกและรับ token ไม่ได้เลย (ไม่มีค่า default เพราะ secret ที่เดาได้
-เท่ากับไม่มีลายเซ็น)
+Backend config อยู่ `backend\.env`; แก้ env แล้ว restart server. ไม่ใช้ `VAR=x command`
+ใน cmd.exe. frontend ใช้ `.env.local` ที่ repo root หรือ process env; สอง VITE variables
+ข้างบนเป็น build-time config ต้อง restart/rebuild เมื่อเปลี่ยน. ไม่มี VITE_BACKEND_URL
 
-### 2. ตั้งรหัสผ่านให้ผู้ใช้
+Backend CORS defaults กับค่าใน .env อาจต่างกัน. local config ที่ตรวจใช้งานกับ
+http://localhost:5173; อย่าสมมติว่า default Vite 3000 หรือ 127.0.0.1 เป็น origin เดียวกัน.
+ให้เช็ก CORS_ORIGINS ให้ตรง URL ที่เปิดเว็บ. deployment frontend ไม่ได้รัน FastAPI ให้ด้วย
 
-รหัสผ่าน**ไม่ได้ถูก seed** จึงไม่มี credential ใดอยู่ใน repo · ตั้งด้วยสคริปต์:
-
-```bash
-python backend/scripts/set_password.py owner@baansuan.test
-python backend/scripts/set_password.py fund@example.test --generate
+```bat
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/api/v1/order
+curl http://127.0.0.1:8000/api/v1/shops
 ```
 
-`--generate` สร้างรหัสที่แข็งแรงและพิมพ์ให้ครั้งเดียว · รหัสผ่านไม่รับผ่าน
-argument เพราะจะติดอยู่ใน shell history และ process list
+`/health` ตอบ ok/persistence=true อย่างเดียวไม่รับรองว่า DB พร้อม; bootstrap.error
+และ DB-backed routes ต้องผ่านด้วย. รอบนี้ source database มี 27 tables; 16 GET contracts
+ผ่าน HTTP. partial-data status เป็นผลจริง ไม่จำเป็นต้องเป็น ok ทุก view
 
-ผู้ใช้ที่ `password_hash` ว่าง **ล็อกอินไม่ได้เลย** ไม่ใช่ล็อกอินได้ด้วยรหัสว่าง
+โครงการ default เลือก ACTIVE_PROJECT_ORDER: start_date desc nulls last แล้ว
+updated_at/created_at. อย่า reseed/reset ข้อมูลเพื่อแก้ selected project หรือให้เลขตรง mock.
+ใช้ UUID ที่ API คืน; Shop Finance รับ order_ref เพื่อ pin โครงการได้
 
-### 3. ขอ token
+## 2. Host configuration ที่ทีมต้องทำ
 
-```bash
-curl -X POST https://<service>/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"fund@example.test","password":"<รหัสผ่าน>"}'
-```
+ใช้ service root/build context เป็น `backend` เพราะ repo root เป็น Vite. Dockerfile
+ติดตั้ง requirements.lock.txt, copy app/db/engines/parsers/examples/templates และใช้ user
+ที่ไม่ใช่ root. command ใช้ PORT ของ host (default 8000); healthcheckPath คือ `/health`.
+Railway config ปัจจุบันมี 1 replica; ยังไม่ได้เปลี่ยน scaling ในรอบนี้
 
-ได้ `accessToken` มาแล้วส่งเป็น `Authorization: Bearer <token>`
+| Backend variable | หน้าที่ |
+| --- | --- |
+| DATABASE_URL | URL PostgreSQL ของ host; normalise_database_url แปลง driver/SSL สำหรับ asyncpg |
+| DB_BOOTSTRAP | schema เป็นค่าปกติ; schema+seed เฉพาะฐานสาธิตใหม่ที่ทีมตั้งใจใส่ข้อมูลสังเคราะห์; off ถ้าไม่ bootstrap |
+| DB_POOL | queue สำหรับ service อยู่ยาวตาม deployment config |
+| CORS_ORIGINS | frontend origins ที่ใช้งานจริง คั่น comma |
+| OPENAI_API_KEY / OPENAI_MODEL | optional model mode; backend-only; rules ไม่ต้องใช้ |
+| AUTH_SECRET | secret สำหรับ signed token อย่างน้อย 32 ตัวอักษร เมื่อจะใช้ login/auth |
+| RBAC_ENFORCED | ปัจจุบัน false สำหรับ tester; ไม่เปิดก่อน identity/token/authorization integration พร้อม |
+| AUTH_DEV_HEADER | false สำหรับ tester และ host ที่คนอื่นเข้าถึงได้ |
 
-```bash
-curl https://<service>/api/auth/me -H "Authorization: Bearer <token>"
-```
+schema/seed เป็น idempotent ตาม tests แต่ไม่ใช่เหตุผลให้ reseed ฐานที่มีงานจริงทุก deploy.
+Health bootstrap.applied/error ต้องตรวจหลังเริ่ม service และทดสอบ DB routes จริง.
+schema+seed ใส่ชุดสังเคราะห์; อย่าเรียกสิ่งนั้นว่าข้อมูลลูกค้าจริง
 
-### 4. เปิด enforcement
+Vercel frontend:
 
-ตั้ง `RBAC_ENFORCED=true` บน Railway
-
-⚠️ **หลังเปิดแล้ว endpoint ที่ตรวจสิทธิ์จะต้องมี token** · ถ้า frontend ยังไม่ส่ง
-`Authorization` header จะได้ 401 · **ต่อฝั่ง frontend ให้เสร็จก่อนเปิด**
-
-### ตรวจว่าตั้งค่าถูก
-
-```bash
-curl https://<service>/health
-```
-
-ดูที่ `auth`:
-
-```json
-{"enforced": true, "secretConfigured": true, "devHeaderAccepted": false}
-```
-
-- `secretConfigured: false` ขณะ `enforced: true` → ยังไม่ตั้ง `AUTH_SECRET`
-  ระบบจะตอบ 503 ไม่ใช่ปล่อยผ่าน
-- **`devHeaderAccepted: true` บนเครื่องที่เข้าถึงได้จากภายนอก = ช่องโหว่**
-  แปลว่า `AUTH_DEV_HEADER=true` ซึ่งยอมรับ header `X-User-Email` เป็นตัวตน
-  โดยไม่มีการยืนยัน ใครก็อ้างเป็น role ไหนก็ได้ · ใช้เฉพาะในเครื่องตัวเองกับ DB ทิ้งขว้าง
-
-### รันเทสต์ส่วน auth
-
-เทสต์ 2 ตัวที่ต้องล็อกอินจริงจะ **skip** โดยค่าเริ่มต้น เพราะไม่มีรหัสผ่านอยู่ใน repo
-ถ้าจะรันให้ครบ ตั้งรหัสให้ผู้ใช้เดโมก่อน แล้วส่งผ่าน env:
-
-```bash
-python backend/scripts/set_password.py fund@example.test
-DEMO_LOGIN_PASSWORD='<รหัสที่ตั้ง>' python -m pytest -c backend/pytest.ini -q
-```
-
-**419 ผ่าน + 3 skip** เมื่อไม่ตั้ง `DEMO_LOGIN_PASSWORD` (วัดจริงแล้ว) ·
-ตั้งรหัสแล้วจะเหลือ skip 1 ตัว คือเคสที่ยืนยันพฤติกรรมตอน *ไม่มี* `DATABASE_URL`
-จึงถูกข้ามเสมอเมื่อมี DB
-
-### สิ่งที่ auth นี้ทำและไม่ทำ
-
-**ทำ:** token เซ็นด้วย HMAC-SHA256 ตรวจด้วย `compare_digest` · มีวันหมดอายุบังคับ ·
-รหัสผ่าน hash ด้วย scrypt (memory-hard) ต่างเกลือทุกครั้ง · ทุกการ login ที่ล้มเหลว
-ตอบข้อความเดียวกันหมด (ไม่บอกว่าอีเมลมีอยู่ไหม) · **role มาจากฐานข้อมูลตอนตรวจ
-ไม่ใช่จาก token** จึงปิดบัญชีหรือเปลี่ยน role แล้วมีผลทันที และ token ที่อ้างว่าเป็น
-`admin` ก็ยกระดับตัวเองไม่ได้
-
-**เพิ่มเข้ามาหลังเขียนหัวข้อนี้ครั้งแรก:**
-
-- **จำกัดจำนวนครั้งที่ลองผิด** · `auth_throttle` ในฐานข้อมูล จึงมีผลข้าม replica
-  และอยู่รอด restart · ค่าเริ่มต้น 8 ครั้งใน 15 นาที แล้วล็อก 15 นาที
-  (`AUTH_MAX_ATTEMPTS`, `AUTH_ATTEMPT_WINDOW_SECONDS`, `AUTH_BLOCK_SECONDS`)
-- **เพิกถอน token ก่อนหมดอายุ** · `revoked_tokens` รายเซสชัน และ
-  `users.tokens_valid_from` ทั้งบัญชี · `POST /api/auth/logout`,
-  `/auth/revoke-all`, และ `/auth/revoke` สำหรับ admin · อายุ token ยัง clamp
-  ไว้ 7 วัน **โดยเจตนา** เป็นชั้นที่สอง ไม่ใช่เพราะเพิกถอนไม่ได้
-
-**ยังไม่ทำ:** ไม่มี refresh token — client ต้อง login ใหม่เมื่อ token หมดอายุ
----
-
-## 🧪 เช็กลิสต์ก่อนทีม frontend มาทดสอบ
-
-### ตัวบล็อกเดียว: backend ต้องเข้าถึงได้
-
-ถ้าทีม frontend ทดสอบจากเครื่องตัวเอง **ต้อง deploy ก่อน** (ข้อ 1-4 ด้านบน)
-เพราะเว็บบน Vercel ยังไม่มี backend ให้คุย
-
-**ถ้าทดสอบบนเครื่องเดียวกัน** ใช้ local ได้เลย ไม่ต้อง deploy:
-
-```bash
-docker compose -f backend/docker-compose.yml up -d
-backendun.cmd
-```
-
-แล้วให้ frontend รัน `npm run dev` พร้อมตั้ง 2 ตัวแปรใน `.env.local` ที่ repo root:
-
-```
-VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+```env
+VITE_API_BASE_URL=https://<backend-host>/api/v1
 VITE_USE_MOCK=false
 ```
 
-CORS อนุญาต `localhost:5173` และ `localhost:3000` ไว้แล้ว
+ทีมตั้งค่าสองตัวนี้แล้ว redeploy frontend. ห้ามใส่ database URL, OPENAI_API_KEY,
+AUTH_SECRET หรือ credential ใด ๆ ใน VITE_* ซึ่งถูกฝังใน browser bundle.
+ยังไม่มี backend host URL หรือผล deployment ใหม่ที่ยืนยันในรอบนี้
 
-### ตรวจก่อนเริ่ม 3 คำสั่ง
+## 3. Auth integration ที่ยังต้องทำก่อนใช้งานใน browser
 
-```bash
-curl http://127.0.0.1:8000/health
-curl "http://127.0.0.1:8000/api/v1/order"
-curl "http://127.0.0.1:8000/api/v1/shops"
+Backend มี login/me/logout/revoke-all/admin revoke; token HMAC-SHA256, password scrypt,
+throttle และ revocation ใน DB. role มาจาก DB ตอนตรวจ ไม่ใช่ค่า role selector ของ AppHeader.
+Frontend ยังไม่มี Authorization header และ auth flow จริง; route ที่มี principal dependency
+ต้องใช้ token เมื่อ enforcement เปิด. การตั้ง enforcement ไม่ได้สร้าง actor/tenant scoping
+ให้ทุก operation ที่ยังไม่มี dependency ขึ้นมาเอง
+
+**พบ blocker จริงในรอบนี้:** middleware อนุญาต allow_headers=[Content-Type] เท่านั้น.
+OPTIONS จาก localhost:5173 ขอ authorization,content-type ได้ HTTP400 Disallowed CORS headers.
+ต้องแก้ CORS สำหรับ token transport พร้อม regression test ก่อนอ้างว่า browser auth พร้อม.
+เอกสารรอบนี้บันทึก gap ไม่ได้แก้ behavior ของ middleware
+
+Current /health: enforced=false, secretConfigured=false, devHeaderAccepted=false.
+local admin มี password hash แล้ว แต่ยังไม่ยืนยัน login/admin revoke ผ่าน HTTP ด้วยบัญชีนี้.
+ไม่แสดงหรือ commit credential. ตั้งรหัสแบบ interactive ได้ด้วย:
+
+```bat
+backend\.venv\Scripts\python.exe backend/scripts/set_password.py admin@example.test
 ```
 
-`/order` ต้องได้ `PO-STP-2026-091` และ `status: "ok"` · ถ้าได้ `PO-PERSIST-TEST`
-หรือ `PO-LIVE-001` แปลว่าออเดอร์จากเทสต์ยังอยู่ ให้ reseed:
+ทดสอบ login ผ่าน `/docs` ในสภาพแวดล้อม tester แล้วตรวจ `/auth/me`/logout/revoke ตาม actor.
+อย่าใส่ password ลง command argument/history หรือส่ง credentials ผ่านไฟล์ที่ Git ติดตาม.
+สำหรับ login tests ตั้ง DEMO_LOGIN_PASSWORD ใน environment ของ terminal ที่ทดสอบเท่านั้น;
+ไม่ตั้งค่านี้ในเอกสารหรือ commit. ถ้าไม่ตั้งจะ skip 2 เคสตามที่วัด
 
-```bash
-docker exec -i sme_swarm_db psql -U postgres -d sme_swarm < backend/db/seed.sql
+auth_throttle และ provider_fetch_state ใช้ DB จึงมีการประสานข้าม worker/replica แล้ว;
+คำกล่าวเก่าว่าไม่มี cross-instance gate ไม่ใช่สถานะปัจจุบัน. ยังไม่มี refresh token;
+token มีอายุสูงสุดตาม policy และยังเพิกถอนได้
+
+## 4. เช็กก่อนส่ง frontend team / tester
+
+```bat
+if not exist node_modules\.cache mkdir node_modules\.cache
+backend\.venv\Scripts\python.exe -m pytest -c backend/pytest.ini -q --basetemp=node_modules/.cache/pytest-tester
+backend\.venv\Scripts\python.exe backend/scripts/verify_tester_flow.py
+node scripts/test-import-wiring.mjs
+node scripts/test-page-wiring.mjs
+pnpm build
 ```
 
-### สิ่งที่ frontend จะเห็น (ไม่ส่ง query param เลย)
+Full DB **510 passed / 3 skipped**, ไม่มี DB **410 / 103**; 36 main paths, 27 tables,
+16 GET contracts. Build **1955 modules**, CSS **index-DEindwiw.css**, JS **index-CBenrrOQ.js**.
+Warning Starlette/httpx และ JS >500kB ยังอยู่. ผลนี้ตรวจ local ไม่ใช่ผลบน host.
+ใช้ basetemp ใต้ node_modules/.cache เพราะ Vite watcher เคย crash เมื่อเฝ้า pytest temp
+ที่ถูกล้างใน backend/uploads. Browser flows ที่ตรวจรอบก่อนแยกอยู่ใน tester guide
 
-16 contract ตอบ 200 ครบ และใช้ข้อมูลที่ seed ไว้จริง (`source: "stored_record"`)
+## 5. ผลข้อมูลและ operation ที่ต้องอธิบายกับ tester
 
-| หน้าจอ | ได้ข้อมูลของ |
-| --- | --- |
-| Overview, Health, Cost, AI explain | Baan Suan Kitchen (เกรด A) |
-| Funding options | Rung Charoen Foods — ร้านที่**มีส่วนขาดจริง** 45,000 บาท |
-| Order, Projects, Swarm proposal | `PO-STP-2026-091` ออเดอร์เดโม |
-| Shops, Resources, Chaos, Sales | ทั้ง 3 ร้าน / ข้อมูลเดโม |
+- status insufficient_data คือ partial result: แสดงข้อมูลที่มีพร้อม missing; ไม่เดาศูนย์,
+  ไม่ interpolate series และไม่ค้าง skeleton เมื่อ data=null/[] หรือ HTTP fail.
+- source แยก supplied_input/stored_record/database/demo_dataset/none; DB seed ยังเป็น synthetic.
+- import accepted snapshot ใช้เฉพาะ Overview/Health/Cost/AI ในแท็บ; reload กลับ DB/default.
+  Funding/Cashflow/Shop Finance ยังต้องทำ shared context ไม่ใช่ input ใหม่อัตโนมัติทุกหน้า.
+- SWARM เป็น preview; project 1,000/วัน 30 วัน ขาดรถ required สำหรับสองร้านอาหาร;
+  ได้ 450 จาก packaging และขาด 550 โดยยังไม่มี business constraints ที่ยืนยัน suitability.
+  ไม่ยืนยันรถ/พิกัด/วันรับเงินแทนทีม. อย่านำ Hero 300/วัน 6 ร้านมายืนยันผล DB.
+- Simulator เป็น order-only cash/profit; save จริงแต่ saved-plan read/list/replay ยังไม่มี.
+- สมัครทุน/ลงนาม/ขอเอกสาร/export/resource/Chaos บาง handler ยัง local/toast; ไม่อ้างเป็น
+  business transaction สำเร็จ. ต้องมี API contract + actor + persistence/read-back หรือ unavailable.
+- GET /forecast default project_obligations=true อาจ upsert projected events; ระบุ false
+  ถ้าต้องการอ่าน events เดิมเท่านั้น. coverage ไม่ทราบไม่ใช่ forecast ที่ยืนยันครบ 90 วัน.
+- ข่าวสดยังไม่ยืนยันสำเร็จ. หลังทีม deploy จึงตรวจ provider จาก host ผ่าน gate;
+  ไม่ force/retry เพื่อให้ผ่าน. model mode มีหลักฐานเก่าใน LIVE_PROVIDER_VERIFICATION.md;
+  รอบนี้ไม่เรียก paid LLM หรือข่าวสดซ้ำ
 
-### เรื่องที่ควรบอกทีม frontend ล่วงหน้า
-
-1. **`status: "insufficient_data"` ไม่ใช่ error** — หมายถึงมีข้อมูลบางส่วน
-   และชื่อที่ขาดอยู่ใน `missing` · ให้แสดง empty state ของชุดข้อมูลนั้น
-   ไม่ต้องขึ้น error ทั้งหน้า · เช่น `/overview` จะมี `missing`
-   `["previous_period_statement", "weekly_cash_movements"]` เพราะมีงบงวดเดียว
-   จึงเทียบงวดก่อนไม่ได้และไม่มีความเคลื่อนไหวรายวัน
-2. **ทุก response มี `source`** (`stored_record` / `demo_dataset` / `none`)
-   ใช้แยกได้ว่าเลขนั้นมาจากฐานข้อมูลจริงหรือชุดตัวอย่าง
-3. **`/shops/{id}/finance` ต้องส่ง UUID** ที่ได้จาก `/api/v1/shops` ·
-   ถ้าส่ง id แบบ mock เดิม (`shop-1`) จะได้ envelope
-   `missing: ["unknown_shop_id"]` ไม่ใช่ error — แต่ก็ไม่มีข้อมูลให้แสดง
-4. **ยังไม่ต้องส่ง token** · `RBAC_ENFORCED=false` เป็นค่าเริ่มต้น
-   ทุก endpoint เรียกได้โดยไม่ต้องยืนยันตัวตน
-5. **`actionableItems` เป็นภาษาไทยแล้ว** แต่ `id`, `type`, `priority`
-   ยังเป็นอังกฤษตามสัญญาเดิม
+กติกาปัจจุบันและแผนส่งต่อ: [FRONTEND_INTEGRATION_HANDOFF.md](FRONTEND_INTEGRATION_HANDOFF.md).
+Frontend wiring อนุญาตแล้วโดยคงดีไซน์; ทีม frontend รับงาน presentation หลัง backend/API
+integration ผ่านเกณฑ์ ไม่ใช่หลังเปลี่ยนสีหรือสร้างหน้าใหม่

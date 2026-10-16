@@ -15,7 +15,7 @@ def parse_decimal(value: object) -> Decimal:
     except InvalidOperation as exc:
         raise ValueError("Expected a numeric value without currency symbols or separators") from exc
     if not number.is_finite():
-        return Decimal("0")
+        raise ValueError("NaN and infinity are not allowed")
     return number
 
 
@@ -47,7 +47,7 @@ class FinancialInput(StrictModel):
     opening_assets: PositiveMoney | None = None
     opening_equity: Money | None = None
     current_assets: PositiveMoney | None = None
-    inventory: PositiveMoney = Decimal("0")
+    inventory: PositiveMoney | None = None
     current_liabilities: PositiveMoney | None = None
     cash_balance: PositiveMoney | None = None
     net_income: Money | None = None
@@ -76,29 +76,6 @@ class FinancialInput(StrictModel):
     initial_investment: PositiveMoney | None = None
     investment_net_gain: Money | None = None
     loan: LoanTerms | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def default_missing_amounts(cls, values: object) -> object:
-        """Treat omitted/null numeric inputs as zero so partial forms remain calculable."""
-        if not isinstance(values, dict):
-            return values
-        payload = dict(values)
-        zero_fields = {
-            "assets", "liabilities", "equity", "opening_assets", "opening_equity",
-            "current_assets", "inventory", "current_liabilities", "cash_balance",
-            "net_income", "operating_cash_flow", "investing_cash_flow", "financing_cash_flow",
-            "capital_expenditure", "cash_available_for_debt_service", "debt_principal_due",
-            "debt_interest_due", "working_capital_needed", "minimum_cash_reserve",
-            "buyer_deposit", "committed_funding", "revenue", "total_expenses",
-            "cost_of_goods_sold", "operating_expenses", "interest_expense", "tax_expense",
-            "operating_cash_outflow", "units_sold", "unit_price", "variable_cost_per_unit",
-            "fixed_costs", "initial_investment", "investment_net_gain",
-        }
-        for field in zero_fields:
-            if payload.get(field) is None:
-                payload[field] = 0
-        return payload
 
     @model_validator(mode="after")
     def validate_financials(self) -> "FinancialInput":

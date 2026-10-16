@@ -1,12 +1,15 @@
 # SME SWARM: Finance Copilot - ข้อตกลงและแนวทางการพัฒนาสำหรับ AI
 
 ## ⚠️ 1. กฎเหล็กขั้นเด็ดขาด (เพื่อประหยัด Token และป้องกันระบบพัง)
-> ข้อยกเว้น 2026-10-16 ตามคำอนุญาตผู้ใช้: CODEX ดูแลทั้งสอง lane และแก้ wiring
-> ได้เฉพาะ client.ts, ImportPage.tsx, OverviewPage.tsx, SimulatorPage.tsx, SwarmPage.tsx ·
-> Import แก้ copy ชนิด/ขนาดไฟล์ได้ · คง CSS/Tailwind/layout/structure/routing เดิม
-> ข้อยกเว้นนี้มาก่อนกฎ frontend ทั่วไปด้านล่าง; ไฟล์นอกห้ารายการยังไม่อนุญาต
+> ข้อตกลงล่าสุด 2026-10-16: ทีมอนุญาต frontend wiring เพื่อให้ backend/AI และเว็บ
+> ทำงานร่วมกันได้ **ไม่จำกัดสอง/ห้าไฟล์เดิม** · CODEX เน้น backend/AI, contracts,
+> adapters, integration tests และ wiring ที่จำเป็น; ทีม frontend รับ presentation ต่อ
 
-- **ห้ามแก้ไข FRONTEND เด็ดขาด:** หน้าเว็บ (UI) เสร็จสมบูรณ์แล้ว 100% **ห้าม** แก้ไข React components, CSS, Tailwind classes หรือโครงสร้างหน้าเว็บใดๆ ทั้งสิ้น[cite: 1]
+- **คง UI เดิม:** แก้ client/types/store/hooks/props/handlers/validation/data bindings ได้
+  ตามจำเป็น โดยไม่ขอสิทธิ์รายไฟล์ซ้ำ · ห้ามเปลี่ยน CSS/Tailwind/สี/spacing/layout/motion
+  design/component hierarchy/routing หรือสร้างหน้าใหม่ · ไม่ตีความคำว่า wiring ว่า redesign
+- **หน้าตาเสร็จไม่เท่ากับระบบเสร็จ:** ทุก action ต้องระบุ read/preview/write/unavailable;
+  toast/animation/local state ไม่ใช่หลักฐานว่าเรียก API, บันทึก DB หรือส่งคำขอจริง
 - **การประหยัด TOKEN (Speed Mode):** เราอยู่ในช่วง Hackathon 48 ชั่วโมง ให้สร้างเฉพาะโค้ดที่พร้อมใช้งานจริงบน Production เท่านั้น ห้ามพิมพ์ข้อความเกริ่นนำ ห้ามอธิบายยืดเยื้อ และห้ามพิมพ์คำขอโทษ[cite: 1]
 - **ตำแหน่งไฟล์และ Git:** โค้ดทั้งหมดต้องอยู่ใน `D:\code-project\sme-finance-copilot`[cite: 1] เมื่อเขียนโค้ดชุดใหญ่เสร็จ ต้องให้คำสั่ง Terminal สำหรับ Push โค้ดไปยัง `https://github.com/XevilA/sme-finance-copilot` branch main เสมอ[cite: 1]
 - **กลยุทธ์ AI:** ไม่ต้องเทรน ML โมเดลใหม่ ให้ใช้สูตรคณิตศาสตร์, Rule-based systems และต่อ API ของ LLM ภายนอก (ผ่าน Prompt Engineering) เพื่อวิเคราะห์ข้อมูลและตอบกลับเป็น JSON[cite: 1]
@@ -16,7 +19,9 @@
 
 ## 🤖 2. การแบ่งหน้าที่: ใครทำอะไร (ROLE DELEGATION)
 
-เพื่อป้องกันการทำงานซ้อนทับกัน (Conflict) และอาการ AI หลอน งานจะถูกแบ่งอย่างเด็ดขาด ให้อ่านบทบาทของคุณด้านล่างและทำเฉพาะงานที่ได้รับมอบหมายเท่านั้น
+บทบาทด้านล่างเป็นการแบ่งเดิมเพื่ออ้างอิง. คำสั่งล่าสุดให้ CODEX ดูแล backend/AI, DB/API/adapter
+และ frontend integration ที่จำเป็นก่อนทีม frontend รับช่วง; lane split เดิมไม่บล็อกงานนี้.
+รายละเอียด scope/owner/acceptance อยู่ใน `FRONTEND_INTEGRATION_HANDOFF.md`.
 
 ### 🟢 บทบาทที่ 1: CODEX (ดูแล Core Logic, ระบบคำนวณคณิตศาสตร์ & AI Algorithms)
 **ภารกิจของคุณ:** สร้างระบบตรรกะคำนวณทางคณิตศาสตร์, ระบบตรวจสอบข้อมูล และเขียน Prompt Algorithms สำหรับ AI ในฝั่ง Backend[cite: 1]
@@ -41,9 +46,9 @@
 
 ## 📊 3. สถานะงาน
 
-> อัปเดต 2026-10-16 จาก `269e3d2` · **494 tests ผ่าน + 3 skip** มี PostgreSQL ·
-> ไม่มี DB **394 ผ่าน + 103 skip** · **36 API routes**, **27 ตาราง** ·
-> wiring frontend 5 ไฟล์: **1955 modules**, CSS `index-DEindwiw.css` คงเดิม,
+> ตรวจซ้ำ 2026-10-16 ที่ runtime source `48d9385` + validation regression repair ในรอบนี้ · **510 tests ผ่าน + 3 skip** มี PostgreSQL ·
+> ไม่มี DB **410 ผ่าน + 103 skip** · **36 API routes**, **27 ตาราง** ·
+> implementation ที่ผ่านมาเปลี่ยน frontend 5 ไฟล์; สิทธิ์ปัจจุบันครอบคลุม wiring ที่จำเป็น: **1955 modules**, CSS `index-DEindwiw.css` คงเดิม,
 > JS `index-CBenrrOQ.js` · มี warning bundle >500kB และ Starlette/httpx เดิม
 
 ### 🚀 นักพัฒนาใหม่เริ่มที่นี่
@@ -63,14 +68,14 @@ backend\run.cmd                                      # เซิร์ฟเว�
 | ออเดอร์เดโม | `PO-STP-2026-091` | — |
 
 ```bash
-python -m pytest -c backend/pytest.ini -q    # 494 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
+python -m pytest -c backend/pytest.ini -q    # 510 ผ่าน + 3 skip (ยังไม่ตั้ง DEMO_LOGIN_PASSWORD 2 + เคสเฉพาะตอนไม่มี DB 1)
 ```
 
 **เอกสารอ่านตามลำดับนี้:** ไฟล์นี้ (ภาพรวม) → `progress.md` (งานฝั่ง CLAUDE) →
 `CODEX_HANDOFF.md` (งานฝั่ง CODEX) → `DEPLOY.md` (ขึ้น production) ·
 เฉพาะเรื่อง: `FINANCIAL_ENGINE.md`, `ANALYSIS_CONTRACT.md`, `LIVE_PROVIDER_VERIFICATION.md`
 
-### ✅ Pipeline หลัก — ครบทุกขั้น
+### Pipeline backend มีแล้ว — integration ทุกหน้า/action ยังไม่ครบ
 
 `Read Data → Calculate → AI Analyze → Match Funding → Simulate → Return JSON to Web`
 
@@ -108,7 +113,7 @@ python -m pytest -c backend/pytest.ini -q    # 494 ผ่าน + 3 skip (ยั
 | 8 · RBAC + Authentication | ✅ | token HMAC-SHA256 + รหัสผ่าน scrypt · DB เป็นผู้ตัดสิน role ไม่ใช่ token · ปิด enforcement เป็นค่าเริ่มต้น |
 | 8 · เพิกถอน token | ✅ | `revoked_tokens` เพิกถอนรายเซสชัน · `users.tokens_valid_from` เพิกถอนทั้งบัญชี · `POST /api/auth/logout`, `/auth/revoke-all`, `/auth/revoke` (admin) |
 | 6 · What-If Simulator | ✅ | `POST /api/simulate` · 11 levers · เทียบ Plan A/B |
-| Frontend Integration | ✅ 5-file wiring / ⏳ ยังมีส่วนสาธิต | Import/Overview/order Simulator/SWARM ต่อจริงตามสิทธิ์ล่าสุด · ผล Overview/Health/Cost/AI มาจากคำขอเดียวกันในแท็บ · `src/services/api.ts` ไม่ถูกกู้คืน · 16 GET contracts ผ่าน HTTP แต่ยังมีข้อความ/สูตรคงที่ในหน้าอื่น ดู §4 |
+| Frontend Integration | ✅ Import/Overview/order Simulator/SWARM / ⏳ ยังไม่ครบทุก action | implementation ที่ `4d39680` ต่อจริง; สิทธิ์ใหม่ให้แก้ wiring หน้าอื่นได้แล้ว · ผล Overview/Health/Cost/AI มาจากคำขอเดียวกันในแท็บ · `src/services/api.ts` ไม่ถูกกู้คืน · 16 GET contracts ผ่าน HTTP แต่ยังมีข้อความ/สูตรคงที่ในหน้าอื่น ดู §4 |
 | เตรียม Deploy | ✅ | `Dockerfile`, `railway.json`, bootstrap schema ตอน startup · ทดสอบด้วยการรัน container จริงแล้ว |
 | ตารางภาระแบบระบุวันที่ | ✅ | `receivables`, `payables`, `expense_transactions`, `allocation_resources` · ต่อ `project_cash_events()` ของ CODEX เข้า `/api/forecast` แล้ว |
 | ข้อมูลเสริมเข้าการวิเคราะห์ | ✅ | ส่ง `forecast` + `expense_history` ของ SME เดียวกันเข้า `build_analysis` ทั้งสี่จุด · ความครบของตารางมาจาก `schedule_complete_through` ของผู้เรียก · sub-status ถูกยกขึ้น `missing` ของ envelope |
@@ -117,97 +122,58 @@ python -m pytest -c backend/pytest.ini -q    # 494 ผ่าน + 3 skip (ยั
 
 ---
 
-## 🔜 4. งานที่เหลือ
+## 🔜 4. งานที่เหลือ — backend/AI และ integration ก่อนส่ง frontend team
 
-เรียงตามผลกระทบ · แต่ละข้อบอกชัดว่า **ใครทำ** และ **ขั้นถัดไปคืออะไร**
+Current state และเกณฑ์รับงานฉบับเต็ม: [FRONTEND_INTEGRATION_HANDOFF.md](FRONTEND_INTEGRATION_HANDOFF.md).
+สิทธิ์แก้ frontend wiring ได้แล้ว; งานค้างด้านล่างไม่ใช่งานที่ต้องขอขยายสิทธิ์รายไฟล์อีก
 
-**ผลตรวจ wiring 2026-10-16:** Import → Overview ยอดจริงและ badge ถูกต้อง; Simulator
-POST สี่ controls และ save ลง DB/อ่านกลับจริง; SWARM Radar POST และเคสไม่มีร้านสำรอง
-ปิดปุ่มแล้ว · 494/3 DB, 394/103 ไม่มี DB · 36 routes / 27 tables / 16 GET contracts ·
-รายละเอียด request shapes/ขอบเขตและคำสั่งอยู่ใน `TESTER_READINESS_CURRENT.md`
+| ลำดับ | งานที่เราต้องปิด / เจ้าของ | ผลที่ต้องพิสูจน์ |
+| --- | --- | --- |
+| P0 | SME/project/input context — CODEX | ทุกหน้าใช้บริบทเดียวกัน, ไม่ default ไป demo/คนละ SME เงียบ ๆ; draft เปลี่ยนไม่อ้าง accepted result เก่าเป็นผลใหม่ |
+| P0 | API/types/null/source/missing/error/CORS auth — CODEX | types ตรง runtime; partial data ใช้งานส่วนที่มี; invalid/network failure ไม่มี fake success หรือ skeleton ค้าง |
+| P0 | Stored order constraints/collections — CODEX + ทีมข้อมูล | schema/loader เก็บข้อกำหนดจริง; ไม่ยืนยัน packaging เป็นอาหาร, ไม่เดาพิกัดหรือเปลี่ยนรถ offered เป็น confirmed |
+| P0 | Demo business handlers — CODEX + ทีมกำหนด scope | apply/sign/info/export ต่อ operation จริงพร้อม read-back หรือ unavailable; ไม่เรียก endpoint สมมติ/แจ้งสำเร็จจาก toast |
+| P1 | Saved plan read/replay — CODEX | POST save ที่มีอยู่ต้องอ่านกลับตาม ID/project ได้; full input/results/audit ตรวจซ้ำได้ |
+| P1 | AI context/evidence/fallback — CODEX | SME/งวด/coverage ตรงหน้าจอ; rules/model status ตามจริง; ไม่ยืม baseline forecast ไปยืนยัน scenario |
+| P1 | Chaos/resource effects — CODEX | ใช้ engine สำหรับผล scenario ไม่ใช้ timer/สูตรเงินใน component เป็นผลคำนวณ |
+| P2 | Deploy/unmock — ทีมโฮสต์ + CODEX ตรวจ | backend URL/CORS และ Vercel สอง env ถูกต้อง; ห้ามอ้างว่ามี deployment ใหม่ในรอบนี้ |
+| P2 | Live news — CODEX + ทีมโฮสต์ | ทดสอบจาก deployed host ผ่าน gate; ข่าวสดยังไม่ยืนยันสำเร็จ ไม่ force/retry หรือแต่งบทความ |
+| ส่งต่อ | Presentation/UX/UI — ทีม frontend | ใช้ contract ที่ผ่าน acceptance; CODEX คงดีไซน์เดิมระหว่าง wiring |
 
-**ข้อจำกัดที่ยังบล็อกความครบทั้งเว็บ:** HeroAssembly / ChaosPlayback / AppShell/sidebar
-และหน้าอื่นนอก 5 ไฟล์ยังมีส่วนสาธิต · Chaos Play ไม่ใช่ simulation POST · Column Mapping
-ใน Import ยังเป็นตัวอย่าง ไม่ใช่ auto mapping · ห้ามอ้างว่าทุกปุ่มในเว็บต่อจริงแล้ว
+**สิ่งที่ตรวจซ้ำผ่านแล้ว:** 510/3 DB, 410/103 ไม่มี DB, 36 main routes, 27 tables,
+16 HTTP read contracts, build 1955 / CSS index-DEindwiw.css / JS index-CBenrrOQ.js;
+import/page client regression scripts ผ่าน. ดูวิธีทดสอบใน TESTER_READINESS_CURRENT.md
 
-**ข้อมูลก่อนยืนยัน SWARM:** DB มี order 1,000/วัน 30 วัน; รถ required ยังไม่พร้อมสำหรับ
-สองร้านอาหาร จัดสรรเบื้องต้นได้ 450 ขาด 550 · ร้านที่ได้งานเป็น packaging แต่ project
-ยังไม่เก็บ required_business_types จึงรับรองความเหมาะสมไม่ได้ · ต้องเก็บ constraints/
-collection schedule/พิกัดจริงและยืนยันทรัพยากรก่อนรับงาน · ไม่เดาหรือเปลี่ยน offered เป็น
-confirmed เอง · preview ไม่จองงานและไม่เขียนทับ allocation_resources
+Validation regression จาก main ใหม่แก้แล้ว: optional ยังเป็น None, required ต้องส่ง,
+nonfinite ถูกปฏิเสธ. Inventory backend nullable + Excel aliases คงไว้; schema 39 fields
+แต่ Import 38 fields; ไม่เพิ่ม stock/DIO math. เพิ่ม 16 tests โดยไม่ลด assertion เดิม.
 
-### 🔴 บล็อกการเดโมเว็บจริง
+Legacy Cost adapter ยังคืน 0 เป็น placeholder เมื่อ metrics ไม่พร้อม (HTTP minimal analyze
+ตรวจแล้ว มี insufficient_data/missing). ต้องแก้ adapter/types/consumer คู่กันใน P0;
+Overview ที่เป็น null แล้วไม่ได้แปลว่าทุก widget ปลอด placeholder ครบแล้ว
 
-**1. Deploy backend ขึ้น Railway** — เจ้าของ: **ทีม** (ต้องใช้บัญชี)
+**ข้อจำกัดข้อมูล SWARM:** project 1,000/วัน 30 วัน; สองร้านอาหารติดรถ required ที่ยัง
+ไม่พร้อม. preview จัดสรร Sahai (packaging) 450 และขาด 550; required_business_types,
+buyer coordinates/radius/collection schedule ยังไม่เก็บใน project จึงรับรอง suitability
+ไม่ได้. Backend/schema ต่อได้ภายใต้สิทธิ์ปัจจุบัน; ข้อมูลจริงต้องมาจากเจ้าของ
 
-- โค้ดและ config พร้อมและทดสอบแล้ว: build image สำเร็จ และรัน container
-  เทียบ PostgreSQL จริงผ่าน ทุก endpoint ตอบ 200
-- **ขั้นถัดไป:** ทำตาม `DEPLOY.md` ข้อ 1-4 (สร้าง service → ตั้ง Root Directory
-  เป็น `backend` → เพิ่ม PostgreSQL → ตั้ง env)
-
-**2. ปลด frontend จากโหมด mock** — เจ้าของ: **ทีม** · ติดข้อ 1
-
-- **ขั้นถัดไป:** หลัง deploy เสร็จ ตั้งบน Vercel 2 ตัว
-  (`VITE_API_BASE_URL`, `VITE_USE_MOCK=false`) แล้ว redeploy · `DEPLOY.md` ข้อ 5
-
-### 🟡 ทำได้แต่ยังไม่จำเป็นต่อการเดโม
-
-**3. ดึงข่าวอุตสาหกรรมจริงได้สำเร็จ** — เจ้าของ: **CODEX + ทีมดูแลโฮสต์**
-
-- เส้นทาง unavailable ทำงานถูกต้อง แต่ยังไม่เคยดึงข่าวสดได้สำเร็จ
-- อาการ: DNS และ TCP ต่อได้ แต่ **HTTPS TLS handshake หมดเวลารอ** ·
-  ทดสอบแยกผ่าน HTTP ได้ 429 · ลดความซับซ้อนของคำค้นแล้วไม่ช่วย
-- รอบล่าสุดเรียกผ่าน route เมื่อ gate เปิดแล้ว ยังได้ `timeout` และบทความ 0 รายการ ·
-  ทดสอบ TLS แยกยังหมดเวลารอประมาณ 5.28 วินาที · ยังไม่ได้ยืนยันข่าวจริงหรือการตัดซ้ำจากข่าวจริง
-- บั๊กที่ CODEX พบ (gate ปิดแล้ว route ยังเรียก fetcher) **แก้แล้วใน `c07405b`** ·
-  `routers/insights.py` วิเคราะห์แคชตรง ๆ ด้วย `source_status="unavailable"`,
-  `source_error="provider_gate_closed"` และเทสต์นับจำนวนการเปิด connection
-- **ขั้นถัดไป:** ทีมลองจากโฮสต์ที่ deploy ซึ่ง egress ต่างกันและอาจผ่าน TLS ·
-  รายละเอียดใน `CODEX_HANDOFF.md`
-
-**งานส่งต่อ Module 6 — เจ้าของ: CLAUDE:** simulator ยังสร้าง metrics/grading และ
-ตรวจ resources ที่ส่งมาแบบ inline แต่ไม่ได้โหลด forecast/expense history หรือสร้าง
-analysis findings ของ Plan A/B · หากจะเพิ่ม ให้กำหนดวิธีปรับ cash events ตาม scenario
-และต่อข้อมูล SME เดียวกันก่อน ห้ามนำ forecast ของ baseline ไปยืนยันผล scenario ·
-ไม่ได้รวมใน order-only wiring รอบนี้ แม้ข้อจำกัด lane ถูกยกเว้นวันนี้
-
-**4. พิกัดร้านค้าจริง** — เจ้าของ: **ทีม** (ต้องใช้ข้อมูลธุรกิจ)
-
-- คอลัมน์ `latitude`/`longitude` ใน `sme_profiles` พร้อมแล้วแต่ยังว่างทั้ง 3 ร้าน
-- ตัวกรองระยะทางจึงตัดร้านที่ไม่มีพิกัดออกเมื่อบังคับรัศมี **โดยเจตนา**
-  (ไม่เดาพิกัดจากชื่อจังหวัด)
-- `business_type` ก็ว่างทั้ง 3 ร้านเหมือนกัน แต่**ไม่ใช่ปัญหา**:
-  `repository.py:154` fallback ไป `sector` ซึ่งเป็น NOT NULL
-- **ขั้นถัดไป:** เติมพิกัดจริงลง `sme_profiles`
-
-### 🟠 ต้องทำก่อนเปิดใช้กับข้อมูลจริง
-
-ยังไม่จำเป็นต่อเดโม แต่**อย่าข้าม**ถ้าจะใช้กับข้อมูลลูกค้าจริง
-
-- **เพิกถอน token ได้แล้ว** (`token_revocation.py`) · ยังคง clamp อายุไว้ 7 วัน
-  **โดยเจตนา** เพราะการเพิกถอนต้องมีคนสังเกตและสั่ง แต่การหมดอายุไม่ต้อง —
-  เป็นสองชั้น ไม่ใช่ทางเลือกแทนกัน
-  - `POST /api/auth/logout` เพิกถอนเฉพาะ token ที่ใช้เรียก
-  - `POST /api/auth/revoke-all` เพิกถอนทุก token ของบัญชีตัวเอง (กรณี token ถูกขโมย)
-  - `POST /api/auth/revoke` `{email}` เพิกถอนทุก token ของบัญชีอื่น · **admin เท่านั้น**
-  - ทั้งสามเส้นตรวจ token เสมอแม้ `RBAC_ENFORCED=false` และ**ไม่รับ `AUTH_DEV_HEADER`**
-  - ตั้งรหัสสุ่มให้ `admin@example.test` ในฐาน local แล้ว และอ่านสถานะกลับมายืนยัน ·
-    เก็บ credential เฉพาะ `backend/uploads/admin-tester-credentials.txt` ที่ Git ละเว้น ·
-    `/health` ยังระบุ `secretConfigured=false` จึงยังไม่อ้างว่า login/revoke ด้วยบัญชีนี้
-    ผ่าน server ปัจจุบันได้ · คง `RBAC_ENFORCED=false`, `AUTH_DEV_HEADER=false` สำหรับ tester
-  - แถวใน `revoked_tokens` ตายเองเมื่อ token หมดอายุ · ล้างด้วย
-    `token_revocation.purge_expired()` ซึ่งเป็นงาน maintenance **ไม่ได้ผูกกับ request**
-- **`AUTH_DEV_HEADER` ต้องเป็น `false`** บนทุกเครื่องที่เข้าถึงได้จากภายนอก ·
-  ตรวจที่ `/health` → `auth.devHeaderAccepted`
-- **ข้อมูลเดโมเป็นข้อมูลสังเคราะห์** · เกรดและการจับคู่แหล่งทุนเป็นนโยบายเดโม
-  **ไม่ใช่การอนุมัติสินเชื่อ**
+**ก่อนข้อมูลลูกค้าจริง:** auth มีใน backend แต่ frontend ยังไม่ส่ง token; health ปัจจุบัน
+enforced=false / secretConfigured=false / devHeaderAccepted=false. Login 2 เคสยัง skip
+เมื่อไม่ตั้ง DEMO_LOGIN_PASSWORD; admin มี password hash ใน local DB แล้ว แต่ไม่อ้างว่า
+ทดสอบ admin login/revoke ด้วยบัญชีนี้สำเร็จ. อ่าน DEPLOY.md; ก่อน browser auth ต้องแก้ CORS ให้รับ Authorization ตาม contract ด้วย (preflight ปัจจุบัน
+400 Disallowed CORS headers); ไม่เปิด enforcement แทนการทำ identity/authorization ให้ครบ และไม่ใส่ credential ใน repo/VITE_*.
 
 ---
 
-## ⚠️ 5. เรื่องที่ทีมต้องตัดสินใจ (ไม่ใช่งานโค้ด)
+## ⚠️ 5. เรื่องที่ทีมต้องยืนยัน
 
-1. **เว็บจริงกับ repo ไม่ตรงกัน** — bundle บน Vercel ใหญ่กว่าที่ repo build ได้
-   (JS +48.6 kB, CSS +21.6 kB) และ UI เวอร์ชันนั้นไม่มีอยู่ใน git
-2. **"โครงการล่าสุด"** ใช้ `ACTIVE_PROJECT_ORDER`: start_date desc nulls last ก่อน
-   updated_at/created_at · ไม่ใช่เขียนล่าสุดอย่างเดียว และหน้าเว็บไม่ได้เลือก order_ref
-   จาก query · รอบนี้ /simulator/context ใช้เกณฑ์เดียวกัน ไม่สร้างออเดอร์ทดแทนเพื่อเดโม
+1. **ข้อมูลธุรกิจจริง:** ประเภทงาน/ร้าน, พิกัด/รัศมี, collection schedule และสถานะทรัพยากร.
+   งาน schema/API เป็นของ CODEX; ค่า business requirements ต้องมาจากเจ้าของ ไม่แต่งเอง
+2. **ขอบเขต transaction:** ปุ่มสมัครทุน/ลงนาม/ขอเอกสารจะเป็น preview หรือ workflow จริง;
+   ถ้า workflow จริงต้องระบุ actor, state transitions และการอ่านกลับก่อนต่อปุ่ม
+3. **Host/deploy:** ทีมสร้าง service/ให้ backend URL และตั้ง Vercel env/redeploy.
+   รอบนี้ไม่มีการตรวจ production ใหม่; ข้ออ้าง bundle บน Vercel ต่างจาก repo ในบันทึกเก่า
+   ไม่ใช่ข้อเท็จจริงที่วัดใหม่ในรอบนี้
+4. **บริบทโครงการ:** ปัจจุบัน ACTIVE_PROJECT_ORDER เลือก start_date desc nulls last
+   ก่อน updated_at/created_at. ถ้าทีมต้องเลือก project เอง ให้กำหนด contract/context ให้ชัด
+   ไม่เขียน demo order ทับหรือ reseed เพื่อแก้การเลือกโครงการ

@@ -1,5 +1,64 @@
 # การส่งมอบงานของ CODEX
 
+## รอบ CODEX 2026-10-16 — ข้อตกลงใหม่และตรวจสถานะ Backend/AI integration
+
+### Regression ที่แก้ระหว่างอัปเดตสถานะ
+
+ก่อน push พบ main เพิ่ม `e5098cc` และ `48d9385` จึงรวมทั้งสอง commit ไว้.
+การเติม omitted/null เป็น 0 ทำให้ตัวอย่างเดิมมี total_expenses=0 แต่มีรายการค่าใช้จ่าย
+จึงถูกปฏิเสธ; 8 เทสต์แรกของ AI ล้มก่อนถึง provider. อีกจุดแปลง NaN/Infinity เป็น 0.
+แก้โดยคืน validation เดิม: required ยังต้องส่ง, optional ไม่ทราบเป็น None,
+nonfinite ถูกปฏิเสธ. คง inventory และ Excel aliases ของทีมไว้ แต่ inventory เป็น nullable.
+FinancialInput มี **39 top-level fields (7 required / 32 optional)**; Import ปัจจุบันรับ
+38 fields จึงยังไม่มีช่อง inventory และยังไม่มี stock/DIO math. ไม่เปลี่ยน src/UI.
+
+เพิ่ม regression tests **16 เคส**: unknown เทียบ known zero, nonfinite, required amounts,
+ตัวอย่าง grade B/75 และ inventory aliases. ไม่แก้หรือลด assertion ของ test เดิม.
+ผลสุดท้าย DB **510 passed / 3 skipped (26.93s)**, ไม่มี DB **410 / 103 (16.12s)**;
+targeted validation/Excel/AI **49 passed**. รีสตาร์ต backend แล้ว HTTP analyze ได้ B/75,
+inventory manual=200, NaN=422 และ required assets หาย=422; HTTP tester flow และ
+client/style guard scripts ผ่านอีกครั้ง. ไม่เรียก live provider หรือ deploy ใหม่.
+
+- ผู้ใช้แจ้งว่าทีมให้แก้ frontend เพื่อเชื่อม backend/AI ได้แล้วโดยคง UI เดิม; ยกเลิก
+  two/five-file limit สำหรับ wiring ที่จำเป็น. CODEX เน้น backend/AI/contracts/adapters/
+  integration ก่อนทีม frontend รับ presentation ต่อ ไม่หยุดขอสิทธิ์รายไฟล์ซ้ำ
+- รอบนี้อัปเดตเอกสารและแก้ validation regression ที่พบใน main ใหม่ โดยคง src/UI เดิม.
+  สถานะสุดท้ายอ้าง source `48d9385` + validation regression repair ในรอบนี้; รายละเอียดและผลหลังแก้อยู่ด้านล่าง
+- เพิ่ม FRONTEND_INTEGRATION_HANDOFF.md: ทั้งแปดโมดูล, owner/priority, API vs demo action,
+  request shapes, AI/rules/evidence และ exit criteria ก่อนส่งทีม frontend
+- เขียน CODEX_ASSIGNMENT และ API_CONTRACT_MATRIX ใหม่ให้ตรง source: เอา `/import/*`
+  ที่ไม่มีจริงออก; เพิ่ม upload/manual/analyze/order-simulator contracts และ pending writes
+- แก้ guidelines §1/§2/§4 และ ANALYSIS_CONTRACT: frontend wiring อนุญาตแล้ว, draft ยังไม่
+  invalidate accepted snapshot, import views ไม่ครอบคลุมทุก page, GET AI explain ใช้ rules.
+  LLM optional มีที่ backend ไม่ใช่ทุกครั้งที่เปิด panel จะเรียกโมเดล
+- ตรวจ handler จริง: Funding apply, ShopFinance sign, Funder info request, Projects export,
+  Chaos apply และ legacy store save ยังมี toast/local state. ยังไม่มี backend operations
+  สำหรับ transaction เหล่านี้; เป็น backlog ของ backend+integration ไม่ใช่งานแต่ง UI
+- พบ backend integration gap เพิ่ม: CORS main.py อนุญาต Content-Type เท่านั้น.
+  OPTIONS จาก localhost:5173 ขอ authorization,content-type ได้ **400 Disallowed CORS headers**.
+  บันทึกเป็น P0 ก่อน browser auth integration; **ยังไม่ได้แก้ CORS ในรอบเอกสารนี้**
+- ตรวจ minimal analyze จริง: Cost view คืน costPerUnit/profitPerUnit/breakevenUnits=0
+  ทั้งที่ missing/insufficient_data. บันทึก legacy adapter/type/consumer gap ไว้ใน P0;
+  ยังไม่แก้ Cost adapter หรืออ้างว่า null handling ครบทุก widget
+- เริ่มตรวจพบ local server/Docker ไม่เปิด; เปิด Docker/Postgres เดิมและ backend\run.cmd
+  แล้วตรวจซ้ำ ไม่มี reset/reseed volume, ไม่แก้ .env. DB test run แรกหยุดเพราะ DB ยังไม่พร้อม;
+  ไม่นับเป็นผลผ่าน. ผลหลัง service พร้อม: **494 passed / 3 skipped** (30.21s), ไม่มี DB
+  **394 passed / 103 skipped** (23.44s). Warning Starlette/httpx เดิม
+- HTTP verify_tester_flow ผ่าน: **36 main routes, 27 tables, 16 read contracts**;
+  Rung gap 45,000, forecast minimum 29,700 / first shortfall 2026-10-18,
+  synthetic swarm cost 28,000 และ scenario revenue 275,000. ไม่ยิง live news หรือ paid LLM
+- Build ตรวจซ้ำ: **1955 modules**, CSS **index-DEindwiw.css**, JS **index-CBenrrOQ.js**;
+  bundle >500kB warning เดิม. test-import-wiring และ test-page-wiring ผ่าน
+- ปรับ DEPLOY/README/tester guide ให้แยก local/host, config จริง, cmd.exe, CORS/auth,
+  partial data และ historical provider evidence. ไม่อ้าง deploy/image rebuild/browser E2E ใหม่
+- งานถัดไปที่ต้องปิด: shared identity/input context, nullable/source types + error states,
+  CORS auth preflight, stored order constraints, truthful business action states, saved plan read,
+  AI context และ resource/Chaos engine integration. ข้อมูลจริง/transaction scope/host ยังต้องทีม
+- หลักตัดสินใจ: ไม่เปลี่ยน behavior ที่พบระหว่าง audit เงียบ ๆ, ไม่เปลี่ยน fixture ให้ดูผ่าน,
+  ไม่ยืนยันรถ/เกณฑ์ธุรกิจแทนทีม และไม่เริ่ม redesign. ประวัติด้านล่างคงสถานะ ณ รอบนั้นไว้
+
+---
+
 ## รอบ CODEX 2026-10-16 — Overview, order Simulator และ SWARM wiring
 
 - ฐาน `269e3d2` · ผู้ใช้อนุญาตเพิ่ม OverviewPage.tsx / SimulatorPage.tsx / SwarmPage.tsx

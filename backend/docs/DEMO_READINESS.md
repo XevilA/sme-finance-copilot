@@ -1,5 +1,8 @@
 # งานค้างของ CODEX และความพร้อมสำหรับเดโม
 
+> Current state 2026-10-16: [FRONTEND_INTEGRATION_HANDOFF.md](FRONTEND_INTEGRATION_HANDOFF.md)
+> และ [TESTER_READINESS_CURRENT.md](TESTER_READINESS_CURRENT.md). บันทึก audit ด้านล่างเป็นประวัติ ไม่ใช่รายการงานปัจจุบัน
+
 > แปลจากต้นฉบับภาษาอังกฤษของ CODEX สูตร ชื่อฟิลด์ ชื่อ endpoint ตัวเลข และ commit hash คงเดิม
 
 ## อัปเดต: 2026-10-15

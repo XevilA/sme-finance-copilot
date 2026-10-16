@@ -8,6 +8,26 @@
 
 ---
 
+## สถานะโครงการและข้อตกลงทีม — 2026-10-16
+
+โปรเจกต์มี FastAPI/PostgreSQL และ math/AI backend พร้อม frontend adapter แล้ว;
+Import/Overview/order Simulator/SWARM ต่อ operation จริงบางส่วน แต่ยังไม่ครบทุกปุ่ม.
+ทีมอนุญาตให้ CODEX แก้ frontend wiring ที่จำเป็น **โดยคง UI เดิม** ไม่จำกัดห้าไฟล์เดิม.
+งานหลักตอนนี้คือ backend/AI/API/contracts/integration; ทีม frontend รับ presentation ต่อ
+
+- [สถานะทั้งแปดโมดูลและงานส่งต่อ](backend/docs/FRONTEND_INTEGRATION_HANDOFF.md)
+- [API ที่มีจริงและ request shapes](docs/API_CONTRACT_MATRIX.md)
+- [เริ่มทดสอบและข้อจำกัดปัจจุบัน](backend/docs/TESTER_READINESS_CURRENT.md)
+- [กติกาทำงานและ work list §4](backend/docs/AI_DEVELOPMENT_GUIDELINES.md)
+
+ตรวจ source `48d9385` + validation regression repair ในรอบนี้: 510/3 tests มี DB, 410/103 ไม่มี DB, 36 main API paths,
+27 tables, 16 read contracts. Build 1955 modules / CSS index-DEindwiw.css / JS index-CBenrrOQ.js.
+หน้า/animations ด้านล่างอธิบาย UI และ demo design ไม่ใช่หลักฐานว่า action ทุกปุ่มมี persistence.
+Local backend integration ใช้ localhost:5173 ตาม tester guide; default pnpm dev ที่ 3000
+เป็น frontend/demo server และต้องตรวจ CORS ก่อนใช้กับ backend
+
+---
+
 ## 🌟 แนวคิดหลัก (Core Concept)
 
 **"ห้องประกอบโอกาสธุรกิจ"** เปลี่ยนมุมมองจากการอ่านรายงานตัวเลขแห้งๆ เป็นการ **ประกอบแผนธุรกิจจากชิ้นส่วนจริง** (ร้านค้า ลูกค้า ครัว รถขนส่ง ทีมงาน และแหล่งเงินทุน) เมื่อปรับเปลี่ยนชิ้นส่วน ผู้ใช้และคณะกรรมการจะเห็นผลลัพธ์ทางการเงินและเข้าใจเหตุผลทันทีแบบโปร่งใส
@@ -114,7 +134,7 @@ pnpm build
 
 ---
 
-## 🔄 การสลับระหว่าง Mock และ API จริง (Production Ready)
+## 🔄 การสลับระหว่าง Mock และ API จริง
 
 สามารถสลับการทำงานได้ง่ายๆ ผ่านตัวแปรสภาพแวดล้อม `.env`:
 
@@ -124,9 +144,9 @@ VITE_USE_MOCK=true
 
 # เมื่อพร้อมเชื่อมต่อ Backend จริงของทีม IT:
 VITE_USE_MOCK=false
-VITE_API_BASE_URL=https://api.yourdomain.com/v1
+VITE_API_BASE_URL=https://<backend-host>/api/v1
 ```
-*การสลับไม่กระทบโค้ดส่วน UI แม้แต่บรรทัดเดียว เพราะระบบทำงานผ่าน Adapter ที่ `src/api/client.ts`*
+*ตัวแปรนี้สลับ adapter ที่ `src/api/client.ts`; ไม่ได้เปลี่ยน demo handlers ทุกปุ่มให้เป็น API operation โดยอัตโนมัติ. ดู handoff ก่อนอ้างว่าเชื่อมครบแล้ว*
 
 ---
 

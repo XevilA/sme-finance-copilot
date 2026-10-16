@@ -1,150 +1,158 @@
-# งานที่มอบหมายให้ CODEX — 2026-10-16 (ส่งต่องานหนึ่งวัน)
+# CODEX ASSIGNMENT — Backend / AI integration, 2026-10-16
 
-Claude ลาจนถึงวันเสาร์ วันนี้คุณรับผิดชอบทั้งสองส่วน ได้แก่ โมดูลคณิตศาสตร์และ AI ตามปกติ รวมถึงส่วนของ Claude ได้แก่ ฐานข้อมูล เส้นทาง API ตัวแปลงข้อมูล และการเชื่อมต่อ frontend วันนี้ไม่มีข้อจำกัดจากการแบ่งงาน แต่ยังต้องทำตามกฎ UI ด้านล่าง
+## 1. คำสั่งล่าสุดและขอบเขตที่ใช้จริง
 
-คอมมิตฐาน: `82a355f` บน `main` ขณะเขียนเอกสารนี้ working tree สะอาดและตรงกับ origin
+ผู้ใช้แจ้งว่าทีมอนุญาตให้ทำ frontend เพื่อให้เชื่อม backend/AI และทำงานร่วมกันได้แล้ว
+โดยคง UI เดิม. **ยกเลิกข้อจำกัดสอง/ห้าไฟล์เดิม** สำหรับงาน integration ที่จำเป็น.
+ห้ามใช้ข้อห้ามเก่าเป็นเหตุหยุดงาน wiring หรือขอสิทธิ์รายไฟล์ซ้ำ
 
-> **เพิ่มขอบเขตการอนุญาต 2026-10-16:** ผู้ใช้ตอบชัดเจนว่า “อนุญาต” ให้เพิ่มการเชื่อมต่อใน OverviewPage.tsx, SimulatorPage.tsx และ SwarmPage.tsx รวมถึงแก้ข้อความชนิด/ขนาดไฟล์ในหน้า Import ขณะนี้อนุญาตเฉพาะไฟล์ `src/api/client.ts`, `src/features/import/ImportPage.tsx`, `src/features/overview/OverviewPage.tsx`, `src/features/simulator/SimulatorPage.tsx` และ `src/features/swarm/SwarmPage.tsx` โดยคงสไตล์/เลย์เอาต์/โครงสร้าง/เส้นทางเดิม ข้ออนุญาตนี้แทนข้อจำกัดสองไฟล์ใน §4 ซึ่งบันทึกโจทย์เดิมไว้ ผลการวัดปัจจุบันและส่วน UI สาธิตที่ยังไม่แก้อยู่ใน `CODEX_HANDOFF.md` หัวข้อ 2026-10-16 ตัวเลขที่คอมมิต `82a355f` ด้านล่างเป็นข้อมูลย้อนหลัง
+งานหลักของ CODEX คือ math/AI, database, API routes, adapters, contracts และ integration
+tests พร้อม wiring ของ frontend ที่จำเป็น. ทีม frontend จะเข้ามาทำ presentation/UX/UI
+ต่อเมื่อส่วนนี้พร้อม. วันนี้ lane split เดิมไม่บล็อกงานข้าม backend/database/adapter
 
----
+แก้ client/types/store/hooks/props/handlers/validation/data bindings และสถานะจาก API ได้.
+คง CSS, Tailwind, สี, spacing, layout, motion design, component hierarchy และ routing.
+ไม่สร้างหน้า/flow ใหม่หรือ redesign. ถ้าต้องออกแบบการใช้งานใหม่ ให้บันทึกงานส่งต่อ
+ทีม frontend; ข้อจำกัดนี้ไม่ห้ามแก้ logic การเชื่อมต่อใน component เดิม
 
-## 1. อ่านเอกสารตามลำดับนี้ก่อน
+ประวัติ brief เดิมที่วินิจฉัย Import ตอนยังไม่มี POST อยู่ใน Git ที่ `eb26245`/`dde929e`.
+Import wiring อยู่ใน `269e3d2`; Overview/order Simulator/SWARM wiring อยู่ใน `4d39680`.
+ข้อความ “frontend ไม่มี write path” และ “แก้ได้แค่สอง/ห้าไฟล์” ไม่ใช่สถานะปัจจุบันแล้ว
 
-| ลำดับ | ไฟล์ | เหตุผล |
-| --- | --- | --- |
-| 1 | `backend/docs/AI_DEVELOPMENT_GUIDELINES.md` | กฎพื้นฐาน การแบ่งบทบาท และ §4 ซึ่งเป็นรายการงานคงเหลือตามผลกระทบ ส่วน §3 แสดงจำนวนปัจจุบัน |
-| 2 | `backend/docs/progress.md` | บันทึกงานของ Claude รอบล่าสุดอยู่ด้านบน ตารางสถานะปัจจุบันอยู่ต้นไฟล์ ส่วนตัวเลขของแต่ละรอบเป็นข้อมูลย้อนหลังโดยตั้งใจ |
-| 3 | `backend/docs/CODEX_HANDOFF.md` | บันทึกส่งต่องานของคุณ เรียงรายการใหม่ไว้ด้านบน รวมสิ่งที่ขอให้ Claude เชื่อมต่อและสิ่งที่ Claude ส่งกลับ |
-| 4 | `backend/docs/ANALYSIS_CONTRACT.md` | สัญญาของ `build_analysis` รวมกฎรับ forecast และนโยบาย `expense-history/v1` |
-| 5 | `backend/docs/DEPLOY.md` | ขั้นตอน Railway และรายการตรวจสอบก่อนทดสอบ อ่านหัวข้อ “เช็กลิสต์ก่อนทีม frontend มาทดสอบ” ก่อนแก้สิ่งที่ผู้ทดสอบจะใช้ |
-| 6 | `backend/docs/LIVE_PROVIDER_VERIFICATION.md` | สิ่งที่ยืนยันได้และยังยืนยันไม่ได้เกี่ยวกับผู้ให้บริการข่าวจริง |
+## 2. อ่านตามลำดับก่อนทำงาน
 
-**อย่าเชื่อสถานะจากความจำ รวมถึงข้อความในเอกสารนี้** เอกสารพยายามรักษาความถูกต้อง แต่โค้ดคือแหล่งข้อมูลจริง ตรวจสอบก่อนนำไปใช้อ้างอิง
+1. [AI_DEVELOPMENT_GUIDELINES.md](AI_DEVELOPMENT_GUIDELINES.md) — กติกาและ §4 work list.
+2. [FRONTEND_INTEGRATION_HANDOFF.md](FRONTEND_INTEGRATION_HANDOFF.md) — current state,
+   API vs demo actions, priorities, owners และเกณฑ์รับงานก่อนส่งทีม frontend.
+3. [progress.md](progress.md) แล้ว [CODEX_HANDOFF.md](CODEX_HANDOFF.md) — ใหม่อยู่บน,
+   ตัวเลขในรอบเก่าเป็นประวัติ ไม่ใช่ผลตรวจใหม่.
+4. [ANALYSIS_CONTRACT.md](ANALYSIS_CONTRACT.md) — math, evidence, forecast/expense history.
+5. [API_CONTRACT_MATRIX.md](../../docs/API_CONTRACT_MATRIX.md) — endpoints/request shapes จริง.
+6. [DEPLOY.md](DEPLOY.md) และ [TESTER_READINESS_CURRENT.md](TESTER_READINESS_CURRENT.md).
+7. [LIVE_PROVIDER_VERIFICATION.md](LIVE_PROVIDER_VERIFICATION.md) — หลักฐานสดและข้อจำกัด.
 
----
+Code เป็น source of truth. ตรวจ route/model/client/handler และ HTTP/DB ก่อนอ้างว่าเสร็จ.
+แยก endpoint ตอบได้, มีข้อมูลครบ, ปุ่มต่อจริง และผล deploy แล้วออกจากกัน
 
-## 2. วิธีเรียกใช้งาน
+## 3. สถานะที่ตรวจจาก runtime source `48d9385` + validation regression repair ในรอบนี้
 
-ใช้ Windows `cmd.exe` คำสั่งรูปแบบ `VAR=x command` ใช้ไม่ได้ที่นี่ การตั้งค่าอยู่ใน `backend\.env`
+ตรวจซ้ำ 2026-10-16: pytest **510 passed / 3 skipped** กับ PostgreSQL (26.93s),
+**410 passed / 103 skipped** ไม่มี DB (16.12s). **36** main `/api/*` routes + v1 aliases,
+**4** v1-only inputs/finance routes, `/health`, **27 tables**, **16 read contracts** ผ่าน HTTP.
+Build **1955 modules**, CSS **index-DEindwiw.css**, JS **index-CBenrrOQ.js**.
+warning เดิม: Starlette/httpx และ bundle >500kB. รอบนี้แก้ validation regression โดยคง src/UI
 
-```text
+| โมดูล | สถานะจริง |
+| --- | --- |
+| 1 Validation/Excel | manual/upload/template ต่อแล้ว; XLSX Financials template ≤5 MiB, ไม่มี auto column mapping |
+| 2 Math/grade | Decimal metrics + grade + evidence; Overview unknown เป็น null ไม่เดาศูนย์ |
+| 3 Analyst/forecast | rules, forecast, expense comparison ใช้ผ่าน API; optional LLM จัดลำดับ finding IDs; UI Import ใช้ rules |
+| 4 Funding | matcher/API/options มีแล้ว; apply button ยังเป็น toast ไม่ใช่ส่งคำขอจริง |
+| 5 SWARM | engine + resource eligibility + Radar/swap preview จริง; constraints ใน project ยังไม่ครบ |
+| 6 Simulator | statement และ order A/B; 4 controls + save จริง; saved-plan read และ Chaos integration ยังไม่ครบ |
+| 7 Industry | provider route/cache/gate มี; ข่าวสดยังไม่ยืนยันสำเร็จ และยังไม่มี news UI integration |
+| 8 DB/API/auth | persistence/auth/throttle/revoke มี; frontend ยังไม่ส่ง auth, tester enforcement ปิด |
+
+อย่าอ้างว่า “ทั้งแปดฟีเจอร์ครบทุกปุ่มบนเว็บ”. อ่าน backlog จริงใน handoff; demo handlers
+เช่น apply/sign/info request/export ยังไม่มี corresponding write operations
+
+### Regression ที่แก้ระหว่างอัปเดตสถานะ
+
+ก่อน push พบ main เพิ่ม `e5098cc` และ `48d9385` จึงรวมทั้งสอง commit ไว้.
+การเติม omitted/null เป็น 0 ทำให้ตัวอย่างเดิมมี total_expenses=0 แต่มีรายการค่าใช้จ่าย
+จึงถูกปฏิเสธ; 8 เทสต์แรกของ AI ล้มก่อนถึง provider. อีกจุดแปลง NaN/Infinity เป็น 0.
+แก้โดยคืน validation เดิม: required ยังต้องส่ง, optional ไม่ทราบเป็น None,
+nonfinite ถูกปฏิเสธ. คง inventory และ Excel aliases ของทีมไว้ แต่ inventory เป็น nullable.
+FinancialInput มี **39 top-level fields (7 required / 32 optional)**; Import ปัจจุบันรับ
+38 fields จึงยังไม่มีช่อง inventory และยังไม่มี stock/DIO math. ไม่เปลี่ยน src/UI.
+
+เพิ่ม regression tests **16 เคส**: unknown เทียบ known zero, nonfinite, required amounts,
+ตัวอย่าง grade B/75 และ inventory aliases. ไม่แก้หรือลด assertion ของ test เดิม.
+ผลสุดท้าย DB **510 passed / 3 skipped (26.93s)**, ไม่มี DB **410 / 103 (16.12s)**;
+targeted validation/Excel/AI **49 passed**. รีสตาร์ต backend แล้ว HTTP analyze ได้ B/75,
+inventory manual=200, NaN=422 และ required assets หาย=422; HTTP tester flow และ
+client/style guard scripts ผ่านอีกครั้ง. ไม่เรียก live provider หรือ deploy ใหม่.
+
+## 4. ลำดับงานที่ได้รับอนุญาต
+
+1. ทำ SME/project/input context ให้ตรงกันข้าม API และหน้า; ไม่ย้อนไป default demo เงียบ ๆ.
+2. ทำ runtime contract/types/null/source/missing และ loading/error/empty states ให้ตรงกัน.
+   Cost adapter ยังมี zero placeholders ของ unavailable metrics; แก้ adapter/types/consumer คู่กัน.
+3. เก็บ order constraints/collection schedule ที่ยังขาด และเชื่อม eligibility ตามข้อมูลจริง.
+4. ต่อ action ที่มี API แล้ว; action ที่ไม่มี backend ให้บอก unavailable ไม่แจ้งสำเร็จปลอม.
+5. ทำ saved simulation read/replay, scenario effects, AI context/evidence/fallback ให้ครบตาม scope.
+6. ส่ง contract/fixtures/acceptance tests ให้ frontend team; presentation/design เป็นงานรับช่วง.
+
+รายละเอียดเกณฑ์รับงานและ owner อยู่ใน §งานลำดับถัดไปของ FRONTEND_INTEGRATION_HANDOFF.md.
+นี่เป็น work list ที่ยังต้องทำ ไม่ใช่รายการที่รอบเอกสารนี้ implement เสร็จแล้ว
+
+## 5. Contracts ที่ห้ามเดา
+
+- `POST /api/v1/inputs/manual`, `/api/v1/finance/calculate`: FinancialInput แบบ flat.
+- `POST /api[/v1]/calculate`, `/analyze`: `{input: {...}}`; calculate เพิ่ม persist ได้.
+- `POST /api[/v1]/upload?persist=false`: multipart `file`; return input, metrics,
+  businessMetrics, grading, upload metadata; ไม่มี file bytes ถูกเก็บ.
+- `POST /api[/v1]/analyze`: shop_name/use_llm/sme_id/schedule_complete_through optional;
+  return data + views ของ input เดียวกันพร้อม source/inputHash.
+- `POST /api[/v1]/match-funding`: sme_id/amount/project_id/persist เป็น query parameters
+  ไม่ใช่ JSON body และ matcher ไม่ใช่ loan application.
+- `POST /api[/v1]/simulate/order`: `{baseline: SwarmRequest, scenario: {unit_price,
+  cost_per_unit, deposit_ratio, payment_terms_days}, persist:false, context_missing:[]}`.
+  cost_per_unit=null คงต้นทุนแต่ละร้าน; override ใช้กับทุก candidate และจัดสรรใหม่.
+- `units_sold`, จำนวนงวด และวันเครดิตเป็น strict JSON integers. เงิน/rates ใช้ decimal strings.
+- Optional ไม่รู้ให้ละไว้; null/[] + missing ตามความหมาย ไม่แปลงเป็น 0 เพื่อให้หน้าเต็ม.
+- GET `/forecast` ต้องระบุ SME/coverage จริง; default project_obligations=true อาจเขียน
+  projected events. SWARM preview ใช้ persist=false เพื่อไม่แทนที่ allocations/resources.
+
+## 6. สิ่งที่ต้องได้ข้อมูลจากทีม
+
+- Project ปัจจุบัน 1,000/วัน 30 วัน. สองร้านอาหารติดรถ required ที่ยัง offered/unavailable;
+  preview ได้ 450 จาก Sahai (packaging) และขาด 550. ยังไม่มี required_business_types/
+  buyer coordinates/radius/collection schedule เก็บใน project จึงรับรอง suitability ไม่ได้.
+  Backend/schema ส่วนนี้ทำต่อได้แล้ว; ข้อมูลจริงต้องมาจากเจ้าของ ไม่เดาจากจังหวัดหรือชื่อออเดอร์.
+- Railway account/service URL และ Vercel env/redeploy ต้องทีมโฮสต์ดำเนินการ.
+  ไม่มีหลักฐาน deploy ใหม่; deployment frontend ไม่ได้เปิด FastAPI ให้เอง.
+- Live news ต้องตรวจจาก host ที่ deploy ผ่าน gate; ไม่ force/retry เพื่อแต่งผลผ่าน.
+- Login/auth integration ต้องมี actor จริงก่อนเปิด enforcement. `AUTH_SECRET` ยังไม่ตั้ง,
+  admin มี password hash ใน local DB แล้ว แต่ยังไม่ยืนยัน login/revoke ด้วยบัญชีนี้ผ่าน HTTP.
+- การสร้าง transaction ใหม่สำหรับสมัครทุน/ลงนาม/ขอเอกสารต้องมี business contract/actor
+  ที่ทีมตกลง; สิทธิ์แก้ wiring ไม่ใช่สิทธิ์ยืนยันธุรกรรมแทนคน
+
+## 7. รันบน Windows cmd.exe
+
+```bat
 docker compose -f backend/docker-compose.yml up -d
 backend\run.cmd
-python -m pytest -c backend/pytest.ini -q
 ```
 
-ยืนยันที่ `82a355f`: ผ่าน **477 รายการ + ข้าม 3 รายการ** เมื่อใช้ PostgreSQL และผ่าน **378 รายการ + ข้าม 102 รายการ** เมื่อไม่มีฐานข้อมูล มี 34 เส้นทางใต้ `/api/*` และให้บริการซ้ำใต้ `/api/v1/*` มี 27 ตาราง โดย `schema.sql`, `seed.sql` และ `seed_obligations.sql` รันซ้ำได้
+อีก terminal ที่ repo root:
 
-UUID เดโมเป็นค่าคงที่: Baan Suan `11111111-1111-4111-8111-111111111111` (เกรด A, สุขภาพดี), Rung Charoen `22222222-2222-4222-8222-222222222222` (เกรด D, มีปัญหาการเงิน, ขาดเงินทุน 45,000), Sahai Packing `33333333-3333-4333-8333-333333333333`, ออเดอร์เดโม `PO-STP-2026-091`
+```bat
+set "VITE_USE_MOCK=false"
+set "VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1"
+pnpm exec vite --host localhost --port 5173 --strictPort
+```
 
----
+Config backend อยู่ `backend\.env`; ไม่ใช้ `VAR=x command`, ไม่ใส่ secrets ใน VITE_*.
+5173 ใช้กับ CORS ของ local config ที่ตรวจแล้ว; อย่าสมมติว่า default 3000 ใช้ได้เสมอ.
+ดูคำสั่ง test ใน TESTER_READINESS_CURRENT.md
 
-## 3. สถานะจริงของฟีเจอร์ทั้งแปด
+## 8. กติกาจบงานและส่งต่อ
 
-ขณะนี้ทั้งแปดฟีเจอร์ตอบสนองผ่าน HTTP แล้ว Claude ตรวจสอบทุกรายการกับแอปที่กำลังทำงานบน `82a355f` ตัวเลขเหล่านี้มาจากการวัดจริง
+- คำนวณ/grade/funding/scenario ที่ backend; LLM ห้ามเปลี่ยนตัวเลขหรือหลักฐาน.
+- ใช้ evidence, inputHash และ context SME/coverage ให้ตรงกัน; ไม่ตีความ missing เป็นศูนย์.
+- ทดสอบ real HTTP + อ่าน DB กลับสำหรับ write ก่อนแจ้ง success. Tests ใช้ข้อมูลสังเคราะห์ชัดเจน.
+- ถ้าเปลี่ยน behavior โดยเจตนา ให้แก้ test ตาม contract และระบุใน commit; ไม่ลด assertion.
+- รักษา UI เดิม; รายงาน modules และ asset hashes ทุก wiring block. JS/modules เปลี่ยนได้
+  ตาม implementation; CSS hash เปลี่ยนต้องตรวจการแตะดีไซน์.
+- อัปเดต progress.md, guidelines §4 และ CODEX_HANDOFF.md ด้วยผลวัดและงานค้าง.
+- จบแต่ละ block ด้วย git add, commit, push main; ก่อนหยุดบันทึกสิ่งที่ทำ/ยังไม่ทำ/ข้อจำกัด.
+  ไม่แสดงหรือ commit backend/.env, credentials, uploads หรือข้อมูลธุรกิจจริง
 
-| # | โมดูล | Endpoint | สถานะ |
-| --- | --- | --- | --- |
-| 1 | ตรวจข้อมูล / Excel | `POST /api/upload` | **ทำงาน** `GET /api/analysis/template.xlsx` ได้ 200 และ 5,781 ไบต์; ส่งไฟล์กลับไป `/api/upload` ได้ 200 พร้อม metrics; ไฟล์เสียได้ 422 และข้อความ `Invalid or unreadable .xlsx workbook` |
-| 2 | Math engine + เกรด A–D | `POST /api/calculate`, `POST /api/v1/finance/calculate` | **ทำงาน** ยืนยันค่า `liquidity = 0.7500` จากข้อมูลที่สร้างขึ้นตรวจสอบเอง |
-| 3 | AI analyst + forecast | `POST /api/analyze`, `GET /api/forecast` | **ทำงาน** ส่ง `findings`, `grading`, `indicators`, `explanation`, `aiMode`; forecast มี `projectedFromObligations` |
-| 4 | จับคู่เงินทุน | `POST /api/match-funding`, `GET /api/v1/funding/options` | **ทำงาน** แยกหนี้กับทุน และ Rung Charoen ได้ช่องว่างเงินทุนจริง 45,000 |
-| 5 | จัดสรร SWARM | `POST /api/swarm` | **ทำงาน** รวมการตรวจสิทธิ์ตามทรัพยากรและ `audit.eligibility` ของแต่ละร้าน |
-| 6 | จำลองสถานการณ์ | `POST /api/simulate` | **ทำงาน** มีตัวแปรปรับ 11 รายการ และ Plan A/B |
-| 7 | แนวโน้มอุตสาหกรรม | `GET /api/industry/trends` | **เส้นทางทำงาน แต่ผู้ให้บริการไม่ทำงาน** ตอบ `sourceStatus: "unavailable"`, `sourceError: "timeout"` เพราะ TLS handshake ของ GDELT หมดเวลาจากเครือข่ายนี้ เป็นข้อจำกัดสภาพแวดล้อม ไม่ใช่บั๊กโค้ด |
-| 8 | Backend / DB / RBAC | 34 เส้นทาง, 27 ตาราง | **ทำงาน** รวม token ที่ลงนาม, รหัสผ่าน scrypt, การจำกัดการ login และการเพิกถอน token ราย session/ทั้งบัญชี |
+## 9. รูปแบบ handover ก่อนหยุด
 
-**สรุป:** ฟีเจอร์ทั้งแปดของ backend ทำงานแล้ว แต่หน้าเว็บยังไม่ได้เชื่อมต่อเพื่อเรียกใช้ หัวข้อ 4 จะอธิบายสาเหตุและสิ่งที่ต้องเชื่อมต่อเพิ่มเติม
-
----
-
-## 4. 🔴 รายงานปัญหาจากผู้ใช้ — ตรวจแล้ว ต้นเหตุไม่ได้อยู่ตรงที่คาด
-
-ผู้ใช้รายงานตามข้อความเดิม:
-
-> ตอนนี้คือระบบมันเหมือนยังลากไฟล์มาใส่ไม่ได้ ละรันคำนวณต่อไม่ได้ด้วย ต่อให้กรอกข้อมูลเองก้ไม่คำนวณให้อะ
-> แล้วช่องกรอกข้อมูลไม่ครบ ประมาณนี้
-
-Claude ตรวจสอบก่อนเขียนงานนี้ และพบว่า **backend ไม่ใช่ต้นเหตุ** โดยยืนยันได้สามข้อ:
-
-1. **`src/api/client.ts` ไม่มีเส้นทางเขียนข้อมูลเลย** มี wrapper `GET` อย่างเดียว 16 รายการ ไม่มี upload, calculate, analyze หรือ `POST` สำหรับกรอกข้อมูลด้วยตนเอง frontend จึงเรียก `/api/upload`, `/api/calculate` หรือ `/api/analyze` ไม่ได้ เพราะไม่มีฟังก์ชันเรียก
-2. **`src/features/import/ImportPage.tsx` เป็นหน้าจำลอง** มี 280 บรรทัดและไม่มีการเรียกเครือข่าย สถานะ `isAnalyzing` / `analysisStep` เพียงแสดงลำดับความคืบหน้าแล้วหยุด การลากไฟล์ไม่เคยเชื่อมต่อกับระบบ จึงใช้ไม่ได้ไม่ว่า backend จะทำงานหรือไม่
-3. **ทุกการเรียกจาก client อยู่หลัง `USE_MOCK`** ซึ่งกำหนดเป็น `import.meta.env.VITE_USE_MOCK !== "false"` จึงเปิดโหมดจำลองเป็นค่าเริ่มต้น แม้เส้นทางอ่านทั้ง 16 รายการก็ใช้ fixture ที่ฝังไว้จนกว่าจะตั้งตัวแปรเป็นข้อความ `"false"` ตรงตัว
-
-ข้อความ “ช่องกรอกข้อมูลไม่ครบ” เป็นอาการเดียวกันจากฝั่งฟอร์ม ก่อนหน้านี้ `FinancialInput` บังคับ **7 ฟิลด์** ได้แก่ `currency`, `kind`, `period_start`, `period_end`, `assets`, `liabilities`, `equity` และมีฟิลด์ทางเลือกอีก **31 รายการ** ฟิลด์ทางเลือกเหล่านี้เป็นข้อมูลหลักของ dashboard และเดิม engine ส่ง `null` เมื่อขาดข้อมูล โดยไม่สมมติว่าเป็นศูนย์ ตัวอย่างเช่น หากส่ง `revenue`, `cost_of_goods_sold` และ `operating_expenses` แต่ไม่ส่ง `interest_expense` กับ `tax_expense` ค่า `net_profit` จะเป็น `null` อย่างถูกต้อง เพราะข้อมูลไม่พอคำนวณ ฟอร์มที่เก็บเพียงไม่กี่ช่องจึงแสดง dashboard ว่างได้ตามที่ผู้ใช้พบ
-
-### ⚠️ แก้ปัญหานี้ไม่ได้หากไม่แก้ไฟล์ใต้ `src/` — และได้รับอนุญาตแล้ว
-
-ส่วนที่ขาดอยู่ใน `src/` ซึ่งกฎเดิมห้ามแก้ ผู้ใช้ได้รับคำถามโดยตรงและ **อนุญาตข้อยกเว้นแบบจำกัดในแชตเมื่อ 2026-10-15** โดยตอบว่า:
-
-> อนุมัติให้ Codex แก้ src/api/client.ts กับ src/features/import/ImportPage.tsx
-> ได้เท่าที่เป็นการ wiring ห้ามแตะดีไซน์
-
-เรื่องนี้สรุปแล้ว ไม่ต้องถามซ้ำ การปรับดีไซน์ยังไม่ได้รับอนุญาต อย่าขยายขอบเขตเอง
-
-**แก้ได้เฉพาะห้าไฟล์ต่อไปนี้ และแก้เพื่อเชื่อมระบบเท่านั้น:**
-
-- `src/api/client.ts` — เพิ่ม wrapper `POST`: upload แบบ multipart, calculate, analyze และข้อมูลกรอกเอง ทำตามรูปแบบฟังก์ชัน 16 รายการเดิม และคงการทำงานของ `USE_MOCK` เพื่อให้โหมดจำลองยังใช้ได้เมื่อไม่มี backend
-- `src/features/import/ImportPage.tsx` — ผูกฟอร์มกับ state จริง เพิ่มช่องข้อมูลที่ขาด และเรียกฟังก์ชัน client ใหม่เมื่อส่งข้อมูล
-- `src/features/overview/OverviewPage.tsx`, `src/features/simulator/SimulatorPage.tsx`, `src/features/swarm/SwarmPage.tsx` — ทำ wiring ตามที่ได้รับอนุญาต โดยคงหน้าตาและโครงสร้างเดิม
-
-ห้ามเปลี่ยน CSS, Tailwind classes, สี, ระยะห่าง, layout, โครงสร้าง component, routing หรือข้อความที่แสดงอยู่เดิม เพิ่มได้เฉพาะ label ที่จำเป็นสำหรับฟิลด์ใหม่ ห้ามแตะไฟล์อื่นใต้ `src/`
-
-fingerprint ของ bundle จะเปลี่ยน ซึ่งเป็นสิ่งที่คาดไว้ การ build ก่อนหน้าทั้งหมดมี `1955 modules` และไฟล์ `index-DEindwiw.css` / `index-DrkwTzbk.js` ซึ่งใช้ตรวจจับการแก้ UI โดยไม่ตั้งใจ การเชื่อม `client.ts` เข้ากับแอปทำให้ hash ของ JS เปลี่ยนได้ตามปกติ **รายงานจำนวน modules ใหม่และ hash ทั้งสองไฟล์ใน commit message** และยืนยันว่า hash ของ CSS ไม่เปลี่ยน หาก hash ของ CSS เปลี่ยน แสดงว่าแก้ styling และต้องย้อนกลับ
-
----
-
-## 5. งานเพิ่มเติมที่ควรทำ เรียงตามลำดับ
-
-1. **ทดสอบอัปโหลดไฟล์ที่ถูกต้องผ่าน route จริง** การส่ง template ไปกลับข้างต้นทำด้วยมือในวันนี้และยังไม่มีใน suite ให้เพิ่มการทดสอบนี้
-2. **เติม `latitude` / `longitude` ใน `sme_profiles`** เฉพาะเมื่อทีมให้พิกัดจริงมาเท่านั้น ห้ามเดาจากชื่อจังหวัด เพราะตัวกรองระยะทางตั้งใจตัดร้านที่ไม่มีพิกัดออก และตำแหน่งที่เดาจะทำให้ผลแย่กว่าการตัดออก หากไม่มีข้อมูลให้เว้นไว้
-3. **ตั้งรหัสผ่านให้ `admin@example.test`** บัญชี seed ไม่มีรหัสผ่าน จึงยังทดสอบ `POST /api/auth/revoke` ไม่ได้ ใช้ `python backend/scripts/set_password.py admin@example.test`
-4. **ลองดึงข่าวจริงจากโฮสต์ที่ deploy แล้ว** หาก deploy สำเร็จ เพราะ egress ต่างกันและอาจช่วยยืนยันสาเหตุ TLS timeout ที่ยังเป็นข้อสันนิษฐาน
-
----
-
-## 6. รูปแบบ request ที่ถ้าเดาจะเสียเวลาเป็นชั่วโมง
-
-ข้อมูลเหล่านี้วัดจากระบบจริง ไม่ใช่ความจำ นักพัฒนา frontend จะพบทุกข้อ
-
-- **ข้อมูลเดียวกันมี body สองรูปแบบ** `/api/calculate` และ `/api/analyze` ต้องรับ input แบบมี wrapper: `{"input": { ...fields... }}` ส่วน `/api/v1/finance/calculate` และ `/api/v1/inputs/manual` รับ object แบบแบน หากส่ง object แบนไปยังคู่แรก จะได้ `422 {"loc": ["body","input"], "msg": "Field required"}` การเปลี่ยนให้รับ object แบนด้วยถือเป็นการเปลี่ยนสัญญา API และควรระบุใน commit message
-- **`units_sold` ต้องเป็น JSON integer ไม่ใช่ string** ค่า `"7000"` ได้ 422 `int_type` ส่วนฟิลด์จำนวนเงินรับ string ได้ HTML form ส่งทุกค่าเป็น string ดังนั้น client ต้องแปลงฟิลด์นี้
-- **พฤติกรรมค่าไม่ส่งหรือ `null` เปลี่ยนแล้ว:** backend ปัจจุบันกำหนดฟิลด์ตัวเลขที่ขาดหรือเป็น `null` เป็นศูนย์ รวมถึง `inventory` ซึ่งรองรับชื่อ Inventory/Stock และ Category 6 ใน Excel ค่าที่ไม่ใช่ตัวเลขหรือรูปแบบตัวเลขผิดยังถูกตรวจสอบโดย schema
-- **`period_start` / `period_end` ต้องเป็นวันที่ ISO** และ `kind` ต้องเป็น `actual`, `forecast` หรือ `simulated`
-- **มีการตรวจงบดุล:** `assets = liabilities + equity` หากไม่ตรงจะได้ 422 `Balance sheet mismatch`
-
-### จุดที่มักพลาดใน stack
-
-- PostgreSQL ที่โฮสต์จัดการให้ส่ง URL รูปแบบ `postgresql://` ซึ่ง SQLAlchemy จับคู่กับ driver แบบ synchronous `db.py::normalise_database_url` จะกำหนด asyncpg และย้าย `sslmode` ไปเป็น connect argument ให้วาง URL ของโฮสต์โดยไม่แก้
-- asyncpg ตรวจชนิดพารามิเตอร์เทียบกับชนิดคอลัมน์ **ก่อน** SQL `CAST` จะทำงาน ดังนั้นวันที่ UUID และจำนวนเงินต้องเป็น Python object จริงใน parameter dict ไม่ใช่ string
-- PostgreSQL อนุมานชนิดของ branch ที่เป็น `NULL` เปล่าใน `CASE` ไม่ได้ และตีความ expression ทั้งก้อนเป็น text ให้ cast อย่างชัดเจน
-- `ON CONFLICT DO NOTHING` แก้แถวที่ถูกสร้างไว้ก่อนจากเส้นทางอื่นไม่ได้ ใช้ `DO UPDATE` เมื่อ seed เดโมต้องทำให้ได้สถานะตรงกัน
-- **ลำดับ route สำคัญ:** ต้องลงทะเบียน path แบบค่าคงที่ก่อน path ที่มี parameter ไม่เช่นนั้น `/swarm/{order_ref}` จะดัก `/swarm/proposal`
-- `requirements.lock.txt` เป็นรายการ dependency แบบ pin แบน ๆ ถ้าขาด dependency ตอน runtime container จะพังแม้ venv ในเครื่องซ่อนปัญหาไว้ มี test ตรวจกรณีนี้
-- heredoc ใน shell นี้พังเมื่อมี apostrophe ใช้เครื่องมือเขียนไฟล์แทนเมื่อมีข้อความดังกล่าว
-- `load_shop_resources` ต้องรับ keyword-only `project_id` และไม่มีค่าเริ่มต้น การอ่านโดยไม่ระบุ scope ทำให้ได้ resource เดิมซ้ำตามจำนวน project และ `ShopCapacity` ปฏิเสธ id ซ้ำ นี่เคยเป็นบั๊กจริงที่พบขณะรัน ไม่ใช่แค่ข้อกังวลทางทฤษฎี
-
----
-
-## 7. ติดขัดที่ทีม ไม่ใช่ที่โค้ด — อย่าหาทางเลี่ยง
-
-- **การ deploy backend ไป Railway** `Dockerfile`, `railway.json` และ startup schema bootstrap เสร็จและยืนยันแล้วด้วยการ build image และรัน container เชื่อม PostgreSQL จริง เหลือเพียงสร้าง service ในบัญชีทีม ซึ่งต้องใช้ credential ของทีม นี่คือสิ่งเดียวที่ยังบล็อก live web demo
-- **ปิด mock ของ frontend** ทำหลัง deploy โดยตั้งตัวแปร Vercel สองตัวคือ `VITE_API_BASE_URL` และ `VITE_USE_MOCK=false` แล้ว deploy ใหม่ ไม่มีตัวแปรตัวที่สาม `VITE_BACKEND_URL` เคยใช้กับ `src/services/api.ts` ซึ่งถูกลบใน `44db2f2`
-- คง `RBAC_ENFORCED=false` และ `AUTH_DEV_HEADER=false` สำหรับผู้ทดสอบ frontend ไม่ส่ง auth headers และ `/funder/projects` เป็น route เดียวที่ผูกกับ `resolve_principal` การเปิด enforcement จะทำให้เฉพาะหน้านั้นได้ 401
-
----
-
-## 8. วิธีทำงาน
-
-- **ยืนยันด้วยการเรียกจริงและผลลัพธ์จริงก่อนบอกว่าทำงาน** เรียก endpoint แล้วอ่านข้อมูลกลับ อย่ารายงานว่าสำเร็จเพียงเพราะเขียนโค้ด Claude เพิ่งพบบั๊กจริงในสัปดาห์นี้ที่ test ผ่านแต่การเรียกจริงจับได้ และคุณก็พบ gate bug ใน Claude ด้วยวิธีเดียวกัน
-- **หาก test ล้มเพราะเปลี่ยนพฤติกรรมโดยตั้งใจ ให้แก้ test และระบุใน commit** ห้ามลดความเข้มของ assertion เพื่อให้ผ่าน
-- **ห้ามแต่งข้อมูลขึ้นเอง** หากข้อมูลไม่พอสร้างชุดข้อมูล ให้ส่งชุดว่างพร้อมชื่อใน `missing`; `status` ต้องสอดคล้องกับข้อมูลที่ขาดและห้ามอ้างว่า `ok`; ทุก response ต้องมี `source` กฎนี้ใช้ทั้งโปรเจกต์ และงาน envelope ล่าสุดมีไว้เพื่อรักษากฎนี้
-- **บอกเมื่อสิ่งที่ได้รับมอบหมายไม่ถูกต้อง** และบอกสิ่งที่พบแม้ไม่มีใครถาม บั๊กจริงหลายรายการถูกจับได้ด้วยวิธีนี้
-- อัปเดต `backend/docs/progress.md` และรายการ §4 ใน `AI_DEVELOPMENT_GUIDELINES.md` ให้เป็นปัจจุบัน โดยตรวจตัวเลขกับโค้ด ไม่ใช้ตัวเลขเก่าต่อ
-- ปิดงานแต่ละช่วงด้วย `git add`, `git commit` และ `git push` ไป `main` เขียน commit message ให้เก็บเหตุผลไว้ ไม่ใช่บอกแค่ diff
-
----
-
-## 9. สิ่งที่ฝากให้ Claude ในวันเสาร์
-
-เพิ่มหัวข้อใน `backend/docs/CODEX_HANDOFF.md` ระบุสิ่งที่แก้ จำนวน test ที่วัดได้ จำนวน modules และ hash ของ asset ทั้งสองไฟล์ การตัดสินใจที่มีทางเลือกอื่นที่สมเหตุสมผล และสิ่งที่ตั้งใจไม่ทำ หากเลือกไม่เชื่อม `src/` ให้ระบุชัดเจนเพื่อให้ Claude เห็นเป็นเรื่องแรก
+เพิ่มรอบใหม่ไว้บนสุดของ CODEX_HANDOFF.md: ฐาน commit และขอบเขตที่ได้รับอนุญาต,
+สิ่งที่แก้และสิ่งที่ยังไม่แก้, ผล real HTTP/DB พร้อมตัวเลข, tests/skips/warnings,
+module count/CSS/JS hashes, provider/deploy ที่ตรวจจริงหรือยังไม่ได้ตรวจ และงานถัดไป.
+บันทึก regression/behavior change และเหตุผลตรงไปตรงมา; ตัวเลขในรอบเก่าคงเป็นประวัติ.
+อัปเดต progress.md และ guidelines §4 ให้สอดคล้องก่อน commit/push main

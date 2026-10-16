@@ -1,5 +1,23 @@
 # SME SWARM Backend — คู่มือภาษาไทย
 
+## สถานะและแนวทางส่งต่อ — 2026-10-16
+
+งานหลักคือ backend/AI, API/contracts/adapters และ integration; frontend wiring ที่จำเป็น
+อนุญาตแล้วทุกไฟล์โดยคง UI เดิม. ทีม frontend รับ presentation ต่อหลัง contract พร้อม
+
+- [Current state / priorities / acceptance](docs/FRONTEND_INTEGRATION_HANDOFF.md)
+- [API matrix จริง](../docs/API_CONTRACT_MATRIX.md), [cmd.exe tester guide](docs/TESTER_READINESS_CURRENT.md)
+- ตรวจ source `48d9385` + validation regression repair ในรอบนี้: 510 passed / 3 skipped พร้อม DB; 410 / 103 ไม่มี DB;
+  36 main routes + aliases, 27 tables, 16 HTTP read contracts
+- Rules/optional LLM/forecast มีที่ backend; Import ใช้ rules และ GET AI panel ไม่ใช่ LLM call.
+  สมัครทุน/ลงนาม/export/Chaos บาง operation ยังเป็น demo ต้องทำ contract ไม่แจ้ง success ปลอม
+- CORS Authorization preflight ยัง 400; shared context/types/order constraints/saved-plan read
+  เป็นงาน integration ค้าง. อย่าเปิด auth enforcement โดยคิดว่าการต่อ browser token ครบแล้ว
+
+คำสั่งหลักใน cmd.exe ที่ repo root: `docker compose -f backend/docker-compose.yml up -d`
+แล้ว `backend\run.cmd`. Config อยู่ backend\.env; รอบนี้แก้เอกสารและ validation regression; ไม่มี deployment ใหม่
+
+
 Backend ใช้ Python 3.12 ขึ้นไป ร่วมกับ FastAPI, Pydantic, openpyxl และ Decimal สำหรับตรวจข้อมูลและคำนวณการเงิน โค้ดอยู่ใน `D:\code-project\sme-finance-copilot\backend`
 
 ## ติดตั้งครั้งแรก

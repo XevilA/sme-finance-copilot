@@ -99,8 +99,9 @@ JSON และ Excel ใช้การตรวจสอบและการ�
 เส้นทางเหล่านี้เป็น stateless · ข้อมูลของผู้เรียกถูกส่งกลับให้ผู้เรียกเท่านั้น
 และไม่ถูกใช้เป็น "ธุรกิจล่าสุด" ร่วมกับ client รายอื่น · ลายนิ้วมือ SHA-256 ใช้ระบุ input
 ที่ปรับรูปแล้ว **ไม่ใช่การทำ anonymization ไม่ใช่การยืนยันตัวตน และไม่ใช่กลไกควบคุมสิทธิ์** ·
-เบราว์เซอร์เก็บผลล่าสุดไว้ในหน่วยความจำและทำเครื่องหมายว่า stale เมื่อ input เปลี่ยน
-ผลลัพธ์ไม่ถูกเก็บข้ามการรีโหลดหน้า
+เบราว์เซอร์เก็บผล analyze ที่สำเร็จล่าสุดไว้ในหน่วยความจำแท็บ ไม่เก็บข้าม reload ·
+client ปัจจุบันยังไม่ invalidate accepted snapshot เมื่อแก้ draft; เป็น integration backlog
+ไม่ควรอ้างว่า snapshot เดิมเป็นผลของ draft ใหม่จน analyze สำเร็จ
 
 ## โหมด rules และโหมดโมเดล (optional)
 
@@ -139,39 +140,31 @@ Structured Outputs บังคับให้คำตอบอ้างได�
 
 อ้างอิง: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)
 
-## ขอบเขตฝั่ง Frontend
+## ขอบเขตฝั่ง Frontend — สถานะปัจจุบัน 2026-10-16
 
-> อัปเดตรอบ Import wiring หลัง `dde929e`: แก้เพียง client.ts และ ImportPage.tsx
-> ตามสิทธิ์เฉพาะ · `/analyze` เพิ่ม `shop_name` optional และ `views` ที่ backend adapter
-> สร้างจากผล analysis เดียวกัน มี `source=supplied_input` และ `inputHash` ทุก view ·
-> browser เก็บผลที่ยอมรับแล้วเฉพาะในแท็บ เพื่อใช้ Overview/Health/Cost/AI โดยไม่เขียน
-> business state ร่วมกันใน server · เนื้อหาด้านล่างเป็นสถานะก่อน wiring รอบนี้
->
-> ยังมีค่าคงที่ใน OverviewPage และสูตรใน SimulatorPage ที่ไม่ได้รับสิทธิ์แก้ ·
-> ดู `TESTER_READINESS_CURRENT.md` ก่อนอ้างว่าทุกหน้ารองรับข้อมูลจริงครบแล้ว
+ผู้ใช้และทีมอนุญาต wiring ใน frontend ที่จำเป็นแล้ว ไม่จำกัดสอง/ห้าไฟล์เดิม; คง UI,
+CSS/Tailwind/layout/component hierarchy/routing. CODEX เน้น backend/AI/contracts และ
+integration ก่อนส่งทีม frontend ทำ presentation ต่อ. ดู FRONTEND_INTEGRATION_HANDOFF.md.
 
-ไฟล์ frontend ทั้งหมดถูกคืนสภาพไปที่ commit `73649fc` ซึ่งเป็นดีไซน์เดิมก่อนเริ่มพัฒนา backend ·
-ไม่มีการเพิ่ม JSON editor, ปุ่มอัปโหลด, การ์ดเกรด, ป้ายโหมด, store วิเคราะห์ฝั่ง frontend
-หรือการแก้ Vite proxy · พฤติกรรม mock และ API adapter เดิมถูกรักษาไว้เหมือนเดิมทุกจุด
+Frontend implementation คงที่จาก `4d39680`; backend รวม main `48d9385` และแก้
+validation regression ในรอบนี้ (required ต้องส่ง, unknown=None, nonfinite ถูกปฏิเสธ,
+inventory nullable). ไม่มี stock/DIO math เพิ่ม. Import ใช้ upload/manual/calculate/analyze จริง; analyze คืน views ของ
+input เดียวกันพร้อม source=supplied_input/inputHash. client ใช้ accepted views ให้
+Overview/Health/Cost/AI ในแท็บ. Cashflow/Funding/Sales/Shop Finance ยังอ่าน DB/default
+ไม่ได้ตาม import อัตโนมัติ; ชื่อร้าน free text ไม่ได้ผูก SME identity หรือบันทึกงบให้ร้านเดโม.
 
-การคำนวณ การให้เกรด rules การต่อโมเดล (optional) และทุก endpoint `/api/*` กับ `/api/v1/*`
-อยู่ภายใต้ `backend/app` · ทดสอบการวิเคราะห์แยกได้ผ่าน `/docs` หรือยิง API ·
-endpoint ตัวอย่างและ Excel template ยังอยู่ · การไม่มีปุ่มบน UI ไม่ได้ทำให้บริการเหล่านี้หายไป
+Import ส่ง use_llm=false และไม่ส่ง sme_id/schedule_complete_through; GET /ai/explain
+ใช้ build_analysis แบบ rules. Backend optional use_llm=true มีอยู่แต่ไม่ใช่ทุกครั้งที่
+เปิด AI panel จะเรียก LLM. ไม่มี model call สดใหม่ในรอบเอกสารนี้; หลักฐานด้านล่างเป็นวันที่เดิม.
 
-การต่อ frontend ในอนาคตต้องใช้ component tag, Tailwind class, layout และโครงสร้างหน้าเดิม
-โดยไม่เปลี่ยน · เจ้าของ frontend ต่อ fetch hook หรือ props ตามสัญญานี้ได้
-**ตรรกะการคำนวณและการตัดสินใจต้องอยู่ที่ backend**
+Overview ใช้ null สำหรับ unknown, prior diff, reserve และมี netProfitMargin แล้ว.
+Types frontend ยังต้อง sync source/nullable/margin; ห้ามแก้ด้วย default 0.
+Order Simulator มี POST จริงแยกจาก statement simulation แต่ยังไม่สร้าง analysis findings
+หรือ forecast ทั้งกิจการของ Plan B. SWARM เป็น allocation preview ไม่ใช่ reservation.
 
-> **หมายเหตุ (อัปเดต 2026-10-15):** ข้อความเดิมระบุว่าเส้นทาง analysis POST ยังไม่ถูกต่อเข้า UI
-> และการปิด mock mode เพียงอย่างเดียวไม่พอ เพราะ GET endpoint ของ dashboard เป็นสัญญาแยก
-> — ข้อสังเกตนั้นถูกต้องและได้ดำเนินการแล้ว: ปัจจุบัน contract ทั้ง 16 เส้นทางที่
-> `src/api/client.ts` เรียก ตอบ 200 ครบแล้ว (ดู `progress.md`) · สิ่งที่เหลือคือการ deploy
-> backend แล้วตั้ง `VITE_API_BASE_URL` กับ `VITE_USE_MOCK=false` · และยังเป็นจริงว่า
-> **การ deploy frontend ไม่ได้ deploy FastAPI ไปด้วย**
-
-เทสต์ฝั่ง backend ครอบคลุม: คำตอบทางการเงินที่รู้ค่าแน่นอน, ค่าขอบ, ความเท่ากันของแหล่งข้อมูล,
-การอ้างอิงหลักฐาน, การแยกข้อมูลระหว่างผู้เรียก, การตรวจสอบข้อมูล และการถอยกลับเมื่อผู้ให้บริการล่ม ·
-ตัวอย่างสังเคราะห์ยังได้เกรด B / 75.00 ผ่าน API
+สูตรและ decision อยู่ backend. Frontend bind ตัวเลข, kind/status/missing, evidence IDs
+และ targetElementId ให้ตรงผล/บริบทเดียวกัน; animation ไม่ใช่หลักฐานว่า model/engine ถูกเรียก.
+การ deploy frontend ไม่ได้ deploy FastAPI; cloud URL/env และ provider verification ยังมีงานค้าง.
 
 ## ผลการตรวจสอบผู้ให้บริการจริง: 2026-10-15
 

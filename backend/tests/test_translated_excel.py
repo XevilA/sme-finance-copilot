@@ -45,6 +45,13 @@ def translated_rows(data):
     return rows
 
 
+@pytest.mark.parametrize("label", ["Inventory", "Stock", "สินค้าคงเหลือ", "สต็อก"])
+def test_inventory_aliases_preserve_explicit_amount_without_filling_missing_total(label):
+    parsed = parse_excel(workbook_bytes([*translated_rows(payload()), (label, "1234.50")]), "statement.xlsx")
+    assert parsed.inventory == Decimal("1234.50")
+    assert parsed.total_expenses is None
+
+
 def test_thai_workbook_matches_manual_metrics_grade_and_existing_api():
     data = payload(total_expenses="200000", net_income=None)
     content = workbook_bytes(translated_rows(data), header=("รายการ", "จำนวนเงิน"))

@@ -1,5 +1,8 @@
 # ส่งงานต่อให้ CODEX — สิ่งที่พร้อมแล้วและสิ่งที่รอคุณ
 
+> Current handoff 2026-10-16: [FRONTEND_INTEGRATION_HANDOFF.md](FRONTEND_INTEGRATION_HANDOFF.md).
+> เอกสารนี้เป็นประวัติ; lane split/ข้อห้าม frontend ด้านล่างถูกแทนด้วยสิทธิ์ wiring ล่าสุดโดยคง UI เดิม
+
 > ## ✅ เอกสารนี้เสร็จสิ้นภารกิจแล้ว (2026-10-15)
 >
 > CODEX ทำครบทั้ง 4 โมดูลที่ขอไว้: Module 4 (จับคู่แหล่งทุน), Module 3
