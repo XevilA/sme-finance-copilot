@@ -37,6 +37,7 @@ _TRANSLATIONS = {
     "opening_assets": ("Opening Assets", "สินทรัพย์ต้นงวด"),
     "opening_equity": ("Opening Equity", "ส่วนของเจ้าของต้นงวด"),
     "current_assets": ("Current Assets", "สินทรัพย์หมุนเวียน"),
+    "inventory": ("Inventory", "Stock", "Inventory/Stock", "Category 6: Inventory/Stock", "สินค้าคงเหลือ", "สินค้าคงคลัง", "สต็อก"),
     "current_liabilities": ("Current Liabilities", "หนี้สินหมุนเวียน"),
     "cash_balance": ("Cash Reserve", "Cash Balance", "เงินสดคงเหลือ", "เงินสดสำรอง"),
     "revenue": ("Revenues", "Total Revenue", "รายได้", "รายได้รวม"),
