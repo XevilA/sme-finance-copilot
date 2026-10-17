@@ -182,20 +182,20 @@ export const StoryModeModal: React.FC = () => {
         <div className="bg-navy-surface p-6 rounded-card border border-brand/40 max-w-xl mx-auto text-left space-y-4 shadow-glow-primary">
           <div className="flex items-center gap-2 text-brand-glow font-bold text-sm">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>ผลตอบแทนที่พิสูจน์ได้จริง (Measurable Impact)</span>
+            <span>ตัวชี้วัดเป้าหมายในบทนำเสนอ (ยังไม่ได้วัดจากระบบ)</span>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="p-3 rounded-xl bg-navy-card border border-navy-border">
-              <span className="text-[10px] text-slate-400 block">อัตราส่งมอบตรงเวลา</span>
-              <span className="text-sm font-bold text-emerald-400">100%</span>
+              <span className="text-[10px] text-slate-400 block">อัตราส่งมอบตรงเวลา (เป้าหมาย)</span>
+              <span className="text-sm font-bold text-emerald-400">ยังไม่ได้วัด</span>
             </div>
             <div className="p-3 rounded-xl bg-navy-card border border-navy-border">
-              <span className="text-[10px] text-slate-400 block">ต้นทุนโลจิสติกส์ลดลง</span>
-              <span className="text-sm font-bold text-resource">-32%</span>
+              <span className="text-[10px] text-slate-400 block">ต้นทุนโลจิสติกส์ลดลง (เป้าหมาย)</span>
+              <span className="text-sm font-bold text-resource">ยังไม่ได้วัด</span>
             </div>
             <div className="p-3 rounded-xl bg-navy-card border border-navy-border">
-              <span className="text-[10px] text-slate-400 block">หนี้เสีย (NPL)</span>
-              <span className="text-sm font-bold text-emerald-400">0%</span>
+              <span className="text-[10px] text-slate-400 block">หนี้เสีย (NPL) (เป้าหมาย)</span>
+              <span className="text-sm font-bold text-emerald-400">ยังไม่ได้วัด</span>
             </div>
           </div>
           <p className="text-xs text-slate-300 text-center leading-relaxed">
@@ -217,7 +217,7 @@ export const StoryModeModal: React.FC = () => {
             STORY MODE
           </span>
           <span className="text-xs text-slate-400 font-medium">
-            โหมดนำเสนอโครงการสำหรับกรรมการ
+            บทนำเสนอที่เขียนไว้ล่วงหน้า · ตัวเลขในฉากเป็นตัวอย่างประกอบคำบรรยาย ไม่ใช่ผลคำนวณจากระบบ
           </span>
         </div>
 

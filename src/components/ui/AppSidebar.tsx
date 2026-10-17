@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { useAppStore, NavPage } from "@/store/useAppStore";
+import { apiClient } from "@/api/client";
+import { Shop, SwarmOrder, SwarmProposal } from "@/api/contracts/types";
+import { useEnvelope } from "@/hooks/useEnvelope";
 import {
   LayoutDashboard,
   UploadCloud,
@@ -72,7 +75,6 @@ const navItems: NavItem[] = [
     id: "funding",
     label: "7. จับคู่แหล่งเงินทุน",
     icon: <Coins className="w-4 h-4" />,
-    badge: "ขาด ฿29.5k",
     badgeColor: "bg-red-50 text-danger border border-red-200",
     group: "ประกอบโอกาส & ทีม",
   },
@@ -131,6 +133,18 @@ export const AppSidebar: React.FC = () => {
     "แซนด์บ็อกซ์ & รายงาน",
   ];
 
+  // Footer and the funding badge describe the stored order, shops and proposal.
+  const orderState = useEnvelope<SwarmOrder>(useCallback(() => apiClient.getOrder(), []));
+  const shopState = useEnvelope<Shop[]>(useCallback(() => apiClient.getShops(), []));
+  const proposalState = useEnvelope<SwarmProposal>(useCallback(() => apiClient.getSwarmProposal(), []));
+  const order = orderState.envelope?.data || null;
+  const shops = shopState.envelope?.data || [];
+  const proposal = proposalState.envelope?.data || null;
+  const shortfallShops = proposal ? proposal.shops.filter((shop) => shop.fundingGap > 0).length : 0;
+  const fundingBadge = proposal && proposal.totalFundingGap > 0
+    ? `ขาด ฿${proposal.totalFundingGap.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`
+    : null;
+
   return (
     <aside className="w-64 bg-white border-r border-borderLine flex flex-col shrink-0 select-none">
       <div className="flex-1 overflow-y-auto p-3 space-y-5 text-xs">
@@ -144,6 +158,7 @@ export const AppSidebar: React.FC = () => {
               <div className="space-y-0.5">
                 {items.map((item) => {
                   const isActive = currentPage === item.id;
+                  const badge = item.id === "funding" ? fundingBadge : item.badge;
                   return (
                     <button
                       key={item.id}
@@ -161,13 +176,13 @@ export const AppSidebar: React.FC = () => {
                         </span>
                         <span className="truncate">{item.label}</span>
                       </div>
-                      {item.badge && (
+                      {badge && (
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded-chip shrink-0 ${
                             isActive ? "bg-white/20 text-white" : item.badgeColor
                           }`}
                         >
-                          {item.badge}
+                          {badge}
                         </span>
                       )}
                     </button>
@@ -183,10 +198,17 @@ export const AppSidebar: React.FC = () => {
       <div className="p-3 border-t border-borderLine bg-slate-50 text-[11px] text-ink-muted">
         <div className="flex items-center gap-1.5 font-semibold text-ink">
           <Sparkles className="w-3.5 h-3.5 text-brand" />
-          <span>ชุดข้อมูลสาธิต: demo-300-boxes</span>
+          <span>
+            {order ? `โครงการ: ${order.id}` : "ยังไม่ได้เลือกโครงการ"}
+          </span>
         </div>
         <p className="text-[10px] mt-0.5 leading-snug">
-          6 ร้านค้า · รวม 300 กล่อง/วัน · ขาดทุนหมุนเวียน 2 ร้าน (฿29,500)
+          {order
+            ? `ผู้สมัคร ${shops.length} ร้าน · เป้าหมาย ${order.quantityPerDay} ต่อวัน ${order.days} วัน`
+            : "ยังไม่มีออเดอร์ที่บันทึกไว้"}
+          {proposal
+            ? ` · ข้อเสนอที่บันทึก: รับงาน ${proposal.shops.length} ร้าน, ขาดทุนหมุนเวียน ${shortfallShops} ร้าน (฿${proposal.totalFundingGap.toLocaleString("th-TH", { maximumFractionDigits: 0 })})`
+            : " · ยังไม่มีข้อเสนอที่บันทึกไว้"}
         </p>
       </div>
     </aside>

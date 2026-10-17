@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import { useAppStore, NavPage } from "@/store/useAppStore";
+import { apiClient } from "@/api/client";
+import { FundingOption, Shop, UnlockResource } from "@/api/contracts/types";
+import { useEnvelope } from "@/hooks/useEnvelope";
 import {
   Search,
   Store,
@@ -21,7 +24,7 @@ type SearchResultItem = {
   targetShopId?: string;
 };
 
-const searchableDatabase: SearchResultItem[] = [
+const searchableMenu: SearchResultItem[] = [
   // Menu items
   { id: "m-1", category: "เมนู", title: "ภาพรวมธุรกิจ", subtitle: "ดูรายได้ กำไร เงินสด และเรื่องที่ควรทำต่อ", targetPage: "overview" },
   { id: "m-2", category: "เมนู", title: "ข้อมูลธุรกิจ & นำเข้าไฟล์", subtitle: "อัปโหลด Excel หรือกรอกงบการเงิน 8 หมวด", targetPage: "import" },
@@ -30,34 +33,22 @@ const searchableDatabase: SearchResultItem[] = [
   { id: "m-5", category: "เมนู", title: "ต้นทุนและความคุ้มค่า", subtitle: "ต้นทุนต่อหน่วย จุดคุ้มทุน และแผนลงทุน A/B", targetPage: "cost" },
   { id: "m-6", category: "เมนู", title: "ยอดขายและสินค้า", subtitle: "ยอดขาย กำไร แยกตามสินค้าและช่องทาง", targetPage: "sales" },
   { id: "m-7", category: "เมนู", title: "จับคู่แหล่งเงินทุน", subtitle: "ค้นหาทางเลือกทุนและจำลองค่างวด", targetPage: "funding" },
-  { id: "m-8", category: "เมนู", title: "SME SWARM รวมทีมรับงาน", subtitle: "จัดสรรโควตา 6 ร้าน อาหาร 300 กล่อง/วัน", targetPage: "swarm" },
+  { id: "m-8", category: "เมนู", title: "SME SWARM รวมทีมรับงาน", subtitle: "จัดสรรออเดอร์ให้กลุ่มร้านตามกำลังผลิตและทรัพยากรที่บันทึกไว้", targetPage: "swarm" },
   { id: "m-9", category: "เมนู", title: "แผนเงินรายร้านในทีม", subtitle: "ตรวจกระแสเงินสดรายร้าน และลงนามยอมรับแผน", targetPage: "shop-finance" },
   { id: "m-10", category: "เมนู", title: "SME UNLOCK ปลดล็อกทรัพยากร", subtitle: "แชร์ครัว รถส่งของ เครื่องจักร และแรงงาน", targetPage: "unlock" },
-  { id: "m-11", category: "เมนู", title: "ฝั่งผู้ให้ทุน (Funder Portal)", subtitle: "ค้นหาโครงการและจำลองจัดสรรงบ", targetPage: "funder" },
+  { id: "m-11", category: "เมนู", title: "ฝั่งผู้ให้ทุน (Funder Portal)", subtitle: "ดูโครงการที่บันทึกไว้พร้อมระดับหลักฐาน", targetPage: "funder" },
   { id: "m-12", category: "เมนู", title: "ห้องจำลอง & ซ้อมแผนพัง (Chaos)", subtitle: "ซ้อมวันที่ทุกอย่างพัง เล่นเหตุการณ์ 4 ช่วง", targetPage: "simulator" },
-  { id: "m-13", category: "เมนู", title: "โครงการ & รายงาน", subtitle: "สรุปผลจริงเทียบแผน และส่งออกเอกสาร", targetPage: "projects" },
+  { id: "m-13", category: "เมนู", title: "โครงการ & รายงาน", subtitle: "สรุปผลจริงเทียบแผนที่บันทึกไว้", targetPage: "projects" },
 
-  // Shops
-  { id: "s-1", category: "ร้านค้า", title: "ร้านบ้านข้าวหอม", subtitle: "ว่าง 50 กล่อง/วัน (ขาดทุนหมุนเวียน ฿14,000)", targetPage: "shop-finance", targetShopId: "shop-1" },
-  { id: "s-2", category: "ร้านค้า", title: "ครัวป้าสมร อาหารไทยต้นตำรับ", subtitle: "ว่าง 50 กล่อง/วัน (พร้อมรับงาน)", targetPage: "shop-finance", targetShopId: "shop-2" },
-  { id: "s-3", category: "ร้านค้า", title: "เจ๊ดาวแกงปักษ์ใต้ รสเด็ด", subtitle: "ว่าง 50 กล่อง/วัน (ขาดทุนหมุนเวียน ฿15,500)", targetPage: "shop-finance", targetShopId: "shop-3" },
-  { id: "s-4", category: "ร้านค้า", title: "เฮียฮงหมูกรอบเตาถ่าน", subtitle: "ว่าง 50 กล่อง/วัน (พร้อมรับงาน)", targetPage: "shop-finance", targetShopId: "shop-4" },
-  { id: "s-5", category: "ร้านค้า", title: "ครัวสวนผักออร์แกนิค คลีนฟู้ด", subtitle: "ว่าง 50 กล่อง/วัน (พร้อมรับงาน)", targetPage: "shop-finance", targetShopId: "shop-5" },
-  { id: "s-6", category: "ร้านค้า", title: "ปิ่นโตแม่เพ็ญ ครัวคุณย่า", subtitle: "ว่าง 50 กล่อง/วัน (พร้อมรับงาน)", targetPage: "shop-finance", targetShopId: "shop-6" },
-
-  // Resources
-  { id: "r-1", category: "ทรัพยากร", title: "ครัวว่าง / ครัวกลาง GMP ดินแดง", subtitle: "ว่างรอบเช้า 05:00–11:00 น. รองรับ 300–500 กล่อง", targetPage: "unlock" },
-  { id: "r-2", category: "ทรัพยากร", title: "รถเย็นขนส่งร่วม Chilled Van", subtitle: "บรรทุก 400 กล่อง/เที่ยว แชร์ร่วม 6 ร้าน", targetPage: "unlock" },
-  { id: "r-3", category: "ทรัพยากร", title: "เครื่องซีลถาดอาหารสูญญากาศ", subtitle: "ซีล 800 กล่อง/ชม. บางซื่อ", targetPage: "unlock" },
-
-  // Funding
-  { id: "f-1", category: "แหล่งทุน", title: "Invoice Factoring เปลี่ยน PO เป็นเงินสด", subtitle: "อนุมัติใน 24 ชม. ดอกเบี้ย 8.5% วงเงินสูงสุด 50,000 ฿", targetPage: "funding" },
-  { id: "f-2", category: "แหล่งทุน", title: "SME Soft Loan ดอกเบี้ย 4.5%", subtitle: "สินเชื่อระยะยาว 12 เดือน ธพว.", targetPage: "funding" },
-  { id: "f-3", category: "แหล่งทุน", title: "Crowd SME Bond กองทุนหุ้นกู้โครงการ", subtitle: "ระดมทุนใน 48 ชม. ดอกเบี้ย 7.2%", targetPage: "funding" },
+  // Shop, resource and funding entries are loaded from the backend below, so
+  // the palette never navigates to an identifier no stored record matches.
 ];
 
 export const CommandPalette: React.FC = () => {
   const { isCommandPaletteOpen, setCommandPaletteOpen, setCurrentPage } = useAppStore();
+  const shopState = useEnvelope<Shop[]>(useCallback(() => apiClient.getShops(), []));
+  const resourceState = useEnvelope<UnlockResource[]>(useCallback(() => apiClient.getUnlockResources(), []));
+  const fundingState = useEnvelope<FundingOption[]>(useCallback(() => apiClient.getFundingOptions(), []));
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,14 +78,47 @@ export const CommandPalette: React.FC = () => {
 
   if (!isCommandPaletteOpen) return null;
 
+  // Menu entries plus the shops, resources and funding products the backend
+  // returned. Each record carries its own UUID and its own figures.
+  const money = (value: number) => `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
+  const catalogue: SearchResultItem[] = [
+    ...searchableMenu,
+    ...(shopState.envelope?.data || []).map((shop) => ({
+      id: `shop-${shop.id}`,
+      category: "ร้านค้า" as const,
+      title: shop.name,
+      subtitle: `กำลังผลิตว่าง ${shop.capacityAvailable} ${shop.unit}`
+        + (shop.fundingGap > 0 ? ` · ขาดทุนหมุนเวียน ${money(shop.fundingGap)}` : " · ไม่มีส่วนที่ขาดบันทึกไว้")
+        + ` · ${shop.location}`,
+      targetPage: "shop-finance" as NavPage,
+      targetShopId: shop.id,
+    })),
+    ...(resourceState.envelope?.data || []).map((resource) => ({
+      id: `resource-${resource.id}`,
+      category: "ทรัพยากร" as const,
+      title: resource.title,
+      subtitle: `${resource.capacityText} · ${resource.priceText} · `
+        + (resource.status === "confirmed" ? "ยืนยันแล้ว" : "ยังเป็นข้อเสนอ"),
+      targetPage: "unlock" as NavPage,
+    })),
+    ...(fundingState.envelope?.data || []).map((option) => ({
+      id: `funding-${option.id}`,
+      category: "แหล่งทุน" as const,
+      title: option.name,
+      subtitle: `${option.typeLabel} · ${option.provider} · ดอกเบี้ย ${option.interestRateAnnual}% ต่อปี`
+        + ` · รับเงินใน ${option.disbursementDays} วัน`,
+      targetPage: "funding" as NavPage,
+    })),
+  ];
+
   const filtered = query.trim()
-    ? searchableDatabase.filter(
+    ? catalogue.filter(
         (item) =>
           item.title.toLowerCase().includes(query.toLowerCase()) ||
           item.subtitle.toLowerCase().includes(query.toLowerCase()) ||
           item.category.toLowerCase().includes(query.toLowerCase())
       )
-    : searchableDatabase.slice(0, 8);
+    : catalogue.slice(0, 8);
 
   const handleSelect = (item: SearchResultItem) => {
     setCurrentPage(item.targetPage, { shopId: item.targetShopId });

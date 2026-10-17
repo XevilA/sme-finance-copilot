@@ -15,7 +15,7 @@ const { build } = createRequire(require.resolve('vite/package.json'))('esbuild')
 for (const file of ['overview/OverviewPage', 'simulator/SimulatorPage', 'swarm/SwarmPage', 'import/ImportPage',
   'cost/CostPage', 'funding/FundingPage', 'health/HealthPage', 'cashflow/CashflowPage', 'unlock/UnlockPage',
   'shop-finance/ShopFinancePage', 'funder/FunderPage', 'projects/ProjectsPage', 'ai-panel/AIPanel',
-  'simulator/ChaosPlayback', 'sales/SalesPage']) {
+  'simulator/ChaosPlayback', 'sales/SalesPage', 'overview/HeroAssembly']) {
   const name = `src/features/${file}.tsx`;
   const before = execFileSync('git', ['show', `269e3d2:${name}`], { encoding:'utf8' });
   const after = await readFile(name, 'utf8');
@@ -69,4 +69,4 @@ const demo = await load(true);
 assert.equal((await demo.getSwarmProposal()).source, 'demo_dataset');
 await assert.rejects(demo.assembleSwarm(context.data), /โหมดตัวอย่าง/);
 await assert.rejects(demo.simulateOrder(context.data, scenario, true), /โหมดตัวอย่าง/);
-console.log('PASS: fifteen page style guards, real order context, SWARM resource exclusion, four simulation controls, source/missing, validation, demo write rejection');
+console.log('PASS: sixteen page style guards, real order context, SWARM resource exclusion, four simulation controls, source/missing, validation, demo write rejection');

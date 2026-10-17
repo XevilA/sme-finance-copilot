@@ -1,5 +1,8 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
+import { apiClient } from "@/api/client";
+import { SwarmOrder, SwarmProposal, UnlockResource } from "@/api/contracts/types";
+import { useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { LinkLine } from "@/components/signature/LinkLine";
 import {
@@ -18,6 +21,25 @@ import {
 export const HeroAssembly: React.FC = () => {
   const { setCurrentPage, isReducedMotion, setStoryModeOpen } = useAppStore();
   const [activeScenario, setActiveScenario] = useState<"normal" | "capacity_jam" | "funding_gap">("normal");
+
+  // The diagram labels the stored active order and the stored proposal for it.
+  // Nothing here is a fixed demo figure, and anything the backend has not
+  // recorded reads as unknown rather than as a number.
+  const orderState = useEnvelope<SwarmOrder>(useCallback(() => apiClient.getOrder(), []));
+  const proposalState = useEnvelope<SwarmProposal>(useCallback(() => apiClient.getSwarmProposal(), []));
+  const resourceState = useEnvelope<UnlockResource[]>(useCallback(() => apiClient.getUnlockResources(), []));
+  const order = orderState.envelope?.data || null;
+  const proposal = proposalState.envelope?.data || null;
+  const resources = resourceState.envelope?.data || [];
+  const amount = (value: number | null | undefined) =>
+    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+  const leadShop = proposal?.shops[0] || null;
+  const truck = resources.find((item) => item.category === "truck") || null;
+  const sharedTruckShops = truck
+    ? new Set(resources.filter((item) => item.category === "truck").map((item) => item.ownerShop)).size
+    : 0;
+  const hasDeficit = (proposal?.deficitBoxesPerDay ?? 0) > 0;
+  const hasGap = (proposal?.totalFundingGap ?? 0) > 0;
 
   return (
     <div className="relative bg-navy-deep text-white rounded-card p-6 md:p-8 overflow-hidden shadow-soft-lg mb-8 border border-navy-border">
@@ -43,7 +65,8 @@ export const HeroAssembly: React.FC = () => {
           </h1>
 
           <p className="text-xs md:text-sm text-slate-300 leading-relaxed max-w-md">
-            แพลตฟอร์มช่วยวิเคราะห์กระแสเงินสด รวมกลุ่มร้านอาหารรับงานใหญ่ และจับคู่แหล่งเงินทุนเฉพาะส่วนที่ขาด โดยไม่ต้องเสี่ยงเงินหมุนเวียนสะดุด
+            วิเคราะห์งบที่นำเข้า จัดสรรออเดอร์ให้กลุ่มร้าน และจัดอันดับแหล่งเงินทุนตามส่วนที่ขาด ·
+            ตัวเลขในผังนี้มาจากออเดอร์และข้อเสนอที่บันทึกไว้ในฐานข้อมูล
           </p>
 
           {/* Primary CTA Buttons (Part B Rule #9: กดได้ทันทีเสมอ ไม่ต้องรอ animation) */}
@@ -53,7 +76,7 @@ export const HeroAssembly: React.FC = () => {
               onClick={() => setCurrentPage("swarm")}
               className="px-5 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-btn text-xs md:text-sm font-bold flex items-center gap-2 shadow-glow-primary transition-all cursor-pointer"
             >
-              <span>ลองใช้ข้อมูลตัวอย่าง (300 กล่อง)</span>
+              <span>{order ? `ดูการรวมทีมของออเดอร์ ${order.id}` : "เปิดห้องรวมทีม SWARM"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -69,7 +92,7 @@ export const HeroAssembly: React.FC = () => {
           {/* 2 Interactive Problem Scenarios (Signature S1) */}
           <div className="pt-3 border-t border-navy-border/60">
             <span className="text-[11px] font-bold text-slate-400 block mb-2 uppercase tracking-wider">
-              กดดูตัวอย่างปัญหาที่พบบ่อย (Interactive Assembly):
+              กดเพื่อเน้นจุดติดในข้อเสนอที่บันทึกไว้:
             </span>
             <div className="flex flex-wrap gap-2">
               <button
@@ -162,8 +185,10 @@ export const HeroAssembly: React.FC = () => {
               <div className="w-7 h-7 mx-auto rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center mb-1">
                 <Users className="w-3.5 h-3.5" />
               </div>
-              <div className="text-[10px] text-slate-400 font-medium">ลูกค้าองค์กร</div>
-              <div className="text-xs font-bold text-white">300 กล่อง/วัน</div>
+              <div className="text-[10px] text-slate-400 font-medium">{order?.buyerName || "ลูกค้าองค์กร"}</div>
+              <div className="text-xs font-bold text-white">
+                {order ? `${order.quantityPerDay} ต่อวัน` : "ยังไม่มีออเดอร์"}
+              </div>
             </div>
 
             {/* 2. Shop Hub Node (Center) */}
@@ -179,9 +204,15 @@ export const HeroAssembly: React.FC = () => {
               <div className="w-8 h-8 mx-auto rounded-xl bg-brand text-white flex items-center justify-center mb-1">
                 <Store className="w-4 h-4" />
               </div>
-              <div className="text-[10px] text-slate-300 font-semibold">ร้านค้าหลัก</div>
-              <div className="text-xs font-bold text-white font-mono">฿40,000 / ร้าน</div>
-              <div className="text-[9px] text-slate-400 mt-1">กำลังผลิต 50 กล่อง</div>
+              <div className="text-[10px] text-slate-300 font-semibold">
+                {proposal ? `ร้านที่รับงาน ${proposal.shops.length}` : "ร้านค้าหลัก"}
+              </div>
+              <div className="text-xs font-bold text-white font-mono">
+                {leadShop ? `${amount(leadShop.workingCapitalNeeded)} / ร้านแรก` : "ยังไม่มีข้อเสนอ"}
+              </div>
+              <div className="text-[9px] text-slate-400 mt-1">
+                {leadShop ? `ส่วนแบ่ง ${leadShop.shareBoxesPerDay} ต่อวัน` : "ยังไม่ได้จัดสรร"}
+              </div>
             </div>
 
             {/* 3. Kitchen Node */}
@@ -195,10 +226,16 @@ export const HeroAssembly: React.FC = () => {
               <div className="w-6 h-6 mx-auto rounded-lg bg-resource/20 text-resource flex items-center justify-center mb-1">
                 <ChefHat className="w-3.5 h-3.5" />
               </div>
-              <div className="text-[10px] text-slate-300 font-medium">ครัวกลาง GMP</div>
-              <div className="text-[11px] font-bold text-resource">ว่าง 300 กล่อง</div>
+              <div className="text-[10px] text-slate-300 font-medium">
+                {resources.find((item) => item.category === "kitchen")?.title || "ครัวกลาง"}
+              </div>
+              <div className="text-[11px] font-bold text-resource">
+                {proposal ? `จัดสรรได้ ${proposal.totalCapacityAssigned} / ${proposal.targetCapacity}` : "ยังไม่มีข้อมูล"}
+              </div>
               {activeScenario === "capacity_jam" && (
-                <div className="text-[9px] text-attention font-bold mt-0.5">ผลิตไม่ทัน!</div>
+                <div className="text-[9px] text-attention font-bold mt-0.5">
+                  {hasDeficit ? `ขาด ${proposal?.deficitBoxesPerDay} ต่อวัน` : "ไม่พบส่วนที่ขาดในข้อเสนอนี้"}
+                </div>
               )}
             </div>
 
@@ -207,8 +244,14 @@ export const HeroAssembly: React.FC = () => {
               <div className="w-6 h-6 mx-auto rounded-lg bg-resource/20 text-resource flex items-center justify-center mb-1">
                 <Truck className="w-3.5 h-3.5" />
               </div>
-              <div className="text-[10px] text-slate-300 font-medium">รถเย็นรวม</div>
-              <div className="text-[11px] font-bold text-resource">แชร์ 6 ร้าน</div>
+              <div className="text-[10px] text-slate-300 font-medium">{truck?.title || "รถขนส่ง"}</div>
+              <div className="text-[11px] font-bold text-resource">
+                {!truck
+                  ? "ยังไม่มีข้อมูล"
+                  : truck.status === "confirmed"
+                  ? `ยืนยันแล้ว · เจ้าของ ${sharedTruckShops} ราย`
+                  : "ยังเป็นข้อเสนอ ไม่ได้ยืนยัน"}
+              </div>
             </div>
 
             {/* 5. Funding Node */}
@@ -222,10 +265,14 @@ export const HeroAssembly: React.FC = () => {
               <div className="w-7 h-7 mx-auto rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1">
                 <Coins className="w-3.5 h-3.5" />
               </div>
-              <div className="text-[10px] text-slate-300 font-medium">Invoice Factoring</div>
-              <div className="text-[11px] font-bold text-brand-glow">เติมทุน 24 ชม.</div>
+              <div className="text-[10px] text-slate-300 font-medium">ทุนหมุนเวียนที่ต้องเติม</div>
+              <div className="text-[11px] font-bold text-brand-glow">
+                {proposal ? amount(proposal.totalFundingGap) : "ยังไม่มีข้อมูล"}
+              </div>
               {activeScenario === "funding_gap" && (
-                <div className="text-[9px] text-danger font-bold mt-0.5">ขาด ฿14,000</div>
+                <div className="text-[9px] text-danger font-bold mt-0.5">
+                  {hasGap ? `ขาด ${amount(proposal?.totalFundingGap)}` : "ไม่พบส่วนที่ขาดในข้อเสนอนี้"}
+                </div>
               )}
             </div>
           </div>

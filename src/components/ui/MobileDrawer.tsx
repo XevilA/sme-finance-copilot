@@ -1,4 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
+import { apiClient } from "@/api/client";
+import { SwarmProposal } from "@/api/contracts/types";
+import { useEnvelope } from "@/hooks/useEnvelope";
 import { useAppStore, NavPage, UserRole } from "@/store/useAppStore";
 import {
   LayoutDashboard,
@@ -77,7 +80,6 @@ const navItems: NavItem[] = [
     id: "funding",
     label: "7. จับคู่แหล่งเงินทุน",
     icon: <Coins className="w-4 h-4" />,
-    badge: "ขาด ฿29.5k",
     badgeColor: "bg-red-50 text-danger border border-red-200",
     group: "ประกอบโอกาส & ทีม",
   },
@@ -140,6 +142,13 @@ export const MobileDrawer: React.FC = () => {
     isReducedMotion,
     toggleReducedMotion,
   } = useAppStore();
+
+  // The funding badge reports the stored proposal's own gap, not a fixed figure.
+  const proposalState = useEnvelope<SwarmProposal>(useCallback(() => apiClient.getSwarmProposal(), []));
+  const proposal = proposalState.envelope?.data || null;
+  const fundingBadge = proposal && proposal.totalFundingGap > 0
+    ? `ขาด ฿${proposal.totalFundingGap.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`
+    : null;
 
   if (!isMobileMenuOpen) return null;
 
@@ -233,7 +242,7 @@ export const MobileDrawer: React.FC = () => {
                           </span>
                           <span className="truncate">{item.label}</span>
                         </div>
-                        {item.badge && (
+                        {(item.id === "funding" ? fundingBadge : item.badge) && (
                           <span
                             className={`text-[9px] px-1.5 py-0.5 rounded-chip font-bold shrink-0 ${
                               isActive
@@ -241,7 +250,7 @@ export const MobileDrawer: React.FC = () => {
                                 : item.badgeColor || "bg-slate-100 text-ink-muted"
                             }`}
                           >
-                            {item.badge}
+                            {item.id === "funding" ? fundingBadge : item.badge}
                           </span>
                         )}
                       </button>

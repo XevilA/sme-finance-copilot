@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { BusinessOverview, Envelope } from "@/api/contracts/types";
+import { BusinessOverview } from "@/api/contracts/types";
+import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
 import { HeroAssembly } from "./HeroAssembly";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -21,30 +22,37 @@ import {
 
 export const OverviewPage: React.FC = () => {
   const { setCurrentPage, setAIPanelOpen, activeEvidenceTargetId } = useAppStore();
-  const [dataEnvelope, setDataEnvelope] = useState<Envelope<BusinessOverview> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const load = useCallback(() => apiClient.getOverview(), []);
+  const state = useEnvelope<BusinessOverview>(load);
+  const { envelope: dataEnvelope, loading, error, reload: loadData } = state;
+  const mode = envelopeMode(state, (value) =>
+    value.revenue == null && value.expense == null && value.netProfit == null
+    && value.cashBalance == null && value.actionableItems.length === 0);
   const amount = (value: number | null | undefined) => value == null ? "ยังไม่มีข้อมูล" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 });
   const change = (value: number | null | undefined) => value == null ? "ยังไม่มีข้อมูลเทียบงวดก่อน" : `${value > 0 ? "+" : ""}฿${amount(value)} เทียบงวดก่อน`;
   const [selectedMetric, setSelectedMetric] = useState<"cash" | "profit" | "revenue" | "expense">("cash");
 
-  const loadData = () => {
-    setLoading(true);
-    setError("");
-    apiClient
-      .getOverview()
-      .then((res) => {
-        setDataEnvelope(res);
-        setLoading(false);
-      })
-      .catch((err) => { setError(err.message); setLoading(false); });
-  };
+  if (!loading && (error || mode === "error")) {
+    return (
+      <StateRenderer currentMode="error" errorMessage={error || "อ่านภาพรวมธุรกิจจาก backend ไม่สำเร็จ"} onRetry={loadData}>
+        {null}
+      </StateRenderer>
+    );
+  }
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  if (!loading && error) return <StateRenderer currentMode="error" errorMessage={error} onRetry={loadData}>{null}</StateRenderer>;
+  if (!loading && dataEnvelope && (mode === "unavailable" || mode === "insufficient_data")) {
+    return (
+      <StateRenderer
+        currentMode={mode === "unavailable" ? "unavailable" : "insufficient_data"}
+        unavailableReason="ยังไม่มีงบการเงินที่วิเคราะห์แล้วสำหรับกิจการนี้"
+        missingItems={dataEnvelope.missing}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("import")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
 
   if (loading || !dataEnvelope) {
     return (
@@ -65,9 +73,11 @@ export const OverviewPage: React.FC = () => {
 
   return (
     <StateRenderer
+      currentMode={mode === "stale" ? "stale" : undefined}
+      missingItems={dataEnvelope.missing}
       onAddData={() => setCurrentPage("import")}
       onRetry={loadData}
-      onReanalyze={loadData}
+      onReanalyze={() => setCurrentPage("import")}
     >
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in text-ink">
         {/* Signature S1: Hero Assembly Studio */}
@@ -85,8 +95,9 @@ export const OverviewPage: React.FC = () => {
             <p className="text-xs text-ink-muted flex items-center gap-2 mt-1">
               <Calendar className="w-3.5 h-3.5" />
               <span>
-                ข้อมูลงวด: <strong>{data.period}</strong> · ปรับปรุงล่าสุด:{" "}
-                {new Date(asOf).toLocaleDateString("th-TH")}
+                ข้อมูลงวด: <strong>{data.period}</strong> · ที่มา: {dataEnvelope.source}
+                {asOf ? ` · ปรับปรุงล่าสุด: ${new Date(asOf).toLocaleDateString("th-TH")}` : " · ยังไม่ระบุวันที่ข้อมูล"}
+                {dataEnvelope.missing.length ? ` · ข้อมูลที่ยังขาด ${dataEnvelope.missing.length} รายการ` : ""}
               </span>
             </p>
           </div>
@@ -94,11 +105,11 @@ export const OverviewPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={loadData}
+              onClick={() => setCurrentPage("import")}
               className="px-3 py-1.5 bg-white border border-borderLine hover:border-brand/40 text-xs font-medium rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <RefreshCw className="w-3 h-3 text-ink-muted" />
-              <span>วิเคราะห์ใหม่</span>
+              <span>แก้ข้อมูลและวิเคราะห์ใหม่</span>
             </button>
 
             <button

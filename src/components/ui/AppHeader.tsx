@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { useAppStore, UserRole, PageStateMode } from "@/store/useAppStore";
+import { apiClient } from "@/api/client";
+import { SwarmOrder } from "@/api/contracts/types";
+import { useEnvelope } from "@/hooks/useEnvelope";
 import {
   Search,
   Sliders,
@@ -31,6 +34,11 @@ export const AppHeader: React.FC = () => {
     setMobileMenuOpen,
   } = useAppStore();
 
+  // The project line names the stored active order rather than a fixed demo
+  // project and buyer. With no stored order it says so.
+  const orderState = useEnvelope<SwarmOrder>(useCallback(() => apiClient.getOrder(), []));
+  const order = orderState.envelope?.data || null;
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-borderLine px-3 sm:px-4 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
       {/* Left: Mobile Menu Trigger & Project Selector */}
@@ -57,7 +65,9 @@ export const AppHeader: React.FC = () => {
               </span>
             </div>
             <div className="text-[11px] text-ink-muted leading-tight mt-0.5 truncate hidden sm:block">
-              โครงการ: <strong>อาหารกล่อง 300 กล่อง/วัน</strong> (บจก.สยามเทคโนพาร์ค)
+              {order
+                ? <>โครงการ: <strong>{order.title}</strong> ({order.buyerName})</>
+                : <>โครงการ: <strong>ยังไม่ได้เลือกโครงการ</strong></>}
             </div>
           </div>
         </div>
