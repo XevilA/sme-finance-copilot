@@ -26,6 +26,7 @@ import {
   ProjectRecord,
   AIResponse,
 } from "./contracts/types";
+import type { UploadPreview } from "./statementImport";
 
 import {
   acceptAnalysis,
@@ -352,6 +353,16 @@ export const apiClient = {
     const body = new FormData();
     body.append("file", file);
     return requestJson("/upload?persist=false", { method: "POST", body });
+  },
+
+  async previewStatement(file: File): Promise<UploadPreview> {
+    requireBackend();
+    if (!/\.xlsx$/i.test(file.name)) throw new Error("กรุณาเลือกไฟล์ .xlsx");
+    // Leaves room for multipart overhead under Vercel's 4.5 MB request limit.
+    if (!file.size || file.size > 4 * 1024 * 1024) throw new Error("ไฟล์ต้องไม่ว่างและมีขนาดไม่เกิน 4 MiB สำหรับเว็บนี้");
+    const body = new FormData();
+    body.append("file", file);
+    return requestJson("/upload/preview", { method: "POST", body });
   },
 
   /**

@@ -5,5 +5,14 @@ node_modules
 *.pdf
 extracted_doc_text.txt
 
-# The Vite build does not use the Python backend.
-backend
+# Include backend source for the API function, never local state/customer data.
+.env*
+.worktrees
+backend/.env*
+backend/.venv
+backend/.deps
+backend/uploads
+backend/templates
+backend/tests
+backend/docs
+**/__pycache__

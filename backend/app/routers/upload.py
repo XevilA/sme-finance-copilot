@@ -17,8 +17,40 @@ from ..finance import calculate_business_metrics, calculate_financials
 from ..grading import grade_financials
 from ..repository import parse_uuid, save_financial_record, save_upload_event
 from ..schemas import FinancialInput
+from parsers.statement_parser import extract_statement_workbook
 
 router = APIRouter(tags=["upload"])
+
+
+@router.post("/upload/preview")
+async def preview_upload(file: UploadFile = File(...)) -> dict:
+    """Read only: preview canonical input or separately scoped statements.
+
+    No DB writes, model calls, grading or merging of unrelated statements.
+    Existing /upload keeps its validated FinancialInput contract.
+    """
+    filename = file.filename or "upload.xlsx"
+    try:
+        content = await file.read(MAX_UPLOAD_BYTES + 1)
+    finally:
+        await file.close()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Workbook exceeds 5 MiB")
+    try:
+        try:
+            data = await run_in_threadpool(parse_excel, content, filename)
+        except ExtractionError as canonical_error:
+            try:
+                report = await run_in_threadpool(extract_statement_workbook, content, filename)
+            except ExtractionError:
+                raise canonical_error
+            return {**report, "format": "statements", "persisted": False}
+        return {"format": "financials", "input": data.model_dump(mode="json"),
+                "source": "supplied_input", "persisted": False}
+    except ExtractionError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(422, exc.errors(include_context=False, include_input=False)) from exc
 
 
 async def record_rejection(sme_id: str | None, filename: str, size: int, digest: str, reason: str) -> None:

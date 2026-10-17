@@ -1,5 +1,18 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "build": { "env": { "VITE_USE_MOCK": "false", "VITE_API_BASE_URL": "/api/v1" } },
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{node_modules/**,src/**,dist/**,.worktrees/**,backend/.env*,backend/.venv/**,backend/.deps/**,backend/uploads/**,backend/templates/**,backend/tests/**,backend/docs/**,**/__pycache__/**}"
+    }
+  },
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index.py" },
+    { "source": "/health", "destination": "/api/index.py" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

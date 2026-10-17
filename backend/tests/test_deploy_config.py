@@ -167,3 +167,19 @@ def test_dockerignore_keeps_secrets_and_local_state_out_of_the_image():
     ignored = (BACKEND / ".dockerignore").read_text(encoding="utf-8").split()
     for entry in (".env", ".venv/", "uploads/", "tests/"):
         assert entry in ignored, f"{entry} would be copied into the image"
+
+
+def test_vercel_serves_api_before_spa_and_excludes_private_workbooks():
+    import json
+    root = BACKEND.parent
+    config = json.loads((root / "vercel.json").read_text(encoding="utf-8"))
+    assert config["framework"] == "vite"
+    assert config["rewrites"][0] == {"source": "/api/:path*", "destination": "/api/index.py"}
+    assert config["rewrites"][-1]["destination"] == "/index.html"
+    assert config["build"]["env"] == {"VITE_USE_MOCK": "false", "VITE_API_BASE_URL": "/api/v1"}
+    excluded = config["functions"]["api/index.py"]["excludeFiles"]
+    ignored = (root / ".vercelignore").read_text(encoding="utf-8")
+    for private in ("backend/.env", "backend/.venv", "backend/uploads", "backend/templates", ".worktrees"):
+        assert private in ignored and private in excluded
+    assert "from app.main import app" in (root / "api/index.py").read_text(encoding="utf-8")
+    assert "DB_BOOTSTRAP" in (root / "api/index.py").read_text(encoding="utf-8")

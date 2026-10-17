@@ -4,6 +4,8 @@ import { noteDraftRevision, revisionFor } from "@/api/activeAnalysis";
 import { useAppStore } from "@/store/useAppStore";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
+import { StatementRecord } from "@/api/statementImport";
+import { StatementPreview } from "./StatementPreview";
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -23,6 +25,7 @@ export const ImportPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<number>(1);
   const fileInput = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
+  const [statementRecords, setStatementRecords] = useState<StatementRecord[] | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem("financial-input-draft-v1") || "null");
@@ -124,7 +127,13 @@ export const ImportPage: React.FC = () => {
     try {
       let input: FinancialInput;
       if (file) {
-        input = (await apiClient.uploadStatement(file)).input;
+        setStatementRecords(null);
+        const preview = await apiClient.previewStatement(file);
+        if (preview.format === "statements") {
+          setStatementRecords(preview.statements);
+          return;
+        }
+        input = preview.input;
       } else {
         const values: Record<string, unknown> = {};
         const loan: Record<string, string | number> = {};
@@ -228,7 +237,7 @@ export const ImportPage: React.FC = () => {
                 ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์
               </h3>
               <p className="text-xs text-ink-muted mt-0.5">
-                รองรับไฟล์ .XLSX ตาม Template ขนาดไม่เกิน 5 MiB
+                รองรับไฟล์ .XLSX แบบ Financials และงบไทย/อังกฤษหลายงบ ขนาดไม่เกิน 4 MiB
               </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
@@ -251,10 +260,19 @@ export const ImportPage: React.FC = () => {
             </div>
           </div>
 
+          {statementRecords && <StatementPreview records={statementRecords} onImport={(values) => {
+            setDraft(values);
+            try { sessionStorage.setItem("financial-input-draft-v1", JSON.stringify(values)); } catch { /* Optional draft store. */ }
+            setStatementRecords(null);
+            setActiveSection(1);
+            setActiveTab("manual");
+            addToast({ type: "warning", title: "นำเข้างบที่เลือกแล้ว", message: "กรุณาตรวจตัวเลขและกรอกวันที่เริ่ม/สิ้นงวดที่ยังขาด ก่อนยืนยันการวิเคราะห์", duration: 10000 });
+          }} />}
+
           {/* Template layout the parser actually reads (no automatic mapping) */}
           <div className="bg-white p-5 rounded-card border border-borderLine space-y-3">
             <h4 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-              โครงสร้างไฟล์ที่ระบบอ่าน · ไม่มีการจับคู่คอลัมน์อัตโนมัติ · ต้องมี 7 ฟิลด์บังคับ
+              แบบ Financials วิเคราะห์ได้ทันที ส่วนไฟล์หลายงบต้องเลือกชุดข้อมูลและตรวจในแบบฟอร์มก่อน · ต้องมี 7 ฟิลด์บังคับ
               (currency, kind, period_start, period_end, assets, liabilities, equity) และ assets = liabilities + equity
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
@@ -343,20 +361,20 @@ export const ImportPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">ยอดขายเฉลี่ยต่อเดือน (฿)</label>
+                <label className="font-bold text-ink block mb-1">รายได้รวมในงวด (฿)</label>
                 <input
                   type="number"
-                  name="revenue" aria-label="ยอดขายเฉลี่ยต่อเดือน (฿)" value={draft.revenue || ""}
+                  name="revenue" aria-label="รายได้รวมในงวด (฿)" value={draft.revenue || ""}
                   onChange={(event) => updateDraft("revenue", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">เงินสดคงเหลือในบัญชีวันนี้ (฿)</label>
+                <label className="font-bold text-ink block mb-1">เงินสดคงเหลือปลายงวด (฿)</label>
                 <input
                   type="number"
-                  name="cash_balance" aria-label="เงินสดคงเหลือในบัญชีวันนี้ (฿)" value={draft.cash_balance || ""}
+                  name="cash_balance" aria-label="เงินสดคงเหลือปลายงวด (฿)" value={draft.cash_balance || ""}
                   onChange={(event) => updateDraft("cash_balance", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />

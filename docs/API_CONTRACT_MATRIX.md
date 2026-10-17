@@ -288,3 +288,13 @@ Saved simulation มี POST save แต่ยังไม่มี GET read/lis
 
 AI evidence ใช้ evidenceIds/dataUsed.targetElementId จากผล SME/input เดียวกับตัวเลข.
 Animation/Story/Phase เป็น presentation ไม่ใช่หลักฐานว่า engine หรือ write ถูกเรียกแล้ว
+
+## Excel preview addition — 2026-10-17
+
+`POST /api/v1/upload/preview` (also `/api/upload/preview`): multipart `file`,
+read-only, no SME/project identity required. `format=financials` returns validated
+`input`; `format=statements` returns separate scoped records and no combined
+FinancialInput/grade. `persisted=false` always. Invalid/unsupported files: 422;
+over 5 MiB: 413. Browser limit: 4 MiB on Vercel. Selection is transferred to the
+manual review form, then submitted to the existing manual validation/analyze
+contracts. See [Excel import fix](../backend/docs/EXCEL_IMPORT_FIX.md).
