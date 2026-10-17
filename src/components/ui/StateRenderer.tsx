@@ -1,5 +1,6 @@
 import React from "react";
 import { PageStateMode, useAppStore } from "@/store/useAppStore";
+import { databaseUnavailable, missingDataLabel } from "@/api/dataAvailability";
 import {
   FileQuestion,
   AlertTriangle,
@@ -40,6 +41,16 @@ export const StateRenderer: React.FC<StateRendererProps> = ({
 }) => {
   const globalMode = useAppStore((s) => s.pageStateMode);
   const effectiveMode = currentMode || globalMode;
+
+  if (["error", "insufficient_data", "unavailable"].includes(effectiveMode) && databaseUnavailable(missingItems, errorMessage)) {
+    return <div className="min-h-[460px] flex flex-col items-center justify-center p-8 text-center bg-slate-50 rounded-card border border-borderLine m-4">
+      <ShieldAlert className="w-10 h-10 text-ink-muted mb-4" />
+      <h3 className="text-base font-display font-bold text-ink mb-2">หน้านี้ต้องเชื่อมฐานข้อมูลออนไลน์ก่อน</h3>
+      <p className="text-xs text-ink-muted max-w-lg leading-relaxed">เว็บนี้ยังไม่ได้เชื่อมฐานข้อมูลสำหรับรายการร้านค้า ออเดอร์ แหล่งทุน และโครงการ การอัปโหลด Excel ใช้คำนวณงบการเงินได้ แต่ยังไม่มีรายการเหล่านี้ให้หน้านี้เรียกใช้</p>
+      <p className="text-xs text-ink-muted max-w-lg mt-3">ผู้ดูแลต้องเชื่อมฐานข้อมูลและเพิ่มรายการที่เกี่ยวข้องก่อน แล้วจึงโหลดหน้านี้ใหม่</p>
+      {onRetry && <button type="button" onClick={onRetry} className="mt-5 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-btn text-xs font-semibold flex items-center gap-2"><RefreshCw className="w-4 h-4" />ตรวจการเชื่อมต่ออีกครั้ง</button>}
+    </div>;
+  }
 
   // 1. Normal State -> Render full page children
   if (effectiveMode === "normal") {
@@ -122,7 +133,7 @@ export const StateRenderer: React.FC<StateRendererProps> = ({
           <ul className="text-xs text-ink-muted space-y-1.5 list-disc pl-4">
             {missingItems.map((item, idx) => (
               <li key={idx} className="font-medium text-amber-900">
-                {item}
+                {missingDataLabel(item)}
               </li>
             ))}
           </ul>
@@ -159,20 +170,20 @@ export const StateRenderer: React.FC<StateRendererProps> = ({
             <ul className="text-xs text-ink-muted space-y-1.5 list-disc pl-4">
               {missingItems.map((item, idx) => (
                 <li key={idx} className="font-mono text-[11px]">
-                  {item}
+                  {missingDataLabel(item)}
                 </li>
               ))}
             </ul>
           </div>
         )}
-        <button
+        {onAddData && <button
           type="button"
           onClick={onAddData}
           className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-ink rounded-btn text-xs font-semibold flex items-center gap-1.5 transition-all"
         >
           <PlusCircle className="w-4 h-4" />
           <span>ไปหน้านำเข้าข้อมูล</span>
-        </button>
+        </button>}
       </div>
     );
   }

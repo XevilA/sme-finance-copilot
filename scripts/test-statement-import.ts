@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { StatementRecord, statementDraft } from "../src/api/statementImport";
+import { StatementRecord, statementDraft, statementWithYear, validateImportedPeriod } from "../src/api/statementImport";
 
 const balance: StatementRecord = {
   sheet: "synthetic", section: "balance_sheet", column: "B",
@@ -27,4 +27,14 @@ assert.throws(() => statementDraft([
   { ...income, period: { ...income.period, periodEnd: "2019-09-28" } },
 ]), /ไม่ตรงกัน/);
 assert.equal(statementDraft([{ ...balance, period: { ...balance.period, periodEnd: "2019-12-31" } }]).period_end, "2019-12-31");
+const unknownYear = { ...balance, status: "insufficient_data", period: { ...balance.period, year: null } };
+assert.equal(statementWithYear(unknownYear, "2562").period.year, 2019);
+assert.equal(statementWithYear(unknownYear, "2019").period.year, 2019);
+assert.equal(unknownYear.period.year, null, "Source metadata must not be mutated");
+assert.equal(statementWithYear(balance, "2026").period.year, 2019, "Known years cannot be relabelled");
+assert.equal(statementDraft([statementWithYear(unknownYear, "2562"), income]).statement_year, "2019");
+for (const value of ["", "1", "20xx", "2019.5", "9999"]) assert.throws(() => statementWithYear(unknownYear, value));
+assert.throws(() => validateImportedPeriod({ statement_year: "2019", period_end: "2026-12-31" }), /วันสิ้นงวด/);
+assert.doesNotThrow(() => validateImportedPeriod({ statement_year: "2019", period_start: "2018-10-01", period_end: "2019-09-30" }));
+assert.throws(() => statementDraft([statementWithYear({ ...unknownYear, status: "empty_template" }, "2562")]), /ยังไม่พร้อม/);
 console.log("Statement import: matching source selection, unknown fields, dates and unsafe combinations passed.");

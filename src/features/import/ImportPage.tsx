@@ -4,7 +4,7 @@ import { noteDraftRevision, revisionFor } from "@/api/activeAnalysis";
 import { useAppStore } from "@/store/useAppStore";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
-import { StatementRecord } from "@/api/statementImport";
+import { StatementRecord, validateImportedPeriod } from "@/api/statementImport";
 import { StatementPreview } from "./StatementPreview";
 import {
   UploadCloud,
@@ -135,6 +135,7 @@ export const ImportPage: React.FC = () => {
         }
         input = preview.input;
       } else {
+        validateImportedPeriod(draft);
         const values: Record<string, unknown> = {};
         const loan: Record<string, string | number> = {};
         for (const field of [...fields, { key: "revenue" }, { key: "cash_balance" }, { key: "minimum_cash_reserve" }]) {
@@ -347,6 +348,8 @@ export const ImportPage: React.FC = () => {
               </h3>
               <span className="text-xs text-ink-muted font-medium">บันทึกร่างอัตโนมัติ</span>
             </div>
+
+            {draft.statement_year && <p className="text-xs text-brand">งบที่นำเข้าเป็นปี ค.ศ. {draft.statement_year} · โปรดระบุวันสิ้นงวดให้ตรงกับปีของงบ</p>}
 
             {/* Fields Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">

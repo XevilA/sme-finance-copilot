@@ -80,7 +80,7 @@ export const ShopFinancePage: React.FC = () => {
         unavailableReason={shops.length
           ? "ยังไม่มีแผนการเงินที่บันทึกไว้สำหรับร้านที่เลือก"
           : "ยังไม่มีร้านค้าในฐานข้อมูลให้เลือก"}
-        missingItems={financeState.envelope?.missing || []}
+        missingItems={[...(shopsState.envelope?.missing || []), ...(financeState.envelope?.missing || [])]}
         onRetry={loadData}
         onAddData={() => setCurrentPage("swarm")}
       >
