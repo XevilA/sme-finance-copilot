@@ -161,6 +161,9 @@ const hookPlugin = {
       if (path === "react/jsx-runtime") return { contents: "export const jsx=(type,props)=>({type,props:props||{},children:[props?.children].flat()}); export const jsxs=jsx;" };
       if (path === "react") return { contents: `
         export const useRef = value => ({current:value});
+        // This harness renders the component as one synchronous call, so
+        // effects are not run here; handlers are what these cases exercise.
+        export const useEffect = () => {};
         export const useState = initial => {
           let value = typeof initial === 'function' ? initial() : initial;
           if (value === 'manual') value = globalThis.__importTest.mode;

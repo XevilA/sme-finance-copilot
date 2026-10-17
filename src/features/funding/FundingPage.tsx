@@ -260,7 +260,7 @@ export const FundingPage: React.FC = () => {
                       <td className="py-2.5 font-bold text-ink">{opt.name}</td>
                       <td className="py-2.5 text-ink-muted">{opt.typeLabel}</td>
                       <td className="py-2.5 font-bold font-mono text-brand">
-                        {opt.interestRateAnnual}%
+                        {(opt.interestRateAnnual * 100).toLocaleString("th-TH", { maximumFractionDigits: 2 })}%
                       </td>
                       <td className="py-2.5 font-bold font-mono text-emerald-700">
                         {opt.disbursementDays} วัน

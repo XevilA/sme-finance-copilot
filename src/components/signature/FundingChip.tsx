@@ -70,7 +70,7 @@ export const FundingChip: React.FC<FundingChipProps> = ({
         <div className="border-x border-slate-200">
           <span className="text-[10px] text-ink-muted block">ดอกเบี้ย</span>
           <span className="text-xs font-bold text-brand tabular-nums">
-            {funding.interestRateAnnual}% ต่อปี
+            {(funding.interestRateAnnual * 100).toLocaleString("th-TH", { maximumFractionDigits: 2 })}% ต่อปี
           </span>
         </div>
         <div>

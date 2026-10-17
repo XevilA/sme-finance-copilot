@@ -225,6 +225,7 @@ export type FundingOption = {
   typeLabel: string;
   maxAmount: number;
   minAmount: number;
+  // Decimal fraction per year: 0.15 is 15%, not 0.15%.
   interestRateAnnual: number;
   termMonths: number;
   disbursementDays: number;

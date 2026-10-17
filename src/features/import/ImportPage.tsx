@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { apiClient, FinancialInput } from "@/api/client";
 import { noteDraftRevision, revisionFor } from "@/api/activeAnalysis";
 import { useAppStore } from "@/store/useAppStore";
@@ -80,10 +80,15 @@ export const ImportPage: React.FC = () => {
     setDraft((previous) => {
       const next = { ...previous, [key]: value };
       try { sessionStorage.setItem("financial-input-draft-v1", JSON.stringify(next)); } catch { /* Optional local draft only. */ }
-      noteDraftRevision(revisionFor(next));
       return next;
     });
   };
+
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
+    noteDraftRevision(revisionFor(draft));
+  }, [draft]);
 
   // Stepper Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
