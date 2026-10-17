@@ -1,5 +1,30 @@
 # การส่งมอบงานของ CODEX
 
+## Excel บน Vercel — แก้และตรวจ production แล้ว 2026-10-17
+
+Commit `12aa468` แก้กรณีผู้ใช้อัปโหลด translated workbook แล้วติด mock mode.
+เพิ่ม API function บน Vercel project เดิมและกำหนด build ให้ใช้ `/api/v1` จริง;
+ไม่ provision DB/บริการใหม่หรือเปิด paid LLM. อ่านไฟล์หลายงบผ่าน read-only
+`POST /upload/preview` และเพิ่มการเลือกชีต/ปี/สกุลเงินก่อนนำเข้าแบบฟอร์มเดิม.
+ไม่รวม USD กับ THB หรือเดางบฐานะการเงินที่ว่าง. Revenue/cash labels อ้างอิงงวด.
+
+Vercel Production `7139985114` สำเร็จ; health/capabilities เป็น JSON 200 แล้ว.
+ทดสอบ synthetic HTTP preview → validate → calculate → analyze ผ่านบนโดเมนจริง
+รวม invalid 422 และ template. Browser อัปโหลดไฟล์ของผู้ใช้บนเว็บจริงอ่านได้
+12 records และเลือกงบกำไรขาดทุนไทยได้ ไม่มี mock error. ผู้ใช้ยังต้องกรอก
+วันเริ่ม/สิ้นงวดและสินทรัพย์/หนี้สิน/ส่วนทุนจริง เพราะในไฟล์เป็นแบบฟอร์มว่าง.
+
+Tests: preview/parser 25 passed; deployment 20 passed; TypeScript selection
+assertions, frontend invariants และ build ผ่าน. Full no-DB regression ก่อนเพิ่ม
+deployment assertion สุดท้าย: 433 passed/122 skipped. Local browser synthetic
+flow ถึง Overview แสดงผลของ input ที่เลือก. Production assets:
+`index-my_f_pLU.js`, `index-DDqZG6-c.css`; local build 1959 modules.
+
+ข้อจำกัด deployment นี้: `persistence=false` — คำนวณ/นำเข้า/วิเคราะห์ได้
+แต่การบันทึกโครงการหรือ simulation ถาวรยังต้องตั้ง DATABASE_URL ให้บริการที่มีอยู่.
+ดู [รายละเอียดและหลักฐาน](EXCEL_IMPORT_FIX.md). ข้อความเก่าว่า Vercel ไม่มี API
+ใน frontend handoff เป็นสถานะก่อน commit นี้.
+
 ## รอบ CODEX 2026-10-17 — Backend implementation and verified handover
 
 ฐานเริ่ม `5422af8` หลัง fetch origin/main; ทำใน isolated worktree

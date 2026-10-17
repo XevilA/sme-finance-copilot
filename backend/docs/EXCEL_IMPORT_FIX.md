@@ -58,5 +58,28 @@ reached the real 12-record selection view, including the two eligible income
 columns and blocked USD/template records. Production verification is recorded
 separately after deployment; local success is not deployment evidence.
 
+## Production verification — commit `12aa468`
+
+GitHub's Vercel deployment status is success, Production deployment `7139985114`.
+The existing domain `https://sme-finance-copilot.vercel.app` now serves
+`index-my_f_pLU.js` and `index-DDqZG6-c.css` (1959 modules in local build).
+`/health` and `/api/v1/capabilities` answer HTTP 200 `application/json`;
+health confirms `persistence=false` and bootstrap `off`.
+
+Real production HTTP tests with a synthetic workbook passed preview, manual
+validation, calculation, analysis, invalid-file rejection and canonical template
+preview. Analysis views retained `source=supplied_input`, the expected synthetic
+profit and an unknown cash flow; requests used `persist=false`/`use_llm=false`.
+Browser upload of the user's original workbook on the production domain also
+reached the 12-record selection view, with the THB income records selectable
+and the USD/placeholder records blocked. No mock-mode error appeared. No real
+balance-sheet amounts or dates were fabricated to complete that user's analysis.
+
+Local browser acceptance with synthetic balance/income selection, explicit
+dates and submission reached Overview showing the supplied revenue/expenses/
+profit, and unknown reserve/cash-flow evidence remained unknown. Screenshot
+evidence of the production selection view is local/ignored in
+`backend/uploads/vercel-excel-import-fixed.jpg`.
+
 Vercel references: [Python functions](https://vercel.com/docs/functions/runtimes/python/api-directory),
 [runtime](https://vercel.com/docs/functions/runtimes/python).
