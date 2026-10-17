@@ -109,7 +109,7 @@ async def analysis_context(
         return None, None
     async with session_scope() as session:
         events = await catalog.load_cash_events(session, resolved.sme_id)
-        history = await load_expense_history(session, resolved.sme_id)
+        history = await load_expense_history(session, resolved.sme_id, through=resolved.data.period_end)
     if resolved.data.cash_balance is None:
         # No dated cash snapshot to start from, so no forecast is attempted.
         return None, history

@@ -53,7 +53,7 @@ async def analysis_context(
         return None, None
     async with session_scope() as session:
         events = await catalog.load_cash_events(session, owner)
-        history = await load_expense_history(session, owner)
+        history = await load_expense_history(session, owner, through=data.period_end)
     if data.cash_balance is None:
         return None, history
     forecast = await run_in_threadpool(

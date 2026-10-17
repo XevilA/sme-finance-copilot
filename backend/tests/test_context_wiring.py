@@ -86,10 +86,17 @@ def evidence(body: dict) -> dict:
 # --- expense history reaches the analysis for the SME it belongs to ----------
 
 @needs_db
-def test_overview_carries_the_unusual_expense_finding_of_that_sme():
-    """Rung Charoen's October raw-material total is 69.41% above its own baseline."""
+def test_overview_does_not_explain_a_september_statement_using_october_expenses():
+    """Intentional period-alignment correction: latest observation is not the selected period."""
     flagged = client.get("/api/v1/overview", params={"sme_id": RUNG_CHAROEN}).json()
-    assert f"unusual_expense_{MATERIALS}" in action_ids(flagged)
+    assert flagged["asOf"] == "2026-09-30"
+    assert f"unusual_expense_{MATERIALS}" not in action_ids(flagged)
+    # The positive anomaly case remains required for the correctly selected
+    # October statement, rather than weakening the original financial check.
+    october = client.post("/api/analyze", json={"input": {**EXAMPLE, "period_end": "2026-10-31"},
+        "sme_id": RUNG_CHAROEN}).json()
+    assert f"unusual_expense_{MATERIALS}" in {row["id"] for row in october["data"]["findings"]}
+    assert october["asOf"] == "2026-10-31"
 
 
 @needs_db
@@ -102,7 +109,10 @@ def test_another_smes_history_is_not_borrowed_to_fill_the_gap():
 @needs_db
 def test_the_expense_evidence_served_is_the_requested_smes_own_rows():
     """168,000 is Rung Charoen's October figure; Baan Suan's is not flagged at all."""
-    flagged = client.get("/api/v1/health/indicators", params={"sme_id": RUNG_CHAROEN}).json()
+    october = client.post("/api/analyze", json={"input": {**EXAMPLE, "period_end": "2026-10-31"},
+        "sme_id": RUNG_CHAROEN}).json()
+    flagged = october["views"]["indicators"]
+    assert flagged["asOf"] == "2026-10-31"
     values = {indicator["id"]: indicator["value"] for indicator in flagged["data"]}
     assert values[f"health-expense_current_{MATERIALS}"] == 168000.0
     assert values[f"health-expense_baseline_{MATERIALS}"] == 99166.67
@@ -164,16 +174,17 @@ def test_an_sme_with_no_stored_cash_events_says_so_in_the_envelope():
 
 @needs_db
 def test_ai_explain_cannot_claim_ok_while_the_comparison_inside_says_otherwise():
-    """The regression this wiring exists for.
+    """A complete September expense baseline does not imply forecast coverage.
 
-    build_analysis keeps its own `missing` to the statement's fields, so for
-    Rung Charoen it is empty while data.expenseComparison.status is
-    insufficient_data - the utilities category has no October row. The envelope
-    must report that, because in this project status follows missing.
+    October's missing utility row is outside the selected statement period.
+    The unknown forecast coverage must still keep the envelope insufficient.
     """
     body = client.get("/api/v1/ai/explain", params={"sme_id": RUNG_CHAROEN}).json()
     assert body["data"]["pageId"] == "overview"
-    assert "expense_comparison_insufficient_data" in body["missing"]
+    # The September comparison has its own baseline; October's missing utility
+    # row must not contaminate September. Forecast coverage is still unknown.
+    assert "expense_comparison_insufficient_data" not in body["missing"]
+    assert "forecast_schedule_complete_through" in body["missing"]
     assert body["status"] == "insufficient_data"
 
 
