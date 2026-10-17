@@ -79,7 +79,9 @@ def capabilities() -> dict:
         "resourceReservation": {"available": False, "reason": "quantity_and_time_contract_required"},
         "orderPreview": {"available": True, "endpoint": "/api/v1/simulate/order"},
         "orderResourceOutage": {"available": True, "endpoint": "/api/v1/simulate/order", "scope": "order_only"},
-        "savedSimulationReplay": {"available": True, "endpoint": "/api/v1/simulations/{id}/replay"},
+        "savedSimulationReplay": {"available": DB_ENABLED, "requiresDatabase": True,
+                                  "endpoint": "/api/v1/simulations/{id}/replay"},
+        "deterministicAnalysis": {"available": True, "mode": "rules", "endpoint": "/api/v1/analyze"},
         "arbitraryChaosEffects": {"available": False, "reason": "Only explicit price, cost, deposit, terms, shop removal and resource outage inputs are supported"},
     }, "source": "runtime_contract", "status": "ok", "missing": []}
 

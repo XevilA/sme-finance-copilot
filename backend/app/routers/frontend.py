@@ -107,6 +107,8 @@ async def analysis_context(
     """
     if resolved.sme_id is None or not DB_ENABLED:
         return None, None
+    if schedule_complete_through is not None and schedule_complete_through < resolved.data.period_end:
+        raise HTTPException(422, "schedule_complete_through cannot precede the statement period_end")
     async with session_scope() as session:
         events = await catalog.load_cash_events(session, resolved.sme_id)
         history = await load_expense_history(session, resolved.sme_id, through=resolved.data.period_end)

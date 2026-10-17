@@ -87,6 +87,28 @@ def test_forecast_preview_without_identity_has_no_invented_dated_events():
     assert body["context"]["smeId"] is None
 
 
+@pytest.mark.parametrize("path", ["/analyze", "/calculate", "/forecast/preview", "/funding/evaluate"])
+def test_coverage_before_selected_statement_is_a_validation_error(path):
+    response = client.post("/api/v1" + path, json={"input": EXAMPLE, "schedule_complete_through": "2026-09-01"})
+    assert response.status_code == 422
+    assert "schedule_complete_through cannot precede" in response.text
+
+
+@pytest.mark.skipif(not DB_ENABLED, reason="Requires PostgreSQL")
+def test_unsupported_forecast_calendar_is_422_not_500():
+    response = client.post("/api/forecast/preview", json={"input": {**EXAMPLE, "period_end": "9999-12-31"},
+        "sme_id": "11111111-1111-4111-8111-111111111111"})
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Forecast context has an invalid date range or schedule"
+
+
+@pytest.mark.skipif(not DB_ENABLED, reason="Requires PostgreSQL")
+def test_stored_view_rejects_coverage_before_its_statement():
+    response = client.get("/api/overview", params={"sme_id": "11111111-1111-4111-8111-111111111111",
+        "schedule_complete_through": "2026-09-01"})
+    assert response.status_code == 422
+
+
 @pytest.mark.skipif(not DB_ENABLED, reason="Requires PostgreSQL")
 def test_imported_funding_does_not_use_unrelated_seed_grade_or_gap():
     response = client.post("/api/v1/funding/evaluate", json={"input": EXAMPLE, "amount": "45000", "input_revision": "synthetic-funding-1"})

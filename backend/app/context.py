@@ -7,6 +7,7 @@ from datetime import date
 
 from fastapi import HTTPException
 from pydantic import Field, model_validator
+from starlette.concurrency import run_in_threadpool
 
 from . import catalog
 from .db import DB_ENABLED, session_scope
@@ -30,6 +31,8 @@ class StatementRequest(StrictModel):
 
     @model_validator(mode="after")
     def check_revision(self):
+        if self.schedule_complete_through is not None and self.schedule_complete_through < self.input.period_end:
+            raise ValueError("schedule_complete_through cannot precede the statement period_end")
         if self.expected_input_hash is not None and self.expected_input_hash != fingerprint(self.input.model_dump(mode="json")):
             raise ValueError("expected_input_hash does not match the supplied statement")
         return self
@@ -72,9 +75,14 @@ async def scoped_evidence(request: StatementRequest) -> tuple[dict | None, list[
         history = await load_expense_history(session, request.sme_id, through=request.input.period_end)
     if request.input.cash_balance is None:
         return None, history
-    forecast = forecast_cashflow(
-        events, opening_cash=request.input.cash_balance, as_of=request.input.period_end,
-        minimum_cash_reserve=request.input.minimum_cash_reserve,
-        schedule_complete_through=request.schedule_complete_through,
-    )
+    try:
+        forecast = await run_in_threadpool(
+            lambda: forecast_cashflow(
+                events, opening_cash=request.input.cash_balance, as_of=request.input.period_end,
+                minimum_cash_reserve=request.input.minimum_cash_reserve,
+                schedule_complete_through=request.schedule_complete_through,
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(422, "Forecast context has an invalid date range or schedule") from exc
     return forecast, history
