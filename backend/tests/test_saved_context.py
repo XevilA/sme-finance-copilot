@@ -137,6 +137,25 @@ def test_known_empty_dependencies_round_trip_without_becoming_unknown(synthetic)
     assert f"resources:{synthetic['shop']}" not in context["missing"]
 
 
+def test_inline_empty_resources_cannot_bypass_a_stored_required_offered_truck(synthetic):
+    async def prepare(session):
+        allocation = SwarmAllocation(project_id=uuid.UUID(synthetic["project"]), sme_id=uuid.UUID(synthetic["shop"]),
+                                     assigned_role="producer", share_per_day=10, working_capital_needed=1200,
+                                     current_cash=5000, funding_gap=0, status="ready")
+        session.add(allocation)
+        await session.flush()
+        session.add(AllocationResource(allocation_id=allocation.id, resource_id=uuid.UUID(synthetic["truck"]), required=True))
+    db(prepare)
+    payload = {**order(synthetic), "shops": [{"shop_id": synthetic["shop"], "name": "Synthetic", "capacity_total": "10",
+        "cost_per_unit": "60", "cash_balance": "5000", "resources": []}], "persist": False}
+    response = client.post("/api/swarm", json=payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["shops"] == []
+    assert body["data"]["deficitBoxesPerDay"] == 10
+    assert body["audit"]["eligibility"][synthetic["shop"]]["missing_resources"][0]["status"] == "offered"
+
+
 def test_offered_resource_cannot_be_confirmed_by_saving_a_snapshot(synthetic):
     payload = {**order(synthetic), "persist": True, "shops": [{
         "shop_id": synthetic["shop"], "name": "Synthetic", "capacity_total": "10", "cost_per_unit": "60", "resources": [{

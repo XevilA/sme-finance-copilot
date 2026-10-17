@@ -10,7 +10,7 @@ Two separate mechanisms, because they solve different problems:
 **next_allowed_at** spaces calls out over time, including the backoff after a
 failure and any Retry-After the provider asked for.
 
-**pg_try_advisory_lock** stops two workers calling at the same instant. It is
+**pg_try_advisory_xact_lock** stops two workers calling at the same instant. It is
 tried, not waited on: a worker that cannot take it has nothing to add to the one
 that holds it, so it serves what is cached instead of queueing behind a network
 call.
@@ -20,6 +20,7 @@ success clears the counter, so one bad response does not punish the next hour.
 """
 
 import os
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -48,7 +49,9 @@ def min_interval() -> int:
 
 def lock_key(provider: str) -> int:
     """A stable signed 32-bit key, since advisory locks take integers."""
-    return LOCK_NAMESPACE + (hash(provider) % 100_000)
+    # Python hash() is randomized per interpreter, so it cannot coordinate
+    # independent workers. Keep the key deterministic across process restarts.
+    return LOCK_NAMESPACE + int.from_bytes(hashlib.sha256(provider.encode()).digest()[:4], "big") % 100_000
 
 
 @dataclass(frozen=True)
@@ -66,7 +69,7 @@ class Gate:
 
 
 async def acquire(session: AsyncSession | None, provider: str, *, force: bool = False) -> Gate:
-    """Checks the gate and takes the lock. Release with `release`.
+    """Checks the gate under a transaction lock held through the network call.
 
     `force` skips the time gate but still respects the lock, so a manual refresh
     cannot be used to stampede the provider from several workers at once.
@@ -76,6 +79,14 @@ async def acquire(session: AsyncSession | None, provider: str, *, force: bool = 
         # the honest answer: the caller is a single local process.
         return Gate(allowed=True, reason="no_coordination")
 
+    # Transaction lock cannot escape into a pooled connection and remains held
+    # until the updated backoff/cache state commits. Check time only AFTER
+    # locking, so a concurrent worker cannot act on a stale pre-commit gate.
+    acquired = (await session.execute(
+        text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": lock_key(provider)}
+    )).scalar_one()
+    if not acquired:
+        return Gate(allowed=False, reason="another_worker_is_fetching")
     now = datetime.now(timezone.utc)
     row = (
         await session.execute(
@@ -96,14 +107,6 @@ async def acquire(session: AsyncSession | None, provider: str, *, force: bool = 
             consecutive_failures=failures,
         )
 
-    acquired = (
-        await session.execute(
-            text("SELECT pg_try_advisory_lock(:k)"), {"k": lock_key(provider)}
-        )
-    ).scalar_one()
-    if not acquired:
-        return Gate(allowed=False, reason="another_worker_is_fetching", consecutive_failures=failures)
-
     await session.execute(
         text(
             """
@@ -120,11 +123,12 @@ async def acquire(session: AsyncSession | None, provider: str, *, force: bool = 
 
 
 async def release(session: AsyncSession | None, provider: str) -> None:
-    if session is None:
-        return
-    await session.execute(
-        text("SELECT pg_advisory_unlock(:k)"), {"k": lock_key(provider)}
-    )
+    """Compatibility hook: transaction locks release on commit/rollback only.
+
+    Unlocking before the gate update commits would let another worker read a
+    stale gate. The route keeps its session open through fetch and persistence.
+    """
+    return None
 
 
 async def record_success(session: AsyncSession | None, provider: str) -> None:

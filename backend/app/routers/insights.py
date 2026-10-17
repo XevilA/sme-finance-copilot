@@ -124,49 +124,34 @@ async def industry_trends(
     """
     as_of = datetime.now(timezone.utc)
     cached: list[dict] = []
-    gate = Gate(allowed=True, reason="no_coordination")
-
-    if DB_ENABLED:
-        async with session_scope() as session:
-            cached = await load_cached_articles(session, sector)
-            gate = await fetch_state.acquire(session, PROVIDER, force=force_refresh)
-
-    if not gate.allowed:
-        # Not an error: the cache is the answer while the gate is shut.
-        #
-        # Analysed directly rather than through fetch_industry_trends, which
-        # calls the provider whenever the cache is not fresh within five
-        # minutes - and a seven-day cache is almost never that fresh. Routing
-        # the shut-gate branch through it meant the gate stopped nothing in the
-        # case it exists for, and the backoff never applied. Found by Codex
-        # against a stubbed transport; a test now counts connections.
-        result = analyze_industry_articles(
-            cached, sector, as_of=as_of,
-            source_status="unavailable", source_error="provider_gate_closed",
-        )
-        async with session_scope() as session:
-            provider_status = await fetch_state.status(session, PROVIDER)
-        return _trends_response(
-            sector, result, as_of, cached, 0, provider_status,
-            gate_reason=gate.reason, retry_after=gate.retry_after_seconds,
-        )
-
-    try:
+    if not DB_ENABLED:
         result = await fetch_industry_trends(
             sector, as_of=as_of, cached_articles=cached, force_refresh=force_refresh
         )
-    finally:
-        if DB_ENABLED:
-            async with session_scope() as session:
-                await fetch_state.release(session, PROVIDER)
+        return _trends_response(sector, result, as_of, cached, 0, {"provider": PROVIDER, "coordinated": False})
 
-    stored = 0
-    if DB_ENABLED:
-        async with session_scope() as session:
+    # Transaction advisory locks belong to a PostgreSQL connection. Acquisition,
+    # network call, state update and release must use the SAME session, both
+    # under NullPool and QueuePool. Closing it before fetch drops the lock;
+    # Transaction completion releases the lock after the state commits.
+    async with session_scope() as session:
+        cached = await load_cached_articles(session, sector)
+        gate = await fetch_state.acquire(session, PROVIDER, force=force_refresh)
+        if not gate.allowed:
+            result = analyze_industry_articles(
+                cached, sector, as_of=as_of,
+                source_status="unavailable", source_error="provider_gate_closed",
+            )
+            provider_status = await fetch_state.status(session, PROVIDER)
+            return _trends_response(sector, result, as_of, cached, 0, provider_status,
+                                    gate_reason=gate.reason, retry_after=gate.retry_after_seconds)
+        try:
+            result = await fetch_industry_trends(
+                sector, as_of=as_of, cached_articles=cached, force_refresh=force_refresh
+            )
+            stored = 0
             if result.get("articles"):
                 stored = await upsert_articles(session, result["articles"])
-            # The fetcher reports its own outcome; the gate records it so the
-            # next call is spaced accordingly.
             if result.get("source_status") in {"unavailable", "error"}:
                 await fetch_state.record_failure(
                     session, PROVIDER,
@@ -176,10 +161,9 @@ async def industry_trends(
             else:
                 await fetch_state.record_success(session, PROVIDER)
             provider_status = await fetch_state.status(session, PROVIDER)
-    else:
-        provider_status = {"provider": PROVIDER, "coordinated": False}
-
-    return _trends_response(sector, result, as_of, cached, stored, provider_status)
+            return _trends_response(sector, result, as_of, cached, stored, provider_status)
+        finally:
+            await fetch_state.release(session, PROVIDER)
 
 
 def _trends_response(

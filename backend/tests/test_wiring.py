@@ -266,8 +266,14 @@ def test_forecast_404s_for_an_unknown_sme():
 
 # --- GET /api/industry/trends -----------------------------------------------
 
-def test_industry_trends_answers_even_when_the_provider_fails():
+def test_industry_trends_answers_even_when_the_provider_fails(monkeypatch):
     """A provider outage must not become a 500 or an invented headline."""
+    from app.routers import insights
+    from app.industry import analyze_industry_articles
+    monkeypatch.setattr(insights, "DB_ENABLED", False)
+    async def unavailable(sector, *, as_of, **kwargs):
+        return analyze_industry_articles([], sector, as_of=as_of, source_status="unavailable", source_error="synthetic_timeout")
+    monkeypatch.setattr(insights, "fetch_industry_trends", unavailable)
     body = client.get("/api/industry/trends?sector=food_processing").json()
     assert body["status"] in {"ok", "empty", "stale", "unavailable"}
     assert isinstance(body["data"]["articles"], list)
@@ -277,8 +283,20 @@ def test_industry_trends_answers_even_when_the_provider_fails():
         assert "industry_news" in body["missing"]
 
 
-def test_industry_trends_never_invents_a_publication_date():
+def test_industry_trends_never_invents_a_publication_date(monkeypatch):
+    from app.routers import insights
+    from app.industry import analyze_industry_articles
+    monkeypatch.setattr(insights, "DB_ENABLED", False)
+    async def supplied_article(sector, *, as_of, **kwargs):
+        return analyze_industry_articles([{
+            "id": "a" * 64, "provider": "gdelt", "sector": sector, "source": "example.test",
+            "url": "https://example.test/synthetic-publication-evidence", "title": "Synthetic publication fixture",
+            "published_at": None, "observed_at": as_of.isoformat(), "fetched_at": as_of.isoformat(),
+            "date_source": "gdelt_first_seen", "status": "fresh",
+        }], sector, as_of=as_of, source_status="live")
+    monkeypatch.setattr(insights, "fetch_industry_trends", supplied_article)
     body = client.get("/api/industry/trends?sector=food_processing").json()
+    assert body["data"]["articles"]
     for article in body["data"]["articles"]:
         if article["published_at"] is None:
             assert article["observed_at"] or article["date_source"]

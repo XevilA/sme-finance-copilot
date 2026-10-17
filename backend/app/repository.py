@@ -65,7 +65,7 @@ async def save_swarm_proposal(
     known = set(
         (await session.scalars(select(SmeProfile.id).where(SmeProfile.id.in_(list(shop_ids.values()))))).all()
     )
-    if not known:
+    if known != set(shop_ids.values()):
         return None
 
     project = await session.scalar(select(SwarmProject).where(SwarmProject.order_ref == request_payload["order_ref"]))

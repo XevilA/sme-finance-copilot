@@ -207,11 +207,14 @@ def test_expense_history_gives_a_baseline_to_compare_against():
 # --- provider rate gate -----------------------------------------------------
 
 @needs_db
-def test_the_provider_gate_blocks_a_second_immediate_call():
+def test_the_provider_gate_blocks_a_second_immediate_call(monkeypatch):
     """Several workers calling at once is what produced HTTP 429."""
     from app import fetch_state
-
-    run(lambda session: session.execute(text("DELETE FROM provider_fetch_state")))
+    from app.routers import insights
+    import app.industry as industry
+    provider = "synthetic-gate-" + uuid.uuid4().hex
+    monkeypatch.setattr(insights, "PROVIDER", provider)
+    monkeypatch.setattr(industry.httpx, "AsyncClient", CountingClient)
     first = client.get("/api/industry/trends?sector=food_processing").json()
     assert first["providerGate"]["coordinated"] is True
 
@@ -219,13 +222,14 @@ def test_the_provider_gate_blocks_a_second_immediate_call():
     assert any("provider_gate" in entry for entry in second["missing"]), second["missing"]
     assert second["data"]["retryAfterSeconds"]
     assert fetch_state.min_interval() > 0
+    run(lambda session: session.execute(text("DELETE FROM provider_fetch_state WHERE provider=:p"), {"p": provider}))
 
 
 @needs_db
 def test_backoff_grows_with_consecutive_failures_and_respects_retry_after():
     from app import fetch_state
 
-    run(lambda session: session.execute(text("DELETE FROM provider_fetch_state")))
+    run(lambda session: session.execute(text("DELETE FROM provider_fetch_state WHERE provider='test-provider'")))
     delays = [
         run(lambda session: fetch_state.record_failure(session, "test-provider", "boom"))
         for _ in range(3)
@@ -412,7 +416,7 @@ class CountingClient:
 
 
 @needs_db
-def test_a_shut_gate_serves_the_cache_without_calling_the_provider():
+def test_a_shut_gate_serves_the_cache_without_calling_the_provider(monkeypatch):
     """The gate exists to stop the call. It has to stop the call.
 
     A stale cache is the normal state - rows are kept for seven days but count
@@ -422,7 +426,9 @@ def test_a_shut_gate_serves_the_cache_without_calling_the_provider():
     """
     import app.industry as industry
     from app import fetch_state
-    from app.routers.insights import PROVIDER
+    from app.routers import insights
+    PROVIDER = "synthetic-closed-gate-" + uuid.uuid4().hex
+    monkeypatch.setattr(insights, "PROVIDER", PROVIDER)
 
     # Close the gate for real, through the same table the route reads.
     run(lambda session: fetch_state.record_failure(session, PROVIDER, "timeout", None))
@@ -450,4 +456,4 @@ def test_a_shut_gate_serves_the_cache_without_calling_the_provider():
     assert any(item.startswith("provider_gate:") for item in body["missing"]), body["missing"]
     assert body["status"] != "ok"
 
-    run(lambda session: fetch_state.record_success(session, PROVIDER))
+    run(lambda session: session.execute(text("DELETE FROM provider_fetch_state WHERE provider=:p"), {"p": PROVIDER}))

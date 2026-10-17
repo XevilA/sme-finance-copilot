@@ -73,6 +73,15 @@ async def build_swarm(body: SwarmBody) -> dict:
     for key in CONSTRAINT_FIELDS:
         if key not in body.model_fields_set and stored_constraints and key in stored_constraints:
             constraint_values[key] = stored_constraints[key]
+    if shops and selected_id is not None:
+        # Supplying inline shops is not an operation for deleting a recorded
+        # requirement. A missing/empty client snapshot cannot bypass a required
+        # truck already attached to this project's allocation.
+        ids = [parse_uuid(shop.shop_id) for shop in shops]
+        async with session_scope() as session:
+            authoritative = await load_shop_resources(session, [value for value in ids if value is not None], project_id=selected_id)
+        shops = [ShopCapacity.model_validate({**shop.model_dump(), "resources": authoritative[shop.shop_id]})
+                 if shop.shop_id in authoritative else shop for shop in shops]
     if not shops:
         if not body.sme_ids:
             raise HTTPException(status_code=422, detail="Provide either shops or sme_ids")
