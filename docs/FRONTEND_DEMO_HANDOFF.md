@@ -288,3 +288,41 @@ gives the connection error state with a working retry.
 
 Do not show: Story Mode as evidence of outcomes, the buy-versus-share panel,
 investment appraisal, or any disabled business action as if it completed.
+
+## 9. Deployed Vercel build — what a tester can and cannot do there
+
+`main` is at `c16c645` and Vercel has rebuilt from it.
+`https://sme-finance-copilot.vercel.app` answers HTTP 200 and serves
+`assets/index-8VRLbCAL.js` with `assets/index-DEindwiw.css`.
+
+That deployment has **no backend**. The project ships `backend/Dockerfile` and
+`backend/railway.json`, but no host or service has been created, so there is no
+public API origin for the browser to call. Vercel also has neither
+`VITE_USE_MOCK` nor `VITE_API_BASE_URL` set, and both are build-time values, so
+the deployed bundle is the demo-mode build.
+
+Verified on the deployed site:
+
+* Every page renders and navigates. The sidebar drives navigation; the app has
+  no router, so a deep link such as `/import` serves the shell and opens
+  Overview. The SPA rewrite in `vercel.json` already handles this.
+* Overview reports `ที่มา: demo_dataset`, so the source of each figure is
+  visible rather than implied.
+* Pressing **ยืนยันข้อมูลและเริ่มวิเคราะห์** returns
+  `โหมดตัวอย่างยังไม่คำนวณข้อมูลจริง กรุณาตั้ง VITE_USE_MOCK=false และ VITE_API_BASE_URL ก่อนใช้งาน`.
+  Demo mode refuses to compute; it does not report a fabricated result.
+
+So the link is good for reviewing layout, copy, states and navigation, and it is
+honest about its own limits. It cannot demonstrate import → calculation →
+funding → SWARM → simulator persistence. Those need a reachable API.
+
+Two ways to give a tester the real flow:
+
+1. **Local run** — the sequence in section 8, backend from the repository root
+   where `backend\.env` lives. This is the only path verified end to end.
+2. **Public backend** — create the Railway (or equivalent) service from
+   `backend/Dockerfile`, set `backend/.env` values on it, then set
+   `VITE_USE_MOCK=false` and `VITE_API_BASE_URL=https://<host>/api/v1` in the
+   Vercel project and redeploy. `CORS_ORIGINS` in `backend/.env.example`
+   already lists `https://sme-finance-copilot.vercel.app`. Untested: no host
+   exists yet.
