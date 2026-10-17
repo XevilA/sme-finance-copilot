@@ -1,5 +1,10 @@
 node_modules
 .git
+.vercel
+.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+dist
 .DS_Store
 *.docx
 *.pdf

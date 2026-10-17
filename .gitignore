@@ -43,3 +43,4 @@ backend/uploads/
 *.docx
 *.pdf
 extracted_doc_text.txt
+.env*

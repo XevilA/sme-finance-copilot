@@ -1,5 +1,34 @@
 # การส่งมอบงานของ CODEX
 
+## รอบล่าสุด — Prototype online และทดสอบ workbook 2026-10-18
+
+ผู้ใช้เลือกสร้างเว็บใหม่ในบัญชี Vercel ของตน เพราะไม่มีสิทธิ์ในทีมที่ถือเว็บเดิม:
+[เปิด SME Finance Copilot prototype](https://sme-finance-copilot-prototype.vercel.app/).
+Production เชื่อม Neon PostgreSQL ใน Singapore; `/health` ตอบ `persistence=true`,
+schema 27 ตาราง, bootstrap ปิด และใช้ fixtures สังเคราะห์. ไม่ใช้ข้อมูล workbook
+จริงสร้าง fixture. โค้ด Vercel config ที่ใช้ deploy รอบนี้อยู่ใน source tree.
+
+ตรวจ production HTTP ผ่าน: route 44 รายการ, GET contracts ที่ frontend ใช้ 16 รายการ,
+upload template/corrupt 422, manual/calculate/analyze, funding, SWARM, simulation
+และ forecast. บันทึก simulation สังเคราะห์แบบ scoped แล้ว list/read/replay จากเว็บจริง;
+ผล replay ซ้ำตรงกันและไม่มี context difference. เปิดหน้า 3 และ 6–13 บนเว็บใหม่แล้ว.
+เปิดหน้าให้โหลดจนเห็นข้อมูลจริง; หน้าแสดงข้อกำหนดและชนิดข้อมูลจริง/คาดการณ์/จำลอง
+ตามที่ backend ส่งมา. ข้อมูลตัวอย่างหน้า SWARM/รายร้าน/โครงการมาจาก fixture สังเคราะห์.
+
+อัปโหลด `Financial_Statement_Translated(1).xlsx` เพื่อ preview บนเว็บใหม่ตามที่ผู้ใช้
+อนุญาตแล้ว: อ่านได้ 12 records. แม่แบบอังกฤษ 6 รายการว่าง; งบฐานะไทย 2 งบมีค่าและ
+ผ่านสมการ แต่ต้องให้ผู้ใช้ระบุปีจริงแทน `ปี 1`/`ปี 2`; งบกำไรไทยปี 2562/2561 เลือกได้;
+กระแสเงินสด 2 งบเป็น USD จึงนำไปรวมกับ THB ไม่ได้. รอบนี้ไม่ได้เลือกงบ คำนวณ วิเคราะห์
+หรือบันทึกข้อมูลไฟล์จริง. Screenshot proof อยู่ `backend/uploads/prototype-workbook-year-preview.jpg`
+และไฟล์ใน `backend/uploads/` ถูก ignore.
+
+ยังมีข้อจำกัดสำหรับ prototype: `auth.enforced=false` และไม่มี API key สำหรับ paid LLM;
+AI ที่ทดสอบเป็น rules/fallback ตามสัญญาปัจจุบัน. ข่าวสดคืน unavailable, การลงนาม,
+เบิก/จัดสรรทุนจริง, resource reservation และ export ยังไม่เปิด. หลัง import ไฟล์นี้
+หน้า cashflow และ sales ยังขาด dated cash events และ product/channel split ตามลำดับ;
+อย่าอ้างตัวอย่างสังเคราะห์เป็นผลธุรกิจของผู้ใช้. เว็บเดิมในทีม Vercel อื่นยังไม่ได้เชื่อม
+ฐานข้อมูลนี้ และต้องแจก URL prototype ใหม่ให้ tester.
+
 ## Excel บน Vercel — แก้และตรวจ production แล้ว 2026-10-17
 
 Commit `12aa468` แก้กรณีผู้ใช้อัปโหลด translated workbook แล้วติด mock mode.

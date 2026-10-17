@@ -1,4 +1,31 @@
-# สถานะ backend ก่อนส่ง tester — 2026-10-17
+# สถานะ prototype ก่อนส่ง tester — 2026-10-18
+
+Production prototype ใหม่: [sme-finance-copilot-prototype.vercel.app](https://sme-finance-copilot-prototype.vercel.app/).
+ผู้ใช้เลือกสร้างในบัญชี Vercel ของตน เพราะเว็บเก่าอยู่คนละทีม. Neon PostgreSQL
+ออนไลน์, `/health` persistence=true, bootstrap=off, schema 27 ตารางพร้อม fixtures
+สังเคราะห์. ตัวเว็บเก่าไม่ได้เชื่อมฐานข้อมูลนี้.
+
+| การตรวจ production | ผล |
+| --- | --- |
+| Backend routes / frontend GET contracts | 44 / 16 ผ่าน HTTP |
+| Upload / manual / calculate / analyze | template ผ่าน, invalid upload 422, B/75 กับ input สังเคราะห์ |
+| Funding / SWARM / forecast / simulation | ผ่านด้วย fixture สังเคราะห์ |
+| Scoped simulation save/list/read/replay | ผ่านบน production; replay reproduced=true |
+| หน้า browser | หน้า 3 และ 6–13 โหลดและแสดงผลตามข้อมูล/ข้อกำหนดที่มี |
+| Excel ที่ผู้ใช้ส่ง | Preview อ่าน 12 statements; ยังไม่เลือก/คำนวณ/บันทึกข้อมูลจริง |
+| AI | rules/fallback ผ่าน API; ไม่มี paid LLM key และ auth enforcement ปิด |
+
+ไฟล์ Excel มีงบฐานะไทยที่ปีบัญชีไม่ระบุ (`ปี 1`/`ปี 2`), P&L ปี 2562/2561,
+และ cash flow สกุล USD. ต้องให้ผู้ใช้ยืนยันปีจริง และเพิ่ม cash-event กับ
+product/channel data ก่อนใช้วิเคราะห์หน้า 3/6 ของธุรกิจนั้น. ข่าวสด,
+ลงนาม/จัดสรรทุน, resource reservation และ export ยังไม่พร้อมใช้.
+
+หลักฐานและขอบเขตอยู่ใน [CODEX_HANDOFF.md](CODEX_HANDOFF.md) และ
+[NEW_WORKBOOK_PAGE_ACCEPTANCE.md](NEW_WORKBOOK_PAGE_ACCEPTANCE.md).
+
+---
+
+# สถานะ backend ก่อนส่ง tester — 2026-10-17 (ประวัติ)
 
 Current runtime **f23c09e**, เริ่มจาก 5422af8, backend branch codex/demo-backend.
 Backend รวมเข้า main แล้ว; ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit.

@@ -1,6 +1,20 @@
 # Deploy และ pre-test handoff — Backend / AI
 
-> **Current override 2026-10-17:** ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit.
+> **Online prototype override — 2026-10-18:** ผู้ใช้เลือก deploy เว็บใหม่ในบัญชี
+> `lighttriad00-4894`: https://sme-finance-copilot-prototype.vercel.app/ . เชื่อม
+> Neon แล้ว, health `persistence=true`, 27 tables, bootstrap `off`; production
+> HTTP acceptance และ scoped simulation replay ผ่าน. หน้า UI 3 และ 6–13 โหลดได้.
+> ไฟล์ผู้ใช้ถูก preview อย่างเดียว; งบฐานะไทยยังต้องยืนยันปี `ปี 1`/`ปี 2`.
+> ใช้ project link ที่อยู่ใน `.vercel/project.json` (ignored/local) สำหรับ deploy:
+>
+> ```bat
+> npm.cmd exec --yes --package=vercel -- vercel deploy --prod --yes --scope lighttriad00-4894 --non-interactive
+> ```
+>
+> ตั้งค่า `DATABASE_URL` ผ่าน Vercel project environment เท่านั้น; ห้ามใส่ secret
+> ใน `VITE_*`, source, terminal arguments หรือ Git. เว็บเก่าอยู่คนละ Vercel team.
+
+> **Previous override 2026-10-17 (superseded below):** ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit.
 > Runtime f23c09e รวมเฉพาะ backend เข้า main; ไม่แก้ frontend-owned files.
 > CORS Authorization, nullable Cost, imported funding/forecast context, constraints,
 > scoped simulation list/read/replay และ provider transaction locking แก้แล้ว.

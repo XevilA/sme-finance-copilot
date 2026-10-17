@@ -1,4 +1,36 @@
-# New workbook and pages 3, 6–13 — 17 October 2026
+# New workbook and pages 3, 6–13 — 17–18 October 2026
+
+## Live prototype verification — 18 October
+
+The user selected a separate Vercel prototype because the old deployment is in a
+different Vercel team. Current public prototype:
+`https://sme-finance-copilot-prototype.vercel.app/`. Its server-only Neon
+PostgreSQL connection is live; production `/health` reports `persistence=true`
+and `DB_BOOTSTRAP=off`. Database checks show 27 public tables and the synthetic
+acceptance fixtures. No real workbook values were added to the database.
+
+The production HTTP acceptance script passed: 44 documented API routes, 16
+frontend GET contracts, template download, stateless Excel upload, manual input,
+calculation, analysis, invalid upload 422, funding, SWARM, simulation and
+forecast. A separate production persistence check saved a synthetic simulation,
+read and listed it under its project scope, then replayed it with
+`reproduced=true` and no context differences. UI pages 3 and 6–13 were loaded
+against this database; the pages show their real prerequisites and explicitly
+mark projected or simulated figures. Some business actions remain disabled
+because the prototype has no verified contract, authorization, or source data.
+
+The user's `Financial_Statement_Translated(1).xlsx` was uploaded to the new
+prototype preview with the user's explicit approval. It read 12 candidate
+statements. The six English templates are empty. Two Thai balance sheets have
+values and pass reconciliation but only say `ปี 1` / `ปี 2`; the user must set
+the actual reporting years before those can be selected. The Thai income
+statements are selectable for Buddhist years 2562 and 2561. Two cash-flow
+statements are USD and cannot be combined with THB. No statement was selected,
+analyzed, or persisted during this preview check. Do not infer that the balance
+sheet year 1 is 2562, or merge the USD cash flow into the THB statements.
+
+Saved UI proof: `backend/uploads/prototype-workbook-year-preview.jpg` (ignored by
+Git). No workbook bytes, private amounts, or credentials are recorded here.
 
 ## Finding
 
@@ -53,19 +85,17 @@ frontend invariants and 25 parser/preview tests pass. Production verification of
 the repair is recorded after deployment. This does not claim a database has
 been provisioned or that missing business records have been created.
 
-## Concrete next integration
+## Prototype integration status and remaining limits
 
-Use an online PostgreSQL database reachable from Vercel over TLS. Set its
-server-only `DATABASE_URL` in the existing Vercel project, keep `DB_POOL=null`,
-apply the repository's idempotent schema through an authorized migration, and
-load only explicitly labelled synthetic fixtures for prototype acceptance.
-The Vercel function deliberately keeps bootstrap off. Never expose the local
-Docker database to the internet or publish its credentials. Keep the user's
-workbook out of fixtures and preserve its stateless `persist=false` workflow.
+The online PostgreSQL database, production connection, schema, and synthetic
+fixtures are now configured on the user's new prototype. The Vercel function
+keeps bootstrap off. The old Vercel site remains in another owner's team and is
+not this connected deployment. Keep the user's workbook out of fixtures and
+preserve its stateless `persist=false` preview workflow.
 
-Accept completion only after production health reports persistence enabled,
-the 27-table schema is verified, scoped HTTP writes are read back/replayed,
-and all screens are rechecked with the correct business context. Pages 3/6
-still need dated/product/channel evidence for the imported business even once
-PostgreSQL is connected. Existing backend tests and `SUNDAY_ACCEPTANCE.md`
-describe the synthetic DB acceptance path.
+The prototype database path is accepted: production health, all 27 tables,
+scoped save/list/read/replay, and page rendering were verified. Pages 3/6 still
+need dated cash events and product/channel evidence for the user's imported
+business. Simulation numbers and project examples come from synthetic fixtures;
+they do not describe the workbook's business. Existing backend tests and
+`SUNDAY_ACCEPTANCE.md` describe the synthetic DB acceptance path.
