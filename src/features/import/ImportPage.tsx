@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { apiClient, FinancialInput } from "@/api/client";
+import { noteDraftRevision, revisionFor } from "@/api/activeAnalysis";
 import { useAppStore } from "@/store/useAppStore";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -58,6 +59,7 @@ export const ImportPage: React.FC = () => {
     { key: "working_capital_needed", label: "เงินทุนหมุนเวียนที่ต้องใช้ (฿)", section: 5 },
     { key: "buyer_deposit", label: "มัดจำผู้ซื้อที่พร้อมใช้ (฿)", section: 5 },
     { key: "committed_funding", label: "เงินทุนที่ยืนยันแล้ว (฿)", section: 5 },
+    { key: "inventory", label: "มูลค่าสินค้าคงเหลือ / สต็อกปลายงวด (฿)", section: 6 },
     { key: "cash_available_for_debt_service", label: "เงินสดที่ใช้ชำระหนี้ได้ (฿)", section: 7, signed: true },
     { key: "debt_principal_due", label: "เงินต้นที่ถึงกำหนดในงวด (฿)", section: 7 },
     { key: "debt_interest_due", label: "ดอกเบี้ยที่ถึงกำหนดในงวด (฿)", section: 7 },
@@ -78,6 +80,7 @@ export const ImportPage: React.FC = () => {
     setDraft((previous) => {
       const next = { ...previous, [key]: value };
       try { sessionStorage.setItem("financial-input-draft-v1", JSON.stringify(next)); } catch { /* Optional local draft only. */ }
+      noteDraftRevision(revisionFor(next));
       return next;
     });
   };
@@ -99,11 +102,20 @@ export const ImportPage: React.FC = () => {
     && fields.filter((field) => field.section === section.id && !field.key.startsWith("loan.")).every((field) => draft[field.key]?.trim())
     ? "complete" : "incomplete" }));
 
+  // Fields of the open section the user has not filled in. An empty optional
+  // field is sent as unknown, never as zero.
+  const emptyInSection = fields
+    .filter((field) => field.section === activeSection && !draft[field.key]?.trim())
+    .map((field) => field.key);
+
   const runAnalysis = async (file?: File) => {
-    if (busy.current) return;
+    if (busy.current) return; // One submission at a time; a second click is ignored.
     busy.current = true;
     setIsAnalyzing(true);
     setAnalysisStep("reading");
+    // The revision identifies the exact draft this result belongs to, so a
+    // later edit marks the result stale instead of passing it off as current.
+    const revision = file ? null : revisionFor(draft);
     try {
       let input: FinancialInput;
       if (file) {
@@ -125,10 +137,21 @@ export const ImportPage: React.FC = () => {
       }
       setAnalysisStep("validating");
       input = (await apiClient.validateManual(input)).data;
-      if (!file) await apiClient.calculate(input);
+      const context = { input_revision: revision || revisionFor(input) };
+      if (!file) await apiClient.calculate(input, context);
       setAnalysisStep("analyzing");
-      await apiClient.analyze(input, file ? file.name : draft.shop_name);
-      addToast({ type: "success", title: "วิเคราะห์ข้อมูลสำเร็จ", message: "อัปเดตโมเดลการเงินและสุขภาพธุรกิจเรียบร้อยแล้ว" });
+      // shop_name is free text for display. It never becomes an SME identity,
+      // so imported results stay unattached until a real identity is supplied.
+      const result = await apiClient.analyze(input, file ? file.name : draft.shop_name, context);
+      const gap = (result.missing || []).length;
+      addToast({
+        type: gap ? "warning" : "success",
+        title: gap ? "วิเคราะห์แล้ว แต่ข้อมูลยังไม่ครบ" : "วิเคราะห์ข้อมูลสำเร็จ",
+        message: gap
+          ? `เกรด ${result.data.grading?.grade || "ยังไม่ทราบ"} · ข้อมูลที่ยังขาด ${gap} รายการ ระบบจะไม่เดาค่าเป็น 0`
+          : `เกรด ${result.data.grading?.grade || "ยังไม่ทราบ"} · ใช้ข้อมูลชุดที่ส่งวิเคราะห์นี้ทุกหน้า`,
+        duration: gap ? 9000 : undefined,
+      });
       setCurrentPage("overview");
     } catch (error) {
       addToast({ type: "error", title: "การแจ้งเตือนความสมบูรณ์", message: error instanceof Error ? error.message : "ไม่สามารถคำนวณข้อมูลได้", duration: 10000 });
@@ -223,27 +246,28 @@ export const ImportPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Sample Column Mapping Preview */}
+          {/* Template layout the parser actually reads (no automatic mapping) */}
           <div className="bg-white p-5 rounded-card border border-borderLine space-y-3">
             <h4 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-              จับคู่คอลัมน์ข้อมูล (Column Mapping Interface)
+              โครงสร้างไฟล์ที่ระบบอ่าน · ไม่มีการจับคู่คอลัมน์อัตโนมัติ · ต้องมี 7 ฟิลด์บังคับ
+              (currency, kind, period_start, period_end, assets, liabilities, equity) และ assets = liabilities + equity
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">คอลัมน์ในไฟล์: Date</span>
-                <span className="font-bold text-ink">↔ วันที่ทำรายการ</span>
+                <span className="text-[10px] text-ink-muted block">ชีตที่อ่าน</span>
+                <span className="font-bold text-ink">Financials</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">คอลัมน์ในไฟล์: Sales</span>
-                <span className="font-bold text-ink">↔ ยอดขาย / รายได้</span>
+                <span className="text-[10px] text-ink-muted block">คอลัมน์ A / B</span>
+                <span className="font-bold text-ink">field ↔ value</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">คอลัมน์ในไฟล์: Cost</span>
-                <span className="font-bold text-ink">↔ ต้นทุนขาย</span>
+                <span className="text-[10px] text-ink-muted block">แถวข้อมูลใน Template</span>
+                <span className="font-bold text-ink">41 ชื่อฟิลด์</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">คอลัมน์ในไฟล์: Cash_Balance</span>
-                <span className="font-bold text-ink">↔ เงินสดคงเหลือ</span>
+                <span className="text-[10px] text-ink-muted block">เว้นว่างไว้ = ไม่ทราบ</span>
+                <span className="font-bold text-ink">ไม่ถูกแปลงเป็น 0</span>
               </div>
             </div>
           </div>
@@ -358,12 +382,14 @@ export const ImportPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Row Validation Alert Demonstration (Part B Rule #3) */}
+            {/* Row Validation Alert (Part B Rule #3) — from the live draft */}
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-attention mt-0.5 shrink-0" />
               <div>
-                <strong>การแจ้งเตือนความสมบูรณ์:</strong> ข้อมูลหมวดที่ 6 (สต็อกของสด) ยังไม่ได้กรอก{" "}
-                ระบบจะไม่เดาค่าเป็น 0 แต่จะระบุว่าขาดข้อมูลเพื่อความโปร่งใส
+                <strong>การแจ้งเตือนความสมบูรณ์:</strong>{" "}
+                {emptyInSection.length
+                  ? `หมวดนี้ยังไม่ได้กรอก ${emptyInSection.length} ช่อง (${emptyInSection.join(", ")}) ระบบจะส่งเป็น "ไม่ทราบ" ไม่เดาค่าเป็น 0`
+                  : "หมวดนี้กรอกครบแล้ว ช่องที่เว้นว่างในหมวดอื่นจะถูกส่งเป็น \"ไม่ทราบ\" ไม่ใช่ 0"}
               </div>
             </div>
           </div>

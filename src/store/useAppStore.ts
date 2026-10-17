@@ -25,6 +25,7 @@ export type PageStateMode =
   | "empty"
   | "loading"
   | "insufficient_data"
+  | "unavailable"
   | "error"
   | "not_found"
   | "no_permission"
@@ -75,7 +76,6 @@ interface AppState {
   toggleDetachResource: (resourceId: string) => void;
   swapShop: (oldId: string, newId: string) => void;
   resetSimulation: () => void;
-  saveSimulationPlan: (name: string) => void;
 
   // Command Palette & Modals
   isCommandPaletteOpen: boolean;
@@ -117,16 +117,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       isMobileMenuOpen: false,
       selectedShopId: context?.shopId || state.selectedShopId,
       selectedOrderId: context?.orderId || state.selectedOrderId,
-      contextPill: context?.shopId
-        ? `ร้านที่เลือก: ${context.shopId === "shop-1" ? "ร้านบ้านข้าวหอม (ขาด ฿14,000)" : context.shopId}`
-        : null,
+      contextPill: context?.shopId ? `ร้านที่เลือก: ${context.shopId}` : null,
     }));
   },
   setUserRole: (role) => set({ userRole: role }),
 
   // Cross-Page Context
-  selectedShopId: "shop-1",
-  selectedOrderId: "order-catering-300",
+  selectedShopId: "",
+  selectedOrderId: "",
   contextPill: null,
   setSelectedShopId: (shopId) => set({ selectedShopId: shopId }),
   setSelectedOrderId: (orderId) => set({ selectedOrderId: orderId }),
@@ -200,16 +198,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       swappedShops: {},
       hasUnsavedChanges: false,
     }),
-  saveSimulationPlan: (name) => {
-    const { addToast } = get();
-    set({ hasUnsavedChanges: false });
-    addToast({
-      type: "success",
-      title: "บันทึกแผนจำลองสำเร็จ",
-      message: `สร้างแผนฉบับใหม่ '${name}' และส่งเข้าคิวรอตรวจยอมรับแล้ว`,
-    });
-  },
-
   // Command Palette & Modals
   isCommandPaletteOpen: false,
   setCommandPaletteOpen: (open) => set({ isCommandPaletteOpen: open }),

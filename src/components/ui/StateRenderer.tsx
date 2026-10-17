@@ -16,6 +16,8 @@ interface StateRendererProps {
   currentMode?: PageStateMode;
   missingItems?: string[];
   errorMessage?: string;
+  /** Shown in the unavailable state: why the backend cannot answer this yet. */
+  unavailableReason?: string;
   onRetry?: () => void;
   onAddData?: () => void;
   onClearFilters?: () => void;
@@ -28,6 +30,7 @@ export const StateRenderer: React.FC<StateRendererProps> = ({
   currentMode,
   missingItems = ["มูลค่าสินค้าคงเหลือของสด", "รอบชำระหนี้เฉลี่ย"],
   errorMessage = "ไม่สามารถเชื่อมต่อฐานข้อมูลคำนวณของทีม IT ได้ในขณะนี้",
+  unavailableReason = "ระบบหลังบ้านยังไม่มีข้อมูลหรือยังไม่รองรับการทำรายการนี้",
   onRetry,
   onAddData,
   onClearFilters,
@@ -131,6 +134,44 @@ export const StateRenderer: React.FC<StateRendererProps> = ({
         >
           <PlusCircle className="w-4 h-4" />
           <span>เพิ่มข้อมูลที่ยังขาด</span>
+        </button>
+      </div>
+    );
+  }
+
+  // 3b. Unavailable -> The backend answered and declared it has no evidence or
+  // no operation for this view. Never rendered as zero and never as success.
+  if (effectiveMode === "unavailable") {
+    return (
+      <div className="min-h-[460px] flex flex-col items-center justify-center p-8 text-center bg-slate-50 rounded-card border border-borderLine m-4">
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 text-ink-muted flex items-center justify-center mb-4">
+          <ShieldAlert className="w-7 h-7" />
+        </div>
+        <h3 className="text-base font-display font-bold text-ink mb-2">
+          ยังไม่มีข้อมูลให้แสดงในหน้านี้
+        </h3>
+        <p className="text-xs text-ink-muted mb-4 max-w-md leading-relaxed">{unavailableReason}</p>
+        {missingItems.length > 0 && (
+          <div className="bg-white p-4 rounded-xl border border-borderLine text-left mb-6 max-w-sm w-full shadow-soft-sm">
+            <span className="text-[11px] font-bold text-ink block mb-2">
+              หลักฐานที่ระบบยังไม่มี:
+            </span>
+            <ul className="text-xs text-ink-muted space-y-1.5 list-disc pl-4">
+              {missingItems.map((item, idx) => (
+                <li key={idx} className="font-mono text-[11px]">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onAddData}
+          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-ink rounded-btn text-xs font-semibold flex items-center gap-1.5 transition-all"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span>ไปหน้านำเข้าข้อมูล</span>
         </button>
       </div>
     );

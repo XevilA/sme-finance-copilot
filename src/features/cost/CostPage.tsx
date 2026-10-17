@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { CostBreakdown, Envelope } from "@/api/contracts/types";
+import { CostBreakdown } from "@/api/contracts/types";
+import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -15,26 +16,26 @@ import {
 
 export const CostPage: React.FC = () => {
   const { setCurrentPage } = useAppStore();
-  const [costEnvelope, setCostEnvelope] = useState<Envelope<CostBreakdown> | null>(null);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("inv-share-hub");
-  const [loading, setLoading] = useState(true);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const load = useCallback(() => apiClient.getCostBreakdown(), []);
+  const state = useEnvelope<CostBreakdown>(load);
+  const { envelope: costEnvelope, loading, error, reload: loadData } = state;
+  // An unknown cost metric is null plus a name in missing. It is rendered as
+  // "ยังไม่มีข้อมูล", never as a zero placeholder and never via .toLocaleString().
+  const money = (value: number | null | undefined) =>
+    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+  const units = (value: number | null | undefined) =>
+    value == null ? "ยังไม่มีข้อมูล" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+  const mode = envelopeMode(state, (data) =>
+    data.costPerUnit == null &&
+    data.profitPerUnit == null &&
+    data.breakevenUnits == null &&
+    data.currentMonthlyFixedCost == null &&
+    data.currentMonthlyVariableCost == null &&
+    data.categories.length === 0 &&
+    data.investmentPlans.length === 0);
 
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getCostBreakdown()
-      .then((res) => {
-        setCostEnvelope(res);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  if (loading || !costEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
@@ -46,10 +47,26 @@ export const CostPage: React.FC = () => {
     );
   }
 
-  const cost = costEnvelope.data;
+  const cost = costEnvelope?.data;
+  const missing = costEnvelope?.missing || [];
+
+  if (!cost || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
+    return (
+      <StateRenderer
+        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
+        errorMessage={error || "อ่านโครงสร้างต้นทุนจาก backend ไม่สำเร็จ"}
+        unavailableReason="ยอดรวมในงบไม่มีหลักฐานต้นทุนต่อหน่วยหรือตารางลงทุนตามวันที่"
+        missingItems={missing}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("import")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
 
   return (
-    <StateRenderer onRetry={loadData}>
+    <StateRenderer currentMode={mode === "stale" ? "stale" : undefined} onRetry={loadData} onReanalyze={() => setCurrentPage("import")}>
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6 text-ink animate-fade-in">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderLine pb-4">
@@ -84,26 +101,36 @@ export const CostPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-5 rounded-card border border-borderLine shadow-soft-sm">
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">ต้นทุนต่อหน่วย</span>
-            <span className="text-2xl font-bold font-mono text-ink">฿{cost.costPerUnit}</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">ต่อกล่องอาหาร</span>
+            <span className="text-2xl font-bold font-mono text-ink">{money(cost.costPerUnit)}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {cost.costPerUnit == null ? "ขาด cost_per_unit" : "ต่อหน่วยที่ขายในงวด"}
+            </span>
           </div>
 
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">กำไรส่วนเกินต่อหน่วย</span>
-            <span className="text-2xl font-bold font-mono text-brand">฿{cost.profitPerUnit}</span>
-            <span className="text-[10px] text-brand/80 block mt-0.5">ราคาขาย 80 ฿/กล่อง</span>
+            <span className="text-2xl font-bold font-mono text-brand">{money(cost.profitPerUnit)}</span>
+            <span className="text-[10px] text-brand/80 block mt-0.5">
+              {cost.profitPerUnit == null ? "ขาด contribution_per_unit" : "ราคาขายหักต้นทุนผันแปรต่อหน่วย"}
+            </span>
           </div>
 
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">จุดคุ้มทุน (Breakeven)</span>
-            <span className="text-2xl font-bold font-mono text-emerald-700">{cost.breakevenUnits}</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">กล่องต่อเดือน</span>
+            <span className="text-2xl font-bold font-mono text-emerald-700">{units(cost.breakevenUnits)}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {cost.breakevenUnits == null ? "ขาด breakeven_units" : "หน่วยที่ต้องขายให้คุ้มต้นทุนคงที่"}
+            </span>
           </div>
 
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">ต้นทุนคงที่รายเดือน</span>
-            <span className="text-2xl font-bold font-mono text-ink">฿{cost.currentMonthlyFixedCost.toLocaleString()}</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">ค่าเช่าร้าน/แก๊ส/เงินเดือน</span>
+            <span className="text-2xl font-bold font-mono text-ink">{money(cost.currentMonthlyFixedCost)}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {cost.currentMonthlyVariableCost == null
+                ? "ต้นทุนผันแปร: ยังไม่มีข้อมูล"
+                : `ต้นทุนผันแปร ${money(cost.currentMonthlyVariableCost)}`}
+            </span>
           </div>
         </div>
 
@@ -115,16 +142,20 @@ export const CostPage: React.FC = () => {
                 เปรียบเทียบแผนลงทุน: ซื้อเครื่องเอง (แผน A) vs เช่าแชร์ผ่าน UNLOCK (แผน B)
               </h3>
               <p className="text-[11px] text-ink-muted">
-                คำนวณระยะเวลาคืนทุน (Payback Period), มูลค่าปัจจุบันสุทธิ (NPV), และผลตอบแทนภายใน (IRR)
+                {cost.investmentPlans.length
+                  ? "คำนวณระยะเวลาคืนทุน (Payback Period), มูลค่าปัจจุบันสุทธิ (NPV), และผลตอบแทนภายใน (IRR)"
+                  : "ยังไม่มีแผนลงทุนให้เปรียบเทียบ: ต้องมีตารางกระแสเงินสดของการลงทุนตามวันที่ (investment_cash_schedule) ก่อนคำนวณ Payback, NPV และ IRR · ระบบไม่สร้างค่าเหล่านี้จากยอดรวมในงบ"}
               </p>
             </div>
             <DataKindBadge kind="forecast" size="sm" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {cost.investmentPlans.map((plan) => {
-              const isSelected = selectedPlanId === plan.id;
-              const isPlanB = plan.id === "inv-share-hub";
+            {cost.investmentPlans.map((plan, planIndex) => {
+              const isSelected = (selectedPlanId || cost.investmentPlans[0]?.id) === plan.id;
+              // Highlight is position in the returned list only. The engine does
+              // not return a recommendation, so none is claimed here.
+              const isPlanB = planIndex > 0;
 
               return (
                 <div
@@ -141,7 +172,7 @@ export const CostPage: React.FC = () => {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-chip ${isPlanB ? "bg-resource text-white" : "bg-slate-200 text-ink"}`}>
-                        {isPlanB ? "★ แนะนำ (คุ้มค่าสูงสุด)" : "แนวทางดั้งเดิม"}
+                        {isPlanB ? "แผน B" : "แผน A"}
                       </span>
                       {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                     </div>

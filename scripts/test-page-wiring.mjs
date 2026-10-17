@@ -9,7 +9,13 @@ const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const { build } = createRequire(require.resolve('vite/package.json'))('esbuild');
 
-for (const file of ['overview/OverviewPage', 'simulator/SimulatorPage', 'swarm/SwarmPage', 'import/ImportPage']) {
+// Design guard over every page touched by integration wiring. Compares the
+// className/style JSX attributes against the 269e3d2 baseline, so changing a
+// Tailwind class, adding an element or moving the hierarchy fails the run.
+for (const file of ['overview/OverviewPage', 'simulator/SimulatorPage', 'swarm/SwarmPage', 'import/ImportPage',
+  'cost/CostPage', 'funding/FundingPage', 'health/HealthPage', 'cashflow/CashflowPage', 'unlock/UnlockPage',
+  'shop-finance/ShopFinancePage', 'funder/FunderPage', 'projects/ProjectsPage', 'ai-panel/AIPanel',
+  'simulator/ChaosPlayback', 'sales/SalesPage']) {
   const name = `src/features/${file}.tsx`;
   const before = execFileSync('git', ['show', `269e3d2:${name}`], { encoding:'utf8' });
   const after = await readFile(name, 'utf8');
@@ -63,4 +69,4 @@ const demo = await load(true);
 assert.equal((await demo.getSwarmProposal()).source, 'demo_dataset');
 await assert.rejects(demo.assembleSwarm(context.data), /โหมดตัวอย่าง/);
 await assert.rejects(demo.simulateOrder(context.data, scenario, true), /โหมดตัวอย่าง/);
-console.log('PASS: four page style guards, real order context, SWARM resource exclusion, four simulation controls, source/missing, validation, demo write rejection');
+console.log('PASS: fifteen page style guards, real order context, SWARM resource exclusion, four simulation controls, source/missing, validation, demo write rejection');

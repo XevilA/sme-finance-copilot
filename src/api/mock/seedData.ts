@@ -982,6 +982,8 @@ export const mockBusinessOverview: BusinessOverview = {
   revenue: 148500,
   expense: 112300,
   netProfit: 36200,
+  // 36,200 / 148,500 of the demo fixture, kept explicit rather than derived.
+  netProfitMargin: 24.37,
   cashBalance: 10000,
   usableCashAfterReserve: -5000,
   reserveThreshold: 15000,

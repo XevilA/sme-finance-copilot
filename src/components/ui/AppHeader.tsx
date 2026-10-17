@@ -130,6 +130,7 @@ export const AppHeader: React.FC = () => {
         <div className="relative group">
           <button
             type="button"
+            title="เลือกมุมมองที่จะแสดง ไม่ใช่การเข้าสู่ระบบ สิทธิ์จริงมาจาก token และฐานข้อมูล"
             className="h-8 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-btn text-xs font-medium text-ink flex items-center gap-1.5 transition-colors"
           >
             <User className="w-3.5 h-3.5 text-brand" />
