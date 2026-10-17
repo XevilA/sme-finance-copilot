@@ -11,8 +11,10 @@
 
 ## 📌 สถานะปัจจุบัน
 
-> 2026-10-16 · ตรวจ source `48d9385` + validation regression repair ในรอบนี้และรับข้อตกลง frontend integration ใหม่ ·
-> ลำดับงานปัจจุบันอยู่ใน `FRONTEND_INTEGRATION_HANDOFF.md`; รอบนี้อัปเดตเอกสารและแก้ validation regression โดยคง src/UI ·
+> 2026-10-17 · Frontend integration รอบ CLAUDE อยู่บน `codex/demo-frontend` head `a628b32`
+> (ยังไม่รวมเข้า main) · ตัวเลข backend ในตารางนี้เป็นของรอบ `48d9385`; ผลล่าสุดของ backend
+> อยู่ใน CODEX_HANDOFF/TESTER_READINESS_CURRENT ซึ่งเป็นเอกสารของ CODEX ·
+> รายละเอียด frontend และ checklist วันอาทิตย์: `docs/FRONTEND_DEMO_HANDOFF.md` ·
 > บันทึกรายรอบด้านล่างคงตัวเลขของรอบตัวเองไว้ตามปกติ
 
 | ตัวชี้วัด | ค่า |
@@ -21,11 +23,112 @@
 | API routes | **36** เส้นทางใต้ `/api/*` เสิร์ฟคู่กับ `/api/v1/*` (+ 4 เส้นเฉพาะ `/api/v1/*` และ `/health`) |
 | ตารางฐานข้อมูล | **27** · `schema.sql`, `seed.sql`, `seed_obligations.sql` รันซ้ำได้ทั้งสามไฟล์ |
 | Frontend contract | **16 / 16** ตอบ 200 (เดิม 404 ทั้งหมด) · ทุกเส้นมี `source` และ `status` ตาม `missing` |
-| Frontend bundle | `1955 modules` · CSS คงเดิม `index-DEindwiw.css` · JS เปลี่ยนตาม wiring เป็น `index-CBenrrOQ.js` · implementation เดิมแก้ 5 ไฟล์; สิทธิ์ปัจจุบันให้ wiring ที่จำเป็นทุกไฟล์โดยคง UI |
+| Frontend bundle | 2026-10-17 (`a628b32`): `1957 modules` · CSS คงเดิม `index-DEindwiw.css` เท่าฐานทุกไบต์ · JS `index-8VRLbCAL.js` · integration wiring ครอบคลุม `src/**` โดยคง UI; style guard ขยายเป็น 16 ไฟล์ |
 | Authentication | token HMAC + รหัสผ่าน scrypt · **เพิกถอนได้แล้ว** รายเซสชันและทั้งบัญชี · ปิด enforcement เป็นค่าเริ่มต้น |
 | Deploy | config ครบและทดสอบด้วย container จริง · รอกดสร้าง service บนบัญชีทีม |
 
 **บันทึกเรียงจากใหม่ไปเก่า** — รอบล่าสุดอยู่ด้านบน
+
+---
+
+## รอบ CLAUDE 2026-10-17 — Frontend integration กับ backend จริง
+
+ฐาน main `9eebb41` · worktree `.worktrees/demo-frontend` / branch
+`codex/demo-frontend` · head `a628b32` · ขอบเขตที่แก้: `src/**`,
+`scripts/test-*-wiring.mjs`, ไฟล์นี้ และ `docs/FRONTEND_DEMO_HANDOFF.md` ·
+ไม่แตะไฟล์ของ CODEX (backend code/tests, API_CONTRACT_MATRIX, CODEX_HANDOFF,
+guidelines, readiness). รายละเอียดเต็มและ checklist วันอาทิตย์อยู่ใน
+[FRONTEND_DEMO_HANDOFF.md](../../docs/FRONTEND_DEMO_HANDOFF.md).
+
+### Commits
+
+| Commit | ขอบเขต |
+| --- | --- |
+| `719e616` | data context, contract types, API client, Cost, Import |
+| `30b4bd2` | funding evaluate, SWARM constraints, simulator save/read/replay |
+| `e52752b` | ปุ่มที่ไม่มี backend → operation จริง หรือ unavailable ชัดเจน |
+| `6028b4c` | app chrome และ hero ผูกกับ order/proposal ที่บันทึกไว้ |
+| `a628b32` | แก้หน่วยดอกเบี้ยต่อปี และ setState ระหว่าง render |
+
+33 ไฟล์ · +2,183 / −658 เทียบ `9eebb41`
+
+### สิ่งที่ทำ
+
+- **Data context ร่วม** (`src/api/activeAnalysis.ts`): accepted analysis หนึ่งชุด
+  ต่อแท็บ พร้อม identity, input revision และ inputHash · ส่ง input ชุดเดียวกัน
+  และ revision เดียวกันไป analyze/calculate/funding/forecast · identity ที่ไม่มี
+  คงเป็น null ไม่เดาจากชื่อร้าน · แก้ draft แล้วผลเดิมถูกทำเป็น **stale** ไม่ถูกแทน
+  ด้วย seed · ทุกคำขอมี sequence + epoch จึงไม่มีคำตอบเก่าทับคำตอบใหม่
+- **ไม่สร้างหลักฐานที่ไม่มี**: หลังนำเข้างบ Cashflow / sales products / sales
+  channels คืน envelope `unavailable` (`source: "none"`) พร้อมชื่อหลักฐานที่ขาด
+  เพราะยอดรวมงวดไม่มี dated cash events และไม่มีสัดส่วนรายสินค้า/ช่องทาง
+  และ stored default SME เป็นงบคนละชุด
+- **Contracts/types ตรง runtime**: Envelope มี `source`, `missing` บังคับ,
+  `context`/`inputHash`/`contextHash` และ status `unavailable` · Overview
+  nullable + `netProfitMargin` · Cost ทั้งห้า scalars `number | null`
+  (known zero คง 0) · FundingType/ChaosCategory ตรงค่าที่ API ส่งจริง ·
+  AIResponse มี mode/warning/policyVersion · เพิ่ม types ของ capabilities,
+  forecast preview, order constraints, saved simulation, replay, principal
+- **CostPage.tsx:105 แก้แล้ว**: ทั้งห้า scalars ผ่าน formatter ที่รับ null;
+  ไม่มี `.toLocaleString()` บน null อีก และแสดงชื่อ field ที่ขาดแทนเลขศูนย์
+- **Funding**: ใช้ POST `/funding/evaluate` กับงบที่นำเข้า ไม่ใช่ seed SME ·
+  banner เลิกใช้เลขสาธิตคงที่ (47,500 / 18,000 / 29,500 / 1 พ.ย.) ·
+  gap ที่ไม่ทราบ ≠ gap ที่เป็นศูนย์ · ปุ่มยื่นคำขอปิดตาม `/capabilities`
+- **SWARM**: อ่าน constraints snapshot ของ project เดียวกัน · unknown /
+  explicit [] / explicit null แยกกันสามความหมาย · `missing` ขับสถานะความพร้อม
+- **Simulator**: save → scoped read-back → replay แล้วจึงแจ้งสำเร็จ พร้อม
+  engine, resultHash, reproduced และ contextDifferences · อ่านจำนวนแผนที่
+  บันทึกไว้/replay ได้ ตาม scope ของ project
+- **UNLOCK**: ถอดทรัพยากร → POST `/simulate/order` ด้วย
+  `unavailable_resource_ids` แล้วรายงาน Plan A/B จาก engine แทนการบวก
+  `impactIfDetached.additionalCost` ในเบราว์เซอร์
+- **ปุ่มที่ไม่มี backend** (apply / sign / info request / export / reservation /
+  Chaos apply) ปิดพร้อมเหตุผลจาก `/capabilities` · ลบ success toast ทั้งหมด ·
+  ลบ helper `saveSimulationPlan` ที่เป็น toast อย่างเดียวออกจาก store
+- **App chrome**: header/sidebar/mobile drawer/command palette ผูกกับ order,
+  shops, proposal, resources, funding ที่ backend ส่งจริง · palette ไม่มี
+  shop id ปลอมอีก · Hero ใช้ order/proposal ที่บันทึกไว้
+- **Auth transport**: ส่ง `Authorization: Bearer` เมื่อมี token, แยก 401/403 ·
+  ยังไม่มีหน้า login · role selector ระบุว่าเป็นมุมมอง ไม่ใช่การยืนยันตัวตน
+
+### ผลวัดรอบนี้
+
+| รายการ | ผล |
+| --- | --- |
+| `pnpm build` | **1957 modules** (ฐาน 1955) |
+| CSS | **`index-DEindwiw.css`** 60.41 kB — เท่าฐานทุกไบต์ |
+| JS | **`index-8VRLbCAL.js`** 551.02 kB (ฐาน `index-CBenrrOQ.js` 513.40 kB) |
+| `tsc --noEmit` | ผ่าน |
+| `test-page-wiring.mjs` | PASS · ขยาย style guard จาก **4 เป็น 16 ไฟล์** |
+| `test-import-wiring.mjs` | PASS · เพิ่ม context/invalidation/capabilities/422 |
+| `test:invariants` | 10 invariants ผ่าน (legacy fixture) |
+| Browser flows (VITE_USE_MOCK=false) | 11 เส้นทางผ่าน ดู handoff §4 |
+
+CSS hash ไม่เปลี่ยน จึงไม่มี class/สี/spacing/shadow ใดถูกแตะ · state ใหม่ใน
+StateRenderer เคยสร้าง utility เพิ่มหนึ่งตัว (`bg-slate-50/60`) จึงเขียนใหม่ด้วย
+class เดิมให้ stylesheet กลับมาเท่าฐาน · style guard จับการเพิ่ม DOM node
+โดยไม่ตั้งใจได้ 3 ครั้งและถูกแก้คืนทุกครั้ง · ไม่ลด assertion ของเทสต์เดิม
+
+### พบและแก้ระหว่างทดสอบ browser
+
+- `interestRateAnnual` เป็นทศนิยม (0.15 = 15%) แต่ UI พิมพ์ต่อท้ายด้วย `%`
+  จึงแสดง "0.15% ต่อปี" ต่ำกว่าความจริงร้อยเท่า · แก้ทั้งสองจุดที่แสดงผล
+  และปรับ mock fixture ให้ใช้หน่วยเดียวกับ API
+- ImportPage เผยแพร่ draft revision ภายใน setDraft updater ทำให้เกิด React
+  warning "cannot update a component while rendering" · ย้ายไป effect และ
+  ข้ามรอบแรก เพื่อไม่ให้การเปิดหน้าทำให้ผลจากไฟล์อัปโหลดกลายเป็น stale
+
+### ยังไม่พร้อมและต้องการจากทีม
+
+1. **SME identity ของงบที่นำเข้า** — ยังไม่มีทางผูก imported statement กับ
+   SME id จริง จึงไม่มี dated forecast และเกรดจาก funding เป็น null
+2. **Constraints จริงของ `PO-STP-2026-091`** — required business types, รัศมี,
+   พิกัดผู้ซื้อ, collection schedule ยังไม่ถูกบันทึก
+3. **รถห้องเย็น required ยัง `offered`** จึงกันสองร้านอาหารออกจากการจัดสรร
+4. **Business contract** สำหรับ application/signature/info request/export/
+   reservation ก่อนเปิดปุ่มเหล่านั้น
+5. **หน้า login** — transport พร้อมแล้ว แต่การเพิ่มหน้าเป็นงาน UI ใหม่
+6. **Hosting** — รอบนี้ไม่มี deploy หรือการตรวจบน production
 
 ---
 
