@@ -5,10 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SME Finance Copilot — ห้องประกอบโอกาสธุรกิจ</title>
-    <!-- Google Fonts: IBM Plex Sans Thai, Prompt, Anuphan -->
+    <!-- Load only the two font families used by the app. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap" media="print" onload="this.onload=null;this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap"></noscript>
   </head>
   <body class="bg-[#FAF7F0] text-[#14224A] font-sans antialiased selection:bg-[#6C4CF1]/20 selection:text-[#6C4CF1]">
     <div id="root"></div>

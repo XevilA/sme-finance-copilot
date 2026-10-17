@@ -20,7 +20,7 @@
 }
 
 body {
-  font-family: 'Prompt', 'Anuphan', 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-ivory);
   color: var(--ink);
   line-height: 1.6;

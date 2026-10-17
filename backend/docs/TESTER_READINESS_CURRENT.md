@@ -12,6 +12,7 @@ Production prototype ใหม่: [sme-finance-copilot-prototype.vercel.app](ht
 | Funding / SWARM / forecast / simulation | ผ่านด้วย fixture สังเคราะห์ |
 | Scoped simulation save/list/read/replay | ผ่านบน production; replay reproduced=true |
 | หน้า browser | หน้า 3 และ 6–13 โหลดและแสดงผลตามข้อมูล/ข้อกำหนดที่มี |
+| UI download | entry JS production 215.42 KB / 65.57 KB gzip; feature pages โหลดตามการเปิด |
 | Excel ที่ผู้ใช้ส่ง | Preview อ่าน 12 statements; ยังไม่เลือก/คำนวณ/บันทึกข้อมูลจริง |
 | AI | rules/fallback ผ่าน API; ไม่มี paid LLM key และ auth enforcement ปิด |
 

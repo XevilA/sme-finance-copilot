@@ -3,24 +3,24 @@ import { useAppStore } from "@/store/useAppStore";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { AppSidebar } from "@/components/ui/AppSidebar";
 import { CommandPalette } from "@/components/ui/CommandPalette";
-import { AIPanel } from "@/features/ai-panel/AIPanel";
-import { StoryModeModal } from "@/features/reports/StoryModeModal";
 import { MobileDrawer } from "@/components/ui/MobileDrawer";
 
-// Feature Pages
-import { OverviewPage } from "@/features/overview/OverviewPage";
-import { ImportPage } from "@/features/import/ImportPage";
-import { CashflowPage } from "@/features/cashflow/CashflowPage";
-import { HealthPage } from "@/features/health/HealthPage";
-import { CostPage } from "@/features/cost/CostPage";
-import { SalesPage } from "@/features/sales/SalesPage";
-import { FundingPage } from "@/features/funding/FundingPage";
-import { SwarmPage } from "@/features/swarm/SwarmPage";
-import { ShopFinancePage } from "@/features/shop-finance/ShopFinancePage";
-import { UnlockPage } from "@/features/unlock/UnlockPage";
-import { FunderPage } from "@/features/funder/FunderPage";
-import { SimulatorPage } from "@/features/simulator/SimulatorPage";
-import { ProjectsPage } from "@/features/projects/ProjectsPage";
+// Keep the first download small; Vite fetches each workspace only when opened.
+const OverviewPage = React.lazy(() => import("@/features/overview/OverviewPage").then((page) => ({ default: page.OverviewPage })));
+const ImportPage = React.lazy(() => import("@/features/import/ImportPage").then((page) => ({ default: page.ImportPage })));
+const CashflowPage = React.lazy(() => import("@/features/cashflow/CashflowPage").then((page) => ({ default: page.CashflowPage })));
+const HealthPage = React.lazy(() => import("@/features/health/HealthPage").then((page) => ({ default: page.HealthPage })));
+const CostPage = React.lazy(() => import("@/features/cost/CostPage").then((page) => ({ default: page.CostPage })));
+const SalesPage = React.lazy(() => import("@/features/sales/SalesPage").then((page) => ({ default: page.SalesPage })));
+const FundingPage = React.lazy(() => import("@/features/funding/FundingPage").then((page) => ({ default: page.FundingPage })));
+const SwarmPage = React.lazy(() => import("@/features/swarm/SwarmPage").then((page) => ({ default: page.SwarmPage })));
+const ShopFinancePage = React.lazy(() => import("@/features/shop-finance/ShopFinancePage").then((page) => ({ default: page.ShopFinancePage })));
+const UnlockPage = React.lazy(() => import("@/features/unlock/UnlockPage").then((page) => ({ default: page.UnlockPage })));
+const FunderPage = React.lazy(() => import("@/features/funder/FunderPage").then((page) => ({ default: page.FunderPage })));
+const SimulatorPage = React.lazy(() => import("@/features/simulator/SimulatorPage").then((page) => ({ default: page.SimulatorPage })));
+const ProjectsPage = React.lazy(() => import("@/features/projects/ProjectsPage").then((page) => ({ default: page.ProjectsPage })));
+const AIPanel = React.lazy(() => import("@/features/ai-panel/AIPanel").then((panel) => ({ default: panel.AIPanel })));
+const StoryModeModal = React.lazy(() => import("@/features/reports/StoryModeModal").then((modal) => ({ default: modal.StoryModeModal })));
 
 // Mobile Icons
 import {
@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 
 export const App: React.FC = () => {
-  const { currentPage, setCurrentPage, isReducedMotion, toasts, removeToast } = useAppStore();
+  const { currentPage, setCurrentPage, isReducedMotion, toasts, removeToast, isAIPanelOpen, isStoryModeOpen } = useAppStore();
 
   const renderCurrentPage = () => {
     switch (currentPage) {
@@ -85,7 +85,13 @@ export const App: React.FC = () => {
 
         {/* Dynamic Screen Viewport */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-8">
-          {renderCurrentPage()}
+          <React.Suspense fallback={(
+            <div role="status" className="m-6 rounded-card border border-borderLine bg-white p-6 text-sm text-ink-muted">
+              กำลังโหลดหน้า…
+            </div>
+          )}>
+            {renderCurrentPage()}
+          </React.Suspense>
         </main>
       </div>
 
@@ -150,8 +156,8 @@ export const App: React.FC = () => {
       {/* Global Modals & Side Panels */}
       <MobileDrawer />
       <CommandPalette />
-      <AIPanel />
-      <StoryModeModal />
+      {isAIPanelOpen && <React.Suspense fallback={null}><AIPanel /></React.Suspense>}
+      {isStoryModeOpen && <React.Suspense fallback={null}><StoryModeModal /></React.Suspense>}
 
       {/* Toast Notification Container */}
       <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none max-w-sm w-full">

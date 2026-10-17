@@ -1,5 +1,17 @@
 # การส่งมอบงานของ CODEX
 
+## ปรับความเร็ว UI — 2026-10-18
+
+เว็บ prototype production อัปเดตแล้ว (Vercel deployment
+`dpl_7uw9grWcMGmhkxHAQxEkp2ixPHQZ`). แยก 13 หน้าธุรกิจและ panel ขนาดใหญ่เป็น
+โหลดตามการเปิดหน้า; หน้าแรกไม่ดึง Simulator/Import/SWARM ทุกหน้าไปพร้อมกัน.
+entry JavaScript ของ production build เหลือ 215.42 KB (65.57 KB gzip) จาก
+562,343 bytes ใน build ก่อนปรับ. ตัด Anuphan ที่ไม่ได้ใช้ และปรับ Google Fonts
+ให้โหลดแบบไม่บล็อก render. Production browser เปิดหน้าแรกและหน้า Import ได้.
+
+`pnpm build` และ TypeScript ผ่าน. Source/UI change บันทึกใน Git แล้ว;
+Vercel Git auto-deploy ยังไม่ได้เชื่อม.
+
 ## รอบล่าสุด — Prototype online และทดสอบ workbook 2026-10-18
 
 ผู้ใช้เลือกสร้างเว็บใหม่ในบัญชี Vercel ของตน เพราะไม่มีสิทธิ์ในทีมที่ถือเว็บเดิม:

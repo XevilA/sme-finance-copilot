@@ -60,7 +60,7 @@ export default {
       },
       fontFamily: {
         sans: ['"IBM Plex Sans Thai"', '"Noto Sans Thai"', 'Prompt', 'sans-serif'],
-        display: ['Prompt', '"Anuphan"', 'sans-serif'],
+        display: ['Prompt', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
     },

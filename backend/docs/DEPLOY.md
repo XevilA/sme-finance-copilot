@@ -5,6 +5,9 @@
 > Neon แล้ว, health `persistence=true`, 27 tables, bootstrap `off`; production
 > HTTP acceptance และ scoped simulation replay ผ่าน. หน้า UI 3 และ 6–13 โหลดได้.
 > ไฟล์ผู้ใช้ถูก preview อย่างเดียว; งบฐานะไทยยังต้องยืนยันปี `ปี 1`/`ปี 2`.
+> UI performance deploy `dpl_7uw9grWcMGmhkxHAQxEkp2ixPHQZ` แยก feature pages
+> โหลดตามการเปิด และ entry JS 215.42 KB (65.57 KB gzip); Google Fonts โหลดแบบ
+> asynchronous.
 > ใช้ project link ที่อยู่ใน `.vercel/project.json` (ignored/local) สำหรับ deploy:
 >
 > ```bat
