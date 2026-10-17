@@ -122,46 +122,37 @@ python -m pytest -c backend/pytest.ini -q    # 510 ผ่าน + 3 skip (ยั
 
 ---
 
-## 🔜 4. งานที่เหลือ — backend/AI และ integration ก่อนส่ง frontend team
+## 🔜 4. งานส่งต่อหลัง backend integration — 2026-10-17
 
-Current state และเกณฑ์รับงานฉบับเต็ม: [FRONTEND_INTEGRATION_HANDOFF.md](FRONTEND_INTEGRATION_HANDOFF.md).
-สิทธิ์แก้ frontend wiring ได้แล้ว; งานค้างด้านล่างไม่ใช่งานที่ต้องขอขยายสิทธิ์รายไฟล์อีก
+ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit. ทำใน codex/demo-backend และรวม backend
+เข้า main แล้วที่ runtime f23c09e. ไม่แก้ src/**, frontend wiring scripts/tests, progress.md
+หรือ docs/FRONTEND_DEMO_HANDOFF.md. คง UI เดิม; ไม่อ้าง combined browser completion.
 
-| ลำดับ | งานที่เราต้องปิด / เจ้าของ | ผลที่ต้องพิสูจน์ |
-| --- | --- | --- |
-| P0 | SME/project/input context — CODEX | ทุกหน้าใช้บริบทเดียวกัน, ไม่ default ไป demo/คนละ SME เงียบ ๆ; draft เปลี่ยนไม่อ้าง accepted result เก่าเป็นผลใหม่ |
-| P0 | API/types/null/source/missing/error/CORS auth — CODEX | types ตรง runtime; partial data ใช้งานส่วนที่มี; invalid/network failure ไม่มี fake success หรือ skeleton ค้าง |
-| P0 | Stored order constraints/collections — CODEX + ทีมข้อมูล | schema/loader เก็บข้อกำหนดจริง; ไม่ยืนยัน packaging เป็นอาหาร, ไม่เดาพิกัดหรือเปลี่ยนรถ offered เป็น confirmed |
-| P0 | Demo business handlers — CODEX + ทีมกำหนด scope | apply/sign/info/export ต่อ operation จริงพร้อม read-back หรือ unavailable; ไม่เรียก endpoint สมมติ/แจ้งสำเร็จจาก toast |
-| P1 | Saved plan read/replay — CODEX | POST save ที่มีอยู่ต้องอ่านกลับตาม ID/project ได้; full input/results/audit ตรวจซ้ำได้ |
-| P1 | AI context/evidence/fallback — CODEX | SME/งวด/coverage ตรงหน้าจอ; rules/model status ตามจริง; ไม่ยืม baseline forecast ไปยืนยัน scenario |
-| P1 | Chaos/resource effects — CODEX | ใช้ engine สำหรับผล scenario ไม่ใช้ timer/สูตรเงินใน component เป็นผลคำนวณ |
-| P2 | Deploy/unmock — ทีมโฮสต์ + CODEX ตรวจ | backend URL/CORS และ Vercel สอง env ถูกต้อง; ห้ามอ้างว่ามี deployment ใหม่ในรอบนี้ |
-| P2 | Live news — CODEX + ทีมโฮสต์ | ทดสอบจาก deployed host ผ่าน gate; ข่าวสดยังไม่ยืนยันสำเร็จ ไม่ force/retry หรือแต่งบทความ |
-| ส่งต่อ | Presentation/UX/UI — ทีม frontend | ใช้ contract ที่ผ่าน acceptance; CODEX คงดีไซน์เดิมระหว่าง wiring |
+| งาน | สถานะที่ตรวจแล้ว / งานค้าง |
+| --- | --- |
+| Shared statement context | POST calculate/analyze/funding/evaluate/forecast/preview มี SME/project/revision/hash; imported funding ไม่โหลด seed statement; frontend ยังต้องส่ง context/invalidate draft |
+| Nullable Cost/CORS | backend แก้ครบห้า scalars + known zero; Authorization preflight ผ่าน allowed origins; CostPage.tsx:105 ยังต้อง guard null โดย Claude |
+| Constraints/collections | schema/load/read/write พร้อม, unknown != known-empty; ข้อมูลจริงต้องมาจากทีม ไม่มี backfill/confirmation ทรัพยากร |
+| Saved simulation | full input/results/audit/version/context + scoped list/read/replay ผ่าน HTTP/DB; frontend wiring รอ Claude |
+| Resource/Chaos | outage/shop removal และสี่ order controls recompute จริง; arbitrary narrative effects/cost/delay/reservation unavailable |
+| AI/evidence | imported analysis ใช้ own dated evidence ถึง period_end; statement Plan A/B มี own rules findings ไม่มี baseline forecast ถูกนำไปแอบใช้กับ Plan B; LLM optional bounded fallback คงเดิม |
+| Provider | stable transaction lock ข้าม workers จน commit, tests แยก synthetic gate; real request timeout/unavailable/0 articles, backoff 60s; ข่าวสดยัง unavailable |
+| Auth | real HTTP synthetic login/logout/revoke/403 + DB read-back ผ่าน; demo enforcement=false/.env คงเดิม; frontend identity/login ยังไม่พร้อม |
+| Business operations | application/signature/info-request/export/reservation unavailable ตาม /capabilities; ต้องมี business contract/actors ก่อนสร้าง transactions |
+| Deploy | local เท่านั้น; ทีมต้องให้ backend host URL/Vercel env/redeploy ไม่มีการซื้อ infra/deploy ใหม่ |
 
-**สิ่งที่ตรวจซ้ำผ่านแล้ว:** 510/3 DB, 410/103 ไม่มี DB, 36 main routes, 27 tables,
-16 HTTP read contracts, build 1955 / CSS index-DEindwiw.css / JS index-CBenrrOQ.js;
-import/page client regression scripts ผ่าน. ดูวิธีทดสอบใน TESTER_READINESS_CURRENT.md
+ผลวัดล่าสุด: **545 passed/3 skipped DB; 426/122 no DB**. เพิ่ม 35 tests ไม่ลด assertions.
+HTTP verify_backend_demo และ verify_tester_flow ผ่านจาก main; **43 main API paths / 27 tables /
+16 read contracts**. Build หลังรวม backend: **1955 modules, index-DEindwiw.css,
+index-CBenrrOQ.js**. Client/style scripts ผ่าน; ไม่ใช่หลักฐาน browser flow ใหม่ครบทุกหน้า.
 
-Validation regression จาก main ใหม่แก้แล้ว: optional ยังเป็น None, required ต้องส่ง,
-nonfinite ถูกปฏิเสธ. Inventory backend nullable + Excel aliases คงไว้; schema 39 fields
-แต่ Import 38 fields; ไม่เพิ่ม stock/DIO math. เพิ่ม 16 tests โดยไม่ลด assertion เดิม.
-
-Legacy Cost adapter ยังคืน 0 เป็น placeholder เมื่อ metrics ไม่พร้อม (HTTP minimal analyze
-ตรวจแล้ว มี insufficient_data/missing). ต้องแก้ adapter/types/consumer คู่กันใน P0;
-Overview ที่เป็น null แล้วไม่ได้แปลว่าทุก widget ปลอด placeholder ครบแล้ว
-
-**ข้อจำกัดข้อมูล SWARM:** project 1,000/วัน 30 วัน; สองร้านอาหารติดรถ required ที่ยัง
-ไม่พร้อม. preview จัดสรร Sahai (packaging) 450 และขาด 550; required_business_types,
-buyer coordinates/radius/collection schedule ยังไม่เก็บใน project จึงรับรอง suitability
-ไม่ได้. Backend/schema ต่อได้ภายใต้สิทธิ์ปัจจุบัน; ข้อมูลจริงต้องมาจากเจ้าของ
-
-**ก่อนข้อมูลลูกค้าจริง:** auth มีใน backend แต่ frontend ยังไม่ส่ง token; health ปัจจุบัน
-enforced=false / secretConfigured=false / devHeaderAccepted=false. Login 2 เคสยัง skip
-เมื่อไม่ตั้ง DEMO_LOGIN_PASSWORD; admin มี password hash ใน local DB แล้ว แต่ไม่อ้างว่า
-ทดสอบ admin login/revoke ด้วยบัญชีนี้สำเร็จ. อ่าน DEPLOY.md; ก่อน browser auth ต้องแก้ CORS ให้รับ Authorization ตาม contract ด้วย (preflight ปัจจุบัน
-400 Disallowed CORS headers); ไม่เปิด enforcement แทนการทำ identity/authorization ให้ครบ และไม่ใส่ credential ใน repo/VITE_*.
+Prototype วันนี้: [PROTOTYPE_TODAY.md](PROTOTYPE_TODAY.md).
+Current acceptance: [SUNDAY_ACCEPTANCE.md](SUNDAY_ACCEPTANCE.md),
+[TESTER_READINESS_CURRENT.md](TESTER_READINESS_CURRENT.md),
+[API_CONTRACT_MATRIX.md](../../docs/API_CONTRACT_MATRIX.md), newest CODEX_HANDOFF.
+GET และ POST analysis จำกัด expense observations ถึง statement period_end แล้ว;
+imported screens ต้องใช้ POST context APIs เพื่อไม่กลับไป stored defaults. Actual project ยังขาด constraints/coordinates/collections และรถ required
+ยัง offered. ห้ามยืนยัน packaging เป็น food หรือใช้ข่าว/transactions ที่ไม่มีหลักฐาน.
 
 ---
 

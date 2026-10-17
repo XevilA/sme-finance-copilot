@@ -1,3 +1,49 @@
+# สถานะ backend ก่อนส่ง tester — 2026-10-17
+
+Current runtime **f23c09e**, เริ่มจาก 5422af8, backend branch codex/demo-backend.
+Backend รวมเข้า main แล้ว; ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit.
+**Backend core พร้อมใช้ local prototype วันนี้** ตาม [PROTOTYPE_TODAY.md](PROTOTYPE_TODAY.md).
+**Frontend integration และ deployed browser acceptance ยังไม่เสร็จ**.
+
+| ผลตรวจล่าสุด | ค่า |
+| --- | --- |
+| pytest PostgreSQL | **545 passed / 3 skipped (34.03s)** |
+| pytest ไม่มี DB | **426 passed / 122 skipped (10.29s)** |
+| Tests เพิ่ม | **35**, ไม่ลด assertions เดิม |
+| Main API paths / DB / legacy read contracts | **43 / 27 tables / 16** |
+| HTTP/DB synthetic end-to-end | import/calculate/analyze/funding/forecast/SWARM/save/list/read/replay ผ่าน |
+| Auth HTTP + DB | synthetic actors/ephemeral secret ผ่าน; demo enforcement คง false |
+| Build หลังรวม backend | **1955 modules / index-DEindwiw.css / index-CBenrrOQ.js** |
+| Client/style checks | import/page scripts + 4 style guards ผ่าน |
+| Live news | **unavailable**, real attempt timeout, 0 articles, backoff 60s |
+| Deploy/browser ใหม่ | **ยังไม่ได้ตรวจ/ไม่มี deployment ใหม่** |
+
+| โมดูล | สถานะ | ขอบเขตจริง |
+| --- | --- | --- |
+| 1 Validation/Excel | **real usable (backend)** | 39 FinancialInput fields, template XLSX <=5 MiB; required/finite/nullable/inventory aliases คงเดิม; Import ยัง 38 ไม่มี auto mapping/DIO |
+| 2 Math/grade | **real usable (backend)** | Decimal metrics/evidence/grade; unknown Cost null ไม่ใช่ 0 |
+| 3 Analyst/forecast | **partial** | rules, own evidence/scoped dated preview ใช้ได้; optional LLM fallback ผ่าน tests แต่ไม่มี paid live call รอบนี้; frontend shared context ยังไม่ครบ; GET/POST expense period alignment แก้แล้ว |
+| 4 Funding | **real usable (evaluation)** | imported input จัดอันดับ debt/equity ได้ เกรด/amount ของ input เดียวกัน; application unavailable |
+| 5 SWARM | **partial** | constraints/eligibility/resources preview/persistence พร้อม; real business inputs ยังขาดและรถ required offered, ไม่มี resource reservation/capacity-time contract |
+| 6 Simulator | **partial** | four controls, resource outage/shop removal, scoped save/read/replay ใช้ได้; arbitrary Chaos/universal business forecast และ frontend saved-plan wiring ยังไม่พร้อม |
+| 7 Industry | **unavailable (live)** | cache/gate/unavailable behavior ทดสอบแล้ว แต่ 0 live articles; ไม่ใช้ lastSuccessAt จาก tests เก่ายืนยันข่าว |
+| 8 DB/API/auth | **partial** | persistence + synthetic HTTP tokens/revocation/CORS ผ่าน; demo auth off, frontend login/context integration และ hosting ยังรอทีม |
+
+เร่งด่วนเมื่อ Claude กลับมา: CostPage.tsx:105 เรียก nullable fixed cost ด้วย
+.toLocaleString() โดยไม่ guard. Partial Cost API ถูกต้องแล้ว แต่หน้านี้ยัง crash ได้.
+Frontend-owned files ไม่ถูกแก้ในรอบนี้. Funding/Cashflow ต้องใช้ POST contextual APIs,
+draft changes invalidate accepted snapshot, ต่อ scoped saved reads/replay และ unavailable
+capabilities. อย่าอ้างว่าทั้งแปดฟีเจอร์ใช้งานผ่าน browser ครบ.
+
+คำสั่ง cmd.exe และ acceptance วันอาทิตย์ฉบับเต็ม:
+[SUNDAY_ACCEPTANCE.md](SUNDAY_ACCEPTANCE.md). Contracts/examples/null/errors/identity:
+[API_CONTRACT_MATRIX.md](../../docs/API_CONTRACT_MATRIX.md). ผล/ข้อจำกัดรอบนี้อยู่บนสุด
+[CODEX_HANDOFF.md](CODEX_HANDOFF.md). ไม่ reset/reseed volume, ไม่แก้ .env หรือทรัพยากรเดิม.
+
+---
+
+# ประวัติรอบ 2026-10-16 (ไม่ใช่ผลตรวจล่าสุด)
+
 # สถานะก่อนส่ง tester — ตรวจจริง 2026-10-16
 
 ตรวจซ้ำ runtime source `48d9385` + validation regression repair ในรอบนี้ · ทีมอนุญาต frontend wiring ทุกไฟล์ที่จำเป็น

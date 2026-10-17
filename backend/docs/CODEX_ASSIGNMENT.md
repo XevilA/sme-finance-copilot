@@ -1,5 +1,15 @@
 # CODEX ASSIGNMENT — Backend / AI integration, 2026-10-16
 
+> **Current override 2026-10-17:** ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit.
+> Runtime f23c09e รวมเฉพาะ backend เข้า main; ไม่แก้ frontend-owned files.
+> CORS Authorization, nullable Cost, imported funding/forecast context, constraints,
+> scoped simulation list/read/replay และ provider transaction locking แก้แล้ว.
+> ผลล่าสุด 545/3 DB, 426/122 no DB; 43 main paths, 27 tables, build1955/CSS
+> index-DEindwiw.css/JS index-CBenrrOQ.js. Frontend/browser/hosting ยังไม่รวมเสร็จ;
+> partial Cost ต้อง nullable guard โดย Claude. อ่าน SUNDAY_ACCEPTANCE.md และ
+> CODEX_HANDOFF entry ล่าสุด; เนื้อหาถัดไปเก็บไว้เป็นประวัติของรอบก่อน.
+
+
 ## 1. คำสั่งล่าสุดและขอบเขตที่ใช้จริง
 
 ผู้ใช้แจ้งว่าทีมอนุญาตให้ทำ frontend เพื่อให้เชื่อม backend/AI และทำงานร่วมกันได้แล้ว

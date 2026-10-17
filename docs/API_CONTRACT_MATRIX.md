@@ -1,5 +1,38 @@
 # API Contract Matrix — Backend / AI ↔ Frontend
 
+Latest verified runtime: `f23c09e`, 2026-10-17. Backend-only integration into main;
+frontend integration deferred by the user while Claude is rate limited.
+Final measured suite: **545 passed / 3 skipped with PostgreSQL; 426 / 122 without
+DB**. Older block measurements below are history. Schema still 27 tables,
+43 main `/api/*` paths (+ v1 aliases, 4 v1-only paths and /health).
+
+Provider hardening: stable SHA-256-derived advisory transaction lock, held on one
+session through fetch, cache/backoff persistence and commit. Concurrency tests
+use independent DB sessions and separate Python hash seeds. Provider tests now
+use synthetic gate keys/transports; they no longer clear or fake-success the
+real GDELT gate. Existing assertions retained; publication-date test additionally
+requires a nonempty synthetic article list. One permitted real request on
+2026-10-17 at 07:02 Asia/Bangkok timed out: unavailable / 0 articles / backoff 60s,
+read back from provider_fetch_state. Historical lastSuccessAt from old tests is
+not evidence of live news success. No force refresh, retries or paid LLM calls.
+
+Stored required dependencies are authoritative even when POST swarm receives
+inline shops with resources=[]; clients cannot erase a required offered truck.
+Saving a mixed known/unknown shop set does not persist only a subset.
+
+**Frontend dependency:** existing CostPage.tsx:105 directly calls
+currentMonthlyFixedCost.toLocaleString(); it must accept null before partial-input
+Cost can be used in the browser. No frontend files were changed in this backend
+handover. Claude must also wire imported funding/forecast, active revisions,
+saved reads/replay and unavailable business actions to the contracts below.
+
+Final prototype validation (`f23c09e`): StatementRequest rejects coverage earlier
+than input.period_end with 422; unsupported 90-day forecast calendar returns 422
+instead of 500. `/capabilities` reports deterministicAnalysis mode=rules and
+savedSimulationReplay.available follows DATABASE_URL configuration. This flag is
+a configured capability, not a database liveness probe. Current quick start:
+[PROTOTYPE_TODAY.md](../backend/docs/PROTOTYPE_TODAY.md).
+
 ## Backend integration block 1 — implemented 2026-10-17
 
 Branch `codex/demo-backend`, based on `5422af8`. This section supersedes legacy
@@ -58,9 +91,9 @@ resources. Coverage remains an explicit caller assertion; unknown horizons null.
 CORS now accepts `Authorization, Content-Type` for each configured origin only;
 unlisted origins remain rejected. Auth enforcement settings are unchanged.
 
-Legacy GET analysis views use stored context and are not a substitute for
-accepted imported views. Their historical expense observation window can differ
-from the statement period; imported flows use POST analyze's bounded context.
+GET financial analysis views and POST analyze now both bound expense observations
+through the selected statement period_end. Legacy GET defaults still select a
+stored statement, so they must not replace accepted imported views.
 
 ## Backend integration block 2 — implemented and verified 2026-10-17
 

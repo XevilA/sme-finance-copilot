@@ -1,5 +1,15 @@
 # สถานะและงานส่งต่อ Backend / AI ↔ Frontend
 
+> **Current override 2026-10-17:** ผู้ใช้ให้เน้น backend ก่อนเพราะ Claude ติด limit.
+> Runtime f23c09e รวมเฉพาะ backend เข้า main; ไม่แก้ frontend-owned files.
+> CORS Authorization, nullable Cost, imported funding/forecast context, constraints,
+> scoped simulation list/read/replay และ provider transaction locking แก้แล้ว.
+> ผลล่าสุด 545/3 DB, 426/122 no DB; 43 main paths, 27 tables, build1955/CSS
+> index-DEindwiw.css/JS index-CBenrrOQ.js. Frontend/browser/hosting ยังไม่รวมเสร็จ;
+> partial Cost ต้อง nullable guard โดย Claude. อ่าน SUNDAY_ACCEPTANCE.md และ
+> CODEX_HANDOFF entry ล่าสุด; เนื้อหาถัดไปเก็บไว้เป็นประวัติของรอบก่อน.
+
+
 อัปเดต 2026-10-16 (Asia/Bangkok) · ตรวจ runtime source `48d9385` + validation regression repair ในรอบนี้ ·
 อัปเดตเอกสารและแก้ validation regression; คง src/UI เดิม
 

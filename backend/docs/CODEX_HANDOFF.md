@@ -1,5 +1,108 @@
 # การส่งมอบงานของ CODEX
 
+## รอบ CODEX 2026-10-17 — Backend implementation and verified handover
+
+ฐานเริ่ม `5422af8` หลัง fetch origin/main; ทำใน isolated worktree
+`.worktrees/demo-backend` / `codex/demo-backend`. Commits ที่เผยแพร่เป็นชุด:
+`14999b3` context/nullable contracts, `d77bf5e` constraints/save/read/replay,
+`d7d0958` provider coordination/dependency protection/auth HTTP verification,
+`96e69ca` period alignment ของ GET views. Positive anomaly assertions ยังอยู่ใน
+October ที่ถูกต้อง และเพิ่ม assertion ว่า September ไม่ยืม October มาอธิบาย.
+รวมเฉพาะ backend เข้า main แบบ fast-forward แล้ว; ผู้ใช้ยืนยันให้เน้น backend ก่อน
+เพราะ Claude ติด limit. ไม่แก้ src/** หรือ frontend-owned scripts/tests/progress.
+**ยังไม่อ้างว่า combined frontend/browser integration เสร็จ**.
+
+### Resume หลัง usage limit — prototype วันนี้
+
+ผู้ใช้สั่งให้ปิดงาน backend/AI สำหรับใช้ prototype วันนี้. ตรวจ remote/main แล้วยังคง
+5422af8 จึงรวม backend ที่ทดสอบแล้วโดยรักษา commits เดิม. ช่วงกลับมาพบ Docker/Postgres
+หยุดอยู่ จึงเปิด services เดิม ไม่ reset/reseed และไม่เปลี่ยน .env. คำสั่งตรวจครั้งแรก
+ConnectionRefused ไม่ถูกนับเป็นผลผ่าน; หลัง service พร้อม HTTP/DB pipeline และ auth ผ่าน.
+
+เพิ่ม `f23c09e`: coverage ก่อนวันปิดงบและ forecast calendar ไม่รองรับตอบ 422 แทน 500;
+เพิ่ม 6 tests, capability saved replay ระบุว่าต้องมี DB และ deterministic analysis ระบุ rules.
+Final suite **545/3 DB (34.03s), 426/122 no DB (10.29s)**; เพิ่มรวม 35 tests จาก baseline.
+**Backend core พร้อมใช้ prototype ผ่าน local API ตาม PROTOTYPE_TODAY.md**.
+Frontend/deployed browser, ข่าวสด และธุรกรรมที่ยังไม่มี business contract ไม่ถูกอ้างว่าเสร็จ.
+
+### สิ่งที่เปลี่ยนและหลักฐาน
+
+- POST analyze/calculate/funding/evaluate/forecast/preview ใช้ explicit statement,
+  SME/project/revision/hash; imported funding ไม่โหลด seed statement แทน.
+  Analyze จำกัดประวัติ observations ถึง period_end; dated forecast ใช้ cash snapshot
+  ของ input และ events ของ SME/project เดียวกัน. ไม่มีการแผ่ยอดงบเป็น dated events.
+- Cost ทั้งห้า scalars ไม่ทราบเป็น null; known zero ยังเป็น 0. CORS รับ Authorization
+  เฉพาะ origins ที่ตั้งค่า; preflight ทั้ง allowed origins และ untrusted origin มี tests.
+- Project constraints/collection schedules เก็บและอ่านกลับได้. Unknown ต่างจาก [] และ
+  no-distance-limit ที่ระบุ explicit null. ไม่ backfill ข้อกำหนดหรือเปลี่ยน offered resource.
+  SWARM เก็บ dependencies ของ allocations ที่ยังอยู่; inline resources=[] ไม่ข้าม required
+  offered truck. Mixed known/unknown shops ไม่ persist เพียงบางส่วนอย่างเงียบ ๆ.
+- Order/statement simulation เก็บ full request/results/audit/context/version. มี scoped
+  list/read/replay; ผิด project 404, ไม่มี scope 422, legacy incomplete replay 409.
+  Snapshot replay พิสูจน์ results เท่ากัน; engine/context/revision/hash ต่างแสดง stale แยก.
+- Plan B รองรับ required resource outage และ shop removal โดย recompute allocation;
+  preference outage ไม่สร้าง cost/delay สมมติ. Statement plans มี rules findings จาก
+  statement ของแต่ละ plan; ไม่ยืม baseline dated forecast/expense history มาเป็น Plan B.
+- GET capabilities ประกาศ application/signature/info request/export/reservation และ
+  arbitrary narrative Chaos ว่า unavailable; ไม่มีการสร้างธุรกรรมเอง.
+- Provider พบ regression จริง: randomized hash key และปล่อย DB session ก่อน fetch.
+  แก้เป็น stable key + advisory transaction lock ถือบน session เดียวจน cache/backoff commit.
+  Tests ใช้สอง connections และสอง Python hash seeds ยืนยัน concurrency. แยก provider
+  tests จาก gate จริง/เครือข่าย; ไม่ล้าง provider_fetch_state ทั้งตารางอีก.
+- Auth script ใช้ actors และ secret ชั่วคราว: HTTP login/logout/repeat401/revoke-all/
+  admin revoke/analyst403 + DB read-back ผ่าน; enforcement demo ยัง false, .env ไม่เปลี่ยน.
+
+### ผลวัดรอบสุดท้าย (local)
+
+| รายการ | ผล |
+| --- | --- |
+| Full pytest PostgreSQL | **545 passed / 3 skipped, 34.03s** |
+| Full pytest no DB | **426 passed / 122 skipped, 10.29s** |
+| Tests เพิ่มจาก baseline 510/3 | **35**, ไม่ลด assertions เดิม; publication test เพิ่ม nonempty assertion |
+| HTTP/DB acceptance | verify_backend_demo.py ผ่านจาก worktree และ main หลังรวม |
+| Legacy tester flow | verify_tester_flow.py ผ่าน: **43 main paths / 27 tables / 16 read contracts** |
+| Synthetic imported flow | B/75; shared hash; forecast min **70,000**, 90-day **85,000**; food-only allocation; outage; saved replay reproduced |
+| Existing synthetic examples | finite-order cost **28,000**, scenario revenue **275,000**; Rung gap **45,000**, forecast minimum **29,700** |
+| Frontend build after backend merge | **1955 modules / index-DEindwiw.css / index-CBenrrOQ.js** |
+| Existing client checks | import/page wiring scripts + four-page style guards ผ่าน; invariants ผ่านเฉพาะ legacy fixture |
+| Warnings | Starlette/httpx deprecation และ JS >500kB เดิม |
+
+Full DB รอบก่อนหน้าเจอ temp parent ไม่มี: 522 passed/3 skipped/1 setup error;
+แก้ setup directory แล้ววัดใหม่ตามตาราง. Fixture ใหม่ครั้งแรกใช้ category ไม่ตรง enum;
+แก้ fixture เป็น truck โดยไม่ลด assertions. Client scripts รอบแรกชี้ 8000 ขณะที่ server
+อยู่ 8018 จึง connection fail; เปิด main ที่ 8000 แล้วทั้งสอง scripts ผ่าน.
+ตัวเลขที่ล้มเหลวนี้ไม่ถูกนับเป็นผลผ่าน.
+
+### Provider/deployment และข้อจำกัด
+
+คำขอข่าวปกติหลังแก้ gate เวลา **17 Oct 07:02 Asia/Bangkok** ได้ timeout /
+unavailable / articles=0. DB read-back: lastAttemptAt=2026-10-17T00:02:49.751009Z,
+nextAllowedAt=00:03:49.751009Z, consecutiveFailures=1, lastError=timeout.
+ไม่ force/retry/TLS bypass. lastSuccessAt ใน state เก่าเคยถูก tests แก้ จึงไม่ใช้ยืนยัน
+ข่าวสด. No paid LLM call; optional bounded provider/fallback tests ยังผ่าน.
+ไม่มี backend hosting URL ใหม่, ไม่มี deploy/image rebuild หรือ production browser evidence.
+
+Frontend ยังอยู่ baseline เพราะผู้ใช้ให้รอ Claude: CostPage.tsx:105 ต้อง guard nullable
+currentMonthlyFixedCost ก่อน partial-input Cost; api/client ยังไม่ส่ง imported context ไป
+Funding/Cashflow หรือ invalidate accepted result เมื่อ draft เปลี่ยน. Saved list/replay และ
+capabilities unavailable ยังรอ wiring. GET financial views และ imported POST analyze จำกัด observations ถึง period_end แล้ว;
+legacy GET defaults ยังไม่ใช่ imported input จึงต้องเลือก context ให้ชัดเจน.
+Project จริงยังไม่มี requirements/พิกัด/collection schedule ที่ทีมยืนยัน และ required truck
+ยัง offered. ไม่เปลี่ยนข้อมูลเดิมเพื่อให้ผ่าน. Auth demo enforced=false / secretConfigured=false;
+isolated script ไม่ใช่การยืนยัน admin credential จริงหรือ frontend login.
+
+### ส่งต่อวันอาทิตย์
+
+ใช้ **SUNDAY_ACCEPTANCE.md** และ API_CONTRACT_MATRIX.md เป็น current instructions.
+มี cmd.exe commands สำหรับ DB/no-DB suite, synthetic HTTP writes + DB read-back,
+scoped saved replay, auth และ failures. ตารางทั้งแปดโมดูลอยู่ TESTER_READINESS_CURRENT.md.
+ทีมต้องให้ business constraints/dated schedules, host URL/Vercel config และ frontend branch
+หลัง Claude พร้อม. ไม่รอ hosting เพื่อทดสอบ local และไม่เปิด enforcement แทน auth wiring.
+
+บันทึกถัดจากนี้เป็นประวัติก่อน backend integration รอบนี้; counts/backlog เดิมไม่ใช่สถานะล่าสุด.
+
+---
+
 ## รอบ CODEX 2026-10-16 — ข้อตกลงใหม่และตรวจสถานะ Backend/AI integration
 
 ### Regression ที่แก้ระหว่างอัปเดตสถานะ
