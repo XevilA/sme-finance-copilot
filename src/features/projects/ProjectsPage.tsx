@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { ProjectRecord, Envelope } from "@/api/contracts/types";
+import { Capabilities, ProjectRecord } from "@/api/contracts/types";
+import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -20,34 +21,31 @@ import {
 
 export const ProjectsPage: React.FC = () => {
   const { setStoryModeOpen, addToast } = useAppStore();
-  const [projectsEnvelope, setProjectsEnvelope] = useState<Envelope<ProjectRecord[]> | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("proj-act-001");
-  const [loading, setLoading] = useState(true);
-
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getProjectRecords()
-      .then((res) => {
-        setProjectsEnvelope(res);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const state = useEnvelope<ProjectRecord[]>(useCallback(() => apiClient.getProjectRecords(), []));
+  const { envelope: projectsEnvelope, loading, error, reload: loadData } = state;
+  const mode = envelopeMode(state, (rows) => rows.length === 0);
+  const capabilityState = useEnvelope<Capabilities>(useCallback(
+    () => (apiClient.isDemoMode()
+      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      : apiClient.getCapabilities()),
+    []));
+  const canExport = capabilityState.envelope?.data.reportExport.available === true;
+  const exportBlockedReason = capabilityState.envelope?.data.reportExport.reason
+    || "backend ยังไม่มี operation สำหรับสร้างไฟล์รายงาน";
 
   const handleExportPoster = () => {
+    // /capabilities declares reportExport unavailable: no file is generated and
+    // nothing is queued for download.
     addToast({
-      type: "success",
-      title: "ส่งออกรายงานสำเร็จ",
-      message: "เอกสารสรุปโครงการฉบับผู้บริหารพร้อมดาวน์โหลดในรูปแบบ PDF / Poster Layout แล้ว",
+      type: "warning",
+      title: "ยังไม่รองรับการส่งออกรายงาน",
+      message: `ยังไม่มีไฟล์ใดถูกสร้างหรือดาวน์โหลด · ${exportBlockedReason} · ใช้โหมดเล่าเรื่องเพื่อนำเสนอบนหน้าจอได้`,
+      duration: 9000,
     });
   };
 
-  if (loading || !projectsEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
@@ -56,7 +54,22 @@ export const ProjectsPage: React.FC = () => {
     );
   }
 
-  const projects = projectsEnvelope.data;
+  const projects = projectsEnvelope?.data || [];
+
+  if (!projectsEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
+    return (
+      <StateRenderer
+        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
+        errorMessage={error || "อ่านรายการโครงการจาก backend ไม่สำเร็จ"}
+        unavailableReason="ยังไม่มีโครงการที่บันทึกไว้ในฐานข้อมูล"
+        missingItems={projectsEnvelope?.missing || []}
+        onRetry={loadData}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
+
   const activeProj = projects.find((p) => p.id === selectedProjectId) || projects[0];
 
   return (
@@ -92,10 +105,12 @@ export const ProjectsPage: React.FC = () => {
             <button
               type="button"
               onClick={handleExportPoster}
+              disabled={!canExport}
+              title={canExport ? undefined : exportBlockedReason}
               className="px-3.5 py-2 bg-white border border-borderLine hover:border-brand text-xs font-semibold rounded-btn flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>ดาวน์โหลดสรุปโครงการ (Poster)</span>
+              <span>{canExport ? "ดาวน์โหลดสรุปโครงการ (Poster)" : "ยังไม่รองรับการส่งออกไฟล์"}</span>
             </button>
           </div>
         </div>

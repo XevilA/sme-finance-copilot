@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { AIResponse } from "@/api/contracts/types";
+import { useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import {
   Sparkles,
   X,
@@ -25,26 +26,36 @@ export const AIPanel: React.FC = () => {
     hasUnsavedChanges,
   } = useAppStore();
 
-  const [aiData, setAIData] = useState<AIResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { accepted, stale } = useAnalysisContext();
   const [selectedRefId, setSelectedRefId] = useState<string | null>(null);
+  const load = useCallback(
+    () => (isAIPanelOpen ? apiClient.getAIExplanation(currentPage) : Promise.reject(new Error("panel closed"))),
+    [isAIPanelOpen, currentPage]);
+  const state = useEnvelope<AIResponse>(load, [isAIPanelOpen, currentPage]);
+  const aiData = isAIPanelOpen ? state.envelope?.data ?? null : null;
+  const loading = isAIPanelOpen && state.loading;
+  const error = isAIPanelOpen ? state.error : null;
+  // Deterministic rules are the default. A model run only reorders finding IDs,
+  // and a provider failure is reported as a warning with the rules output kept.
+  const aiMode = aiData?.mode || accepted?.result.data.aiMode || null;
+  const shown: AIResponse | null = isAIPanelOpen && !loading
+    ? aiData || {
+        pageId: currentPage,
+        summary: error ? "เรียกคำอธิบายจาก backend ไม่สำเร็จ" : "ยังไม่มีคำอธิบายสำหรับหน้านี้",
+        reasoning: error || "backend ไม่ได้คืนคำอธิบายของหน้านี้ · ลองนำเข้าข้อมูลหรือเปิดหน้าอื่น",
+        dataUsed: [],
+        suggestions: [],
+        unknowns: [error ? `ข้อผิดพลาด: ${error}` : "backend ไม่ได้คืนคำอธิบายของหน้านี้"],
+      }
+    : null;
+  const aiWarning = aiData?.warning || accepted?.result.data.aiWarning || null;
 
-  // Fetch AI explanation based on current active page
   useEffect(() => {
-    if (isAIPanelOpen) {
-      setLoading(true);
-      apiClient
-        .getAIExplanation(currentPage)
-        .then((res) => {
-          setAIData(res.data);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    } else {
+    if (!isAIPanelOpen) {
       setActiveEvidenceTarget(null);
       setSelectedRefId(null);
     }
-  }, [isAIPanelOpen, currentPage, setActiveEvidenceTarget]);
+  }, [isAIPanelOpen, setActiveEvidenceTarget]);
 
   if (!isAIPanelOpen) return null;
 
@@ -90,10 +101,14 @@ export const AIPanel: React.FC = () => {
             <h3 className="font-display font-bold text-ink text-sm flex items-center gap-1.5">
               <span>SME Copilot Intelligence</span>
               <span className="text-[10px] bg-brand/10 text-brand px-1.5 py-0.2 rounded font-normal">
-                AI วิเคราะห์
+                {aiMode === "rules" ? "กฎเกณฑ์ (deterministic)" : aiMode ? `โหมด ${aiMode}` : "ยังไม่ทราบโหมด"}
               </span>
             </h3>
-            <p className="text-[11px] text-ink-muted">อธิบายบริบทหน้า: {currentPage}</p>
+            <p className="text-[11px] text-ink-muted">
+              อธิบายบริบทหน้า: {currentPage}
+              {aiData?.policyVersion ? ` · เกณฑ์ ${aiData.policyVersion}` : ""}
+              {aiWarning ? ` · ใช้ผลจากกฎเกณฑ์แทนโมเดล: ${aiWarning}` : ""}
+            </p>
           </div>
         </div>
 
@@ -108,11 +123,16 @@ export const AIPanel: React.FC = () => {
       </div>
 
       {/* Stale Warning Bar if user made sandbox simulation changes */}
-      {hasUnsavedChanges && (
+      {(hasUnsavedChanges || stale) && (
         <div className="p-2.5 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
-          <span>ข้อมูลในหน้าเปลี่ยนแล้ว! การวิเคราะห์นี้อิงจากข้อมูลเดิม</span>
+          <span>
+            {stale
+              ? "ข้อมูลตั้งต้นถูกแก้หลังการวิเคราะห์ ผลนี้จึงเป็นของข้อมูลชุดก่อน"
+              : "มีรายการจำลองที่ยังไม่บันทึก ผลนี้อิงจากข้อมูลเดิม"}
+          </span>
           <button
             type="button"
+            onClick={() => { setAIPanelOpen(false); setCurrentPage("import"); }}
             className="px-2 py-0.5 bg-brand text-white text-[10px] font-medium rounded hover:bg-brand-dark flex items-center gap-1"
           >
             <RefreshCw className="w-2.5 h-2.5" />
@@ -129,7 +149,7 @@ export const AIPanel: React.FC = () => {
             <div className="h-20 bg-slate-200 rounded" />
             <div className="h-16 bg-slate-200 rounded" />
           </div>
-        ) : aiData ? (
+        ) : shown ? (
           <>
             {/* 1. Summary & Reasoning */}
             <div className="bg-slate-50 p-3.5 rounded-card border border-slate-100">
@@ -137,9 +157,9 @@ export const AIPanel: React.FC = () => {
                 <FileText className="w-3.5 h-3.5" />
                 สรุปเหตุและผลทางการเงิน
               </span>
-              <p className="text-ink font-medium leading-relaxed mb-2">{aiData.summary}</p>
+              <p className="text-ink font-medium leading-relaxed mb-2">{shown.summary}</p>
               <p className="text-ink-muted leading-relaxed text-[11px] border-t border-slate-200/80 pt-2">
-                {aiData.reasoning}
+                {shown.reasoning}
               </p>
             </div>
 
@@ -151,12 +171,14 @@ export const AIPanel: React.FC = () => {
                   ข้อมูลที่ใช้คำนวณ (Evidence Refs)
                 </span>
                 <span className="text-[10px] text-brand font-medium">
-                  {selectedRefId ? "กำลังส่องแสงอ้างอิง" : "คลิกเพื่อส่องแสงดูจุดจริง"}
+                  {!shown.dataUsed.length
+                    ? "ยังไม่มีตัวเลขที่ใช้อ้างอิง"
+                    : selectedRefId ? "กำลังส่องแสงอ้างอิง" : "คลิกเพื่อส่องแสงดูจุดจริง"}
                 </span>
               </div>
 
               <div className="space-y-1.5">
-                {aiData.dataUsed.map((item) => (
+                {shown.dataUsed.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => handleHighlightEvidence(item)}
@@ -191,8 +213,10 @@ export const AIPanel: React.FC = () => {
                 ข้อเสนอแนะเชิงกลยุทธ์
               </span>
               <div className="space-y-2">
-                {aiData.suggestions.map((sug, idx) => {
+                {shown.suggestions.map((sug, idx) => {
                   const text = typeof sug === "string" ? sug : sug.text;
+                  const target = typeof sug === "string" ? null : sug.targetPage || null;
+                  const label = typeof sug === "string" ? null : sug.actionLabel || null;
                   return (
                     <div
                       key={idx}
@@ -201,14 +225,12 @@ export const AIPanel: React.FC = () => {
                       <p className="mb-2 text-[11px] font-medium">{text}</p>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (currentPage === "overview") setCurrentPage("cashflow");
-                          else if (currentPage === "swarm") setCurrentPage("funding");
-                          else setCurrentPage("simulator");
-                        }}
+                        onClick={() => { if (target) setCurrentPage(target as never); }}
+                        disabled={!target}
+                        title={target ? undefined : "ข้อเสนอนี้ไม่ได้ระบุหน้าเป้าหมายจาก backend"}
                         className="text-[11px] font-bold text-resource-dark hover:underline flex items-center gap-1"
                       >
-                        <span>ไปเปิดแผนจำลองหรือดำเนินการต่อ</span>
+                        <span>{target ? label || `ไปที่หน้า ${target}` : "ไม่ได้ระบุหน้าเป้าหมาย"}</span>
                         <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
@@ -224,7 +246,7 @@ export const AIPanel: React.FC = () => {
                 สิ่งที่ระบบยังไม่ทราบ (ความไม่แน่นอน)
               </span>
               <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
-                {aiData.unknowns.map((unk, idx) => (
+                {(shown.unknowns.length ? shown.unknowns : ["backend ไม่ได้ระบุรายการที่ยังไม่ทราบสำหรับข้อมูลชุดนี้"]).map((unk, idx) => (
                   <li key={idx}>{unk}</li>
                 ))}
               </ul>
@@ -235,15 +257,16 @@ export const AIPanel: React.FC = () => {
 
       {/* Quick Prompt Questions */}
       <div className="p-3 bg-slate-50 border-t border-borderLine space-y-1.5">
-        <span className="text-[10px] font-bold text-ink-muted uppercase block">คำถามลัด:</span>
+        <span className="text-[10px] font-bold text-ink-muted uppercase block">
+          คำถามลัด (ยังไม่รองรับการถาม-ตอบ แสดงเป็นตัวอย่างคำถาม):
+        </span>
         <div className="flex flex-wrap gap-1.5">
           {currentQuestions.map((q, idx) => (
             <button
               key={idx}
               type="button"
-              onClick={() => {
-                // Instantly simulate user asking question
-              }}
+              disabled
+              title="ยังไม่มี endpoint ถาม-ตอบ · GET /ai/explain คืนคำอธิบายจากกฎเกณฑ์ของหน้านี้เท่านั้น"
               className="text-[10px] bg-white border border-slate-200 hover:border-brand hover:text-brand px-2.5 py-1 rounded-chip text-ink transition-colors text-left"
             >
               {q}

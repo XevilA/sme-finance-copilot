@@ -106,9 +106,9 @@ export const ResourceTile: React.FC<ResourceTileProps> = ({
         <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-xl text-[11px] text-danger flex items-start gap-1.5 animate-pulse">
           <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <div>
-            <div className="font-bold">ถอดชิ้นส่วนนี้ออกแล้ว!</div>
+            <div className="font-bold">ถอดออกจากแผนจำลองแล้ว (ยังไม่เปลี่ยนสถานะจริง)</div>
             <div className="text-[10px] text-red-700 leading-tight">
-              {resource.impactIfDetached.bottleneckMessage}
+              บันทึกของเจ้าของทรัพยากร: {resource.impactIfDetached.bottleneckMessage}
             </div>
           </div>
         </div>

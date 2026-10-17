@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback } from "react";
+import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { ProductSales, ChannelSales, Envelope } from "@/api/contracts/types";
+import { envelopeMode, useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -15,26 +17,19 @@ import {
 } from "lucide-react";
 
 export const SalesPage: React.FC = () => {
-  const [productsEnvelope, setProductsEnvelope] = useState<Envelope<ProductSales[]> | null>(null);
-  const [channelsEnvelope, setChannelsEnvelope] = useState<Envelope<ChannelSales[]> | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { setCurrentPage } = useAppStore();
+  const { accepted, stale } = useAnalysisContext();
+  const productState = useEnvelope<ProductSales[]>(useCallback(() => apiClient.getProductSales(), []));
+  const channelState = useEnvelope<ChannelSales[]>(useCallback(() => apiClient.getChannelSales(), []));
+  const productsEnvelope = productState.envelope;
+  const channelsEnvelope = channelState.envelope;
+  const loading = productState.loading || channelState.loading;
+  const error = productState.error || channelState.error;
+  const loadData = () => { productState.reload(); channelState.reload(); };
+  const productMode = envelopeMode(productState, (rows) => rows.length === 0);
+  const channelMode = envelopeMode(channelState, (rows) => rows.length === 0);
 
-  const loadData = () => {
-    setLoading(true);
-    Promise.all([apiClient.getProductSales(), apiClient.getChannelSales()])
-      .then(([prodRes, chanRes]) => {
-        setProductsEnvelope(prodRes);
-        setChannelsEnvelope(chanRes);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  if (loading || !productsEnvelope || !channelsEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
@@ -43,11 +38,33 @@ export const SalesPage: React.FC = () => {
     );
   }
 
-  const products = productsEnvelope.data;
-  const channels = channelsEnvelope.data;
+  const products = productsEnvelope?.data || [];
+  const channels = channelsEnvelope?.data || [];
+
+  // A product or channel breakdown needs catalogue rows. An imported statement
+  // only carries period totals, so neither split is reconstructed from them.
+  if (!productsEnvelope || !channelsEnvelope || productMode === "error" || channelMode === "error"
+    || (productMode === "unavailable" && channelMode === "unavailable")
+    || (products.length === 0 && channels.length === 0)) {
+    const unavailable = productMode === "unavailable" || channelMode === "unavailable";
+    return (
+      <StateRenderer
+        currentMode={error ? "error" : unavailable ? "unavailable" : "insufficient_data"}
+        errorMessage={error || "อ่านยอดขายรายสินค้าและรายช่องทางจาก backend ไม่สำเร็จ"}
+        unavailableReason={accepted
+          ? "งบที่นำเข้าเป็นยอดรวมของงวด จึงไม่มีสัดส่วนรายสินค้าหรือรายช่องทาง · ระบบจะไม่แบ่งสัดส่วนขึ้นเองและไม่ใช้ข้อมูลตัวอย่างแทน"
+          : "ยังไม่มีรายการสินค้าหรือช่องทางขายที่บันทึกไว้"}
+        missingItems={[...(productsEnvelope?.missing || []), ...(channelsEnvelope?.missing || [])]}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("import")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
 
   return (
-    <StateRenderer onRetry={loadData}>
+    <StateRenderer currentMode={stale ? "stale" : undefined} onRetry={loadData} onReanalyze={() => setCurrentPage("import")}>
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6 text-ink animate-fade-in">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderLine pb-4">

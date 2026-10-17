@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { ShopFinance, Envelope } from "@/api/contracts/types";
+import { Capabilities, Shop, ShopFinance } from "@/api/contracts/types";
+import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -19,42 +20,72 @@ import {
 
 export const ShopFinancePage: React.FC = () => {
   const { selectedShopId, setSelectedShopId, setCurrentPage, addToast } = useAppStore();
-  const [finance, setFinance] = useState<ShopFinance | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Signatures acceptance state
-  const [isSigned, setIsSigned] = useState(false);
-
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getShopFinance(selectedShopId)
-      .then((res) => {
-        setFinance(res.data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
-
+  // The switcher lists the shops the backend actually has, with their real
+  // UUIDs. Placeholder identifiers cannot be used to read a stored record.
+  const shopsState = useEnvelope<Shop[]>(useCallback(() => apiClient.getShops(), []));
+  const shops = shopsState.envelope?.data || [];
+  const activeShopId = selectedShopId || shops[0]?.id || "";
+  // Adopt the first real shop once the catalogue arrives, so the selection is a
+  // UUID the backend can read rather than an empty or placeholder identifier.
+  const firstShopId = shops[0]?.id;
   useEffect(() => {
-    loadData();
-  }, [selectedShopId]);
+    if (!selectedShopId && firstShopId) setSelectedShopId(firstShopId);
+  }, [selectedShopId, firstShopId, setSelectedShopId]);
+  const financeState = useEnvelope<ShopFinance | null>(useCallback(
+    () => (activeShopId ? apiClient.getShopFinance(activeShopId) : Promise.reject(new Error("ยังไม่ได้เลือกร้านค้า"))),
+    [activeShopId]), [activeShopId]);
+  const capabilityState = useEnvelope<Capabilities>(useCallback(
+    () => (apiClient.isDemoMode()
+      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      : apiClient.getCapabilities()),
+    []));
+  const canSign = capabilityState.envelope?.data.agreementSignature.available === true;
+  const signBlockedReason = capabilityState.envelope?.data.agreementSignature.reason
+    || "backend ยังไม่มี operation สำหรับลงนามข้อตกลง";
+  const finance = financeState.envelope?.data || null;
+  const loading = shopsState.loading || financeState.loading;
+  const error = shopsState.error || financeState.error;
+  const loadData = () => { shopsState.reload(); financeState.reload(); };
+  const mode = envelopeMode(financeState, (data) => data == null);
+  const amount = (value: number | null | undefined) =>
+    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+  // Stored acceptance flags. The page shows what is recorded and never signs.
+  const parties = finance?.partyAcceptance;
 
   const handleSignAgreement = () => {
-    setIsSigned(true);
+    // /capabilities declares agreementSignature unavailable: there is no actor,
+    // no persisted signature and no status transition behind this button.
     addToast({
-      type: "success",
-      title: "ลงนามยอมรับแผนงานเรียบร้อย",
-      message: `บันทึกข้อตกลงร่วมโครงการสำหรับ ${finance?.name || "ร้านค้า"} แล้ว`,
+      type: "warning",
+      title: "ยังไม่รองรับการลงนามจริง",
+      message: `${signBlockedReason} · สถานะที่แสดงคือสิ่งที่บันทึกไว้ในฐานข้อมูล ไม่ใช่การลงนามจากหน้านี้`,
+      duration: 9000,
     });
   };
 
-  if (loading || !finance) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
         <div className="h-96 bg-slate-200 rounded-card animate-pulse" />
       </div>
+    );
+  }
+
+  if (!finance || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
+    return (
+      <StateRenderer
+        currentMode={mode === "error" ? "error" : "unavailable"}
+        errorMessage={error || "อ่านแผนการเงินรายร้านจาก backend ไม่สำเร็จ"}
+        unavailableReason={shops.length
+          ? "ยังไม่มีแผนการเงินที่บันทึกไว้สำหรับร้านที่เลือก"
+          : "ยังไม่มีร้านค้าในฐานข้อมูลให้เลือก"}
+        missingItems={financeState.envelope?.missing || []}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("swarm")}
+      >
+        {null}
+      </StateRenderer>
     );
   }
 
@@ -79,14 +110,7 @@ export const ShopFinancePage: React.FC = () => {
 
           {/* Shop Switcher Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
-            {[
-              { id: "shop-1", name: "บ้านข้าวหอม (ขาด ฿14k)" },
-              { id: "shop-2", name: "ครัวป้าสมร" },
-              { id: "shop-3", name: "เจ๊ดาวแกงใต้ (ขาด ฿15.5k)" },
-              { id: "shop-4", name: "เฮียฮงหมูกรอบ" },
-              { id: "shop-5", name: "ครัวสวนผัก" },
-              { id: "shop-6", name: "ปิ่นโตแม่เพ็ญ" },
-            ].map((s) => (
+            {shops.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -97,7 +121,7 @@ export const ShopFinancePage: React.FC = () => {
                     : "bg-white border border-borderLine text-ink hover:border-brand/40"
                 }`}
               >
-                {s.name}
+                {s.fundingGap > 0 ? `${s.name} (ขาด ${amount(s.fundingGap)})` : s.name}
               </button>
             ))}
           </div>
@@ -113,9 +137,14 @@ export const ShopFinancePage: React.FC = () => {
             <DataKindBadge kind="forecast" size="sm" />
           </div>
           <p className="text-xs text-ink-muted leading-relaxed">
-            สำหรับ <strong>{finance.name}</strong> โควตา 50 กล่อง/วัน (รวม 500 กล่อง): ได้รับรายได้รวม <strong>฿{finance.revenue.toLocaleString()}</strong>{" "}
-            หักต้นทุนรวม <strong>฿{finance.totalCost.toLocaleString()}</strong> จะได้กำไรสุทธิทางบัญชี <strong>฿{finance.projectedProfit.toLocaleString()}</strong> ({finance.profitMarginPercent}% มาร์จิน){" "}
-            แต่<strong>เงินสดจริงจะติดลบ ฿{Math.abs(finance.minCashBalance).toLocaleString()}</strong> ในสัปดาห์แรกหากไม่มีเงินทุนหมุนเวียนเสริม
+            สำหรับ <strong>{finance.name}</strong> โควตา {finance.boxesPerDay} {finance.totalBoxes ? `ต่อวัน (รวม ${finance.totalBoxes})` : "ต่อวัน"}:
+            ได้รับรายได้รวม <strong>{amount(finance.revenue)}</strong>{" "}
+            หักต้นทุนรวม <strong>{amount(finance.totalCost)}</strong> จะได้กำไรของออเดอร์นี้ก่อนค่าใช้จ่ายอื่น{" "}
+            <strong>{amount(finance.projectedProfit)}</strong> ({finance.profitMarginPercent}% มาร์จิน) ·{" "}
+            <strong>เงินสดต่ำสุดตามตารางของออเดอร์นี้ {amount(finance.minCashBalance)}</strong>
+            {finance.minCashBalance < 0
+              ? " จึงต้องมีเงินทุนหมุนเวียนเสริมก่อนเริ่มงาน"
+              : " ยังไม่ติดลบตามตารางนี้ และไม่รวมภาระอื่นของกิจการ"}
           </p>
         </div>
 
@@ -262,44 +291,52 @@ export const ShopFinancePage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
               <span className="text-[10px] text-slate-400 block">1. ผู้ว่าจ้าง (Buyer)</span>
-              <div className="font-bold text-ink">บจก.สยามเทคโนพาร์ค</div>
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                <CheckCircle2 className="w-3 h-3" /> ลงนามแล้ว
-              </span>
+              <div className="font-bold text-ink">
+                {parties?.buyerSigned ? "ยังไม่ได้บันทึกชื่อคู่สัญญา" : "ยังไม่บันทึกการยอมรับของผู้ว่าจ้าง"}
+              </div>
+              {parties?.buyerSigned && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
+                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
+                </span>
+              )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
               <span className="text-[10px] text-slate-400 block">2. โลจิสติกส์ (Fleet)</span>
-              <div className="font-bold text-ink">รถเย็นรวม SWARM</div>
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                <CheckCircle2 className="w-3 h-3" /> ลงนามแล้ว
-              </span>
+              <div className="font-bold text-ink">
+                {parties?.logisticsSigned ? "ยังไม่ได้บันทึกผู้ให้บริการขนส่ง" : "ยังไม่บันทึกการยอมรับของผู้ขนส่ง"}
+              </div>
+              {parties?.logisticsSigned && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
+                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
+                </span>
+              )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
               <span className="text-[10px] text-slate-400 block">3. ร้านค้า (Shop)</span>
               <div className="font-bold text-ink">{finance.name}</div>
-              {isSigned || finance.partyAcceptance.shopSigned ? (
+              {parties?.shopSigned ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> ลงนามแล้ว
+                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
-                  <AlertTriangle className="w-3 h-3" /> รอยืนยันทุน
+                  <AlertTriangle className="w-3 h-3" /> ยังไม่บันทึกการยอมรับ
                 </span>
               )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
               <span className="text-[10px] text-slate-400 block">4. ผู้ให้ทุน (Funder)</span>
-              <div className="font-bold text-ink">Siam Supply Chain Fintech</div>
-              {isSigned || finance.partyAcceptance.funderSigned ? (
+              <div className="font-bold text-ink">ยังไม่ได้บันทึกผู้ให้ทุน</div>
+              {parties?.funderSigned ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> ยืนยันปล่อยกู้
+                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                  รอจับคู่ทุน
+                  ยังไม่บันทึกการยอมรับ
                 </span>
               )}
             </div>
@@ -307,16 +344,19 @@ export const ShopFinancePage: React.FC = () => {
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[11px] text-ink-muted">
-              การเปลี่ยนแปลงร้านหรือเงื่อนไขสำคัญ จะสร้างสัญญาฉบับใหม่ให้ตรวจยอมรับเสมอ
+              {canSign
+                ? "การเปลี่ยนแปลงร้านหรือเงื่อนไขสำคัญ จะสร้างสัญญาฉบับใหม่ให้ตรวจยอมรับเสมอ"
+                : `สถานะด้านบนอ่านจากที่บันทึกไว้ · ${signBlockedReason}`}
             </span>
             <button
               type="button"
               onClick={handleSignAgreement}
-              disabled={isSigned}
+              disabled={!canSign}
+              title={canSign ? undefined : signBlockedReason}
               className="px-5 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-btn text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
             >
               <FileCheck className="w-4 h-4" />
-              <span>{isSigned ? "ลงนามยอมรับแล้ว" : "ลงนามยอมรับแผนฉบับนี้"}</span>
+              <span>{canSign ? "ลงนามยอมรับแผนฉบับนี้" : "ยังไม่รองรับการลงนาม"}</span>
             </button>
           </div>
         </div>

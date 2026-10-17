@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { FunderProject, Envelope } from "@/api/contracts/types";
+import { Capabilities, FunderProject } from "@/api/contracts/types";
+import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -19,27 +20,21 @@ import {
 
 export const FunderPage: React.FC = () => {
   const { setCurrentPage, addToast } = useAppStore();
-  const [funderEnvelope, setFunderEnvelope] = useState<Envelope<FunderProject[]> | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Budget allocation simulation
-  const [allocatedBudget, setAllocatedBudget] = useState(100000);
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(["funder-proj-1"]);
-
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getFunderProjects()
-      .then((res) => {
-        setFunderEnvelope(res);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const state = useEnvelope<FunderProject[]>(useCallback(() => apiClient.getFunderProjects(), []));
+  const { envelope: funderEnvelope, loading, error, reload: loadData } = state;
+  const mode = envelopeMode(state, (rows) => rows.length === 0);
+  const capabilityState = useEnvelope<Capabilities>(useCallback(
+    () => (apiClient.isDemoMode()
+      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      : apiClient.getCapabilities()),
+    []));
+  const canRequestInfo = capabilityState.envelope?.data.funderInfoRequest.available === true;
+  const infoBlockedReason = capabilityState.envelope?.data.funderInfoRequest.reason
+    || "backend ยังไม่มี operation สำหรับขอเอกสารเพิ่มเติม";
+  const amount = (value: number | null | undefined) =>
+    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+  const rbacOff = (funderEnvelope?.missing || []).includes("rbac_not_enforced");
 
   const handleToggleSelectProject = (id: string) => {
     if (selectedProjectIds.includes(id)) {
@@ -50,14 +45,17 @@ export const FunderPage: React.FC = () => {
   };
 
   const handleRequestInfo = (proj: FunderProject) => {
+    // /capabilities declares funderInfoRequest unavailable: nothing is sent to
+    // the project owner and no request record is created.
     addToast({
-      type: "info",
-      title: "ส่งคำขอข้อมูลเพิ่มเติมแล้ว",
-      message: `ระบบส่งคำขอเข้าถึงเอกสารสำหรับ '${proj.title}' ไปยังเจ้าของโครงการแล้ว`,
+      type: "warning",
+      title: "ยังไม่รองรับการขอเอกสารจริง",
+      message: `ยังไม่มีคำขอใดถูกส่งสำหรับ '${proj.title}' · ${infoBlockedReason}`,
+      duration: 9000,
     });
   };
 
-  if (loading || !funderEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
@@ -69,14 +67,32 @@ export const FunderPage: React.FC = () => {
     );
   }
 
-  const projects = funderEnvelope.data;
+  const projects = funderEnvelope?.data || [];
 
-  // Calculate used budget
+  if (!funderEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
+    return (
+      <StateRenderer
+        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
+        errorMessage={error || "อ่านรายการโครงการสำหรับผู้ให้ทุนจาก backend ไม่สำเร็จ"}
+        unavailableReason="ยังไม่มีโครงการที่เปิดให้ผู้ให้ทุนพิจารณา"
+        missingItems={funderEnvelope?.missing || []}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("swarm")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
+
+  // No endpoint supplies a funder's own budget, so the bar compares the user's
+  // selection against the total target funding of the listed projects. Both
+  // figures are sums of values the backend returned, and selecting a project
+  // allocates, reserves or commits nothing.
+  const allocatedBudget = projects.reduce((sum, proj) => sum + (proj.targetFunding || 0), 0);
   const usedBudget = selectedProjectIds.reduce((sum, id) => {
     const p = projects.find((proj) => proj.id === id);
     return sum + (p?.targetFunding || 0);
   }, 0);
-
   const remainingBudget = allocatedBudget - usedBudget;
 
   return (
@@ -95,7 +111,7 @@ export const FunderPage: React.FC = () => {
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ค้นหาโครงการที่มีหลักฐานคำสั่งซื้อยืนยัน (PO) และจำลองการจัดสรรงบประมาณ
+              ดูโครงการที่บันทึกไว้พร้อมระดับหลักฐาน · การเลือกและยอดรวมเป็นการพิจารณาในเครื่อง ไม่ใช่การจัดสรรจริง
             </p>
           </div>
 
@@ -116,21 +132,21 @@ export const FunderPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="text-[10px] font-bold text-brand uppercase tracking-wider block">
-                จำลองจัดสรรงบประมาณ (Capital Allocation Sandbox)
+                รายการที่เลือกไว้ในเครื่องนี้ · ยังไม่บันทึกและยังไม่จัดสรรเงินทุน
               </span>
               <h3 className="text-sm font-display font-bold text-ink">
-                งบลงทุนที่เตรียมไว้: ฿{allocatedBudget.toLocaleString()}
+                ยอดเป้าหมายรวมของโครงการในรายการ: {amount(allocatedBudget)}
               </h3>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono">
               <div>
-                <span className="text-[10px] text-ink-muted block">งบที่จัดสรรแล้ว:</span>
-                <span className="font-bold text-brand">฿{usedBudget.toLocaleString()}</span>
+                <span className="text-[10px] text-ink-muted block">ยอดเป้าหมายรวมของที่เลือก:</span>
+                <span className="font-bold text-brand">{amount(usedBudget)}</span>
               </div>
               <div className="border-l border-slate-200 pl-4">
-                <span className="text-[10px] text-ink-muted block">คงเหลือ:</span>
+                <span className="text-[10px] text-ink-muted block">ยอดของโครงการที่ยังไม่เลือก:</span>
                 <span className={`font-bold ${remainingBudget < 0 ? "text-danger" : "text-emerald-700"}`}>
-                  ฿{remainingBudget.toLocaleString()}
+                  {amount(remainingBudget)}
                 </span>
               </div>
             </div>
@@ -149,9 +165,12 @@ export const FunderPage: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-ink-muted">
-            <span>เลือกแล้ว {selectedProjectIds.length} โครงการ (ไม่จำเป็นต้องใช้หมดทั้งงบ)</span>
+            <span>
+              เลือกแล้ว {selectedProjectIds.length} โครงการ · การเลือกอยู่ในเครื่องนี้เท่านั้น ไม่ผูกพันเงินทุน
+              {rbacOff ? " · ยังไม่เปิดการบังคับสิทธิ์ สิทธิ์ที่แสดงจึงไม่ใช่การยืนยันตัวตน" : ""}
+            </span>
             <span className="font-mono">
-              {Math.round((usedBudget / allocatedBudget) * 100)}% ของงบประมาณ
+              {Math.round((usedBudget / allocatedBudget) * 100)}% ของยอดเป้าหมายในรายการ
             </span>
           </div>
         </div>
@@ -266,16 +285,18 @@ export const FunderPage: React.FC = () => {
                             : "bg-brand text-white hover:bg-brand-dark"
                         }`}
                       >
-                        {isSelected ? "✓ รวมในงบจัดสรรแล้ว" : "+ จัดสรรงบให้โครงการนี้"}
+                        {isSelected ? "✓ เลือกไว้ในรายการ (ยังไม่จัดสรร)" : "+ เพิ่มเข้ารายการที่สนใจ"}
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => handleRequestInfo(proj)}
+                        disabled={!canRequestInfo}
+                        title={canRequestInfo ? undefined : infoBlockedReason}
                         className="w-full py-2 rounded-btn text-xs font-medium bg-slate-100 text-ink hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"
                       >
                         <Lock className="w-3.5 h-3.5" />
-                        <span>ขอสิทธิ์ดูเอกสารสัญญา</span>
+                        <span>{canRequestInfo ? "ขอสิทธิ์ดูเอกสารสัญญา" : "ยังไม่รองรับการขอเอกสาร"}</span>
                       </button>
                     )}
                   </div>

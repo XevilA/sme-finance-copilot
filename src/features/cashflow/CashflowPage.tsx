@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { CashflowDay, Envelope } from "@/api/contracts/types";
+import { CashflowDay } from "@/api/contracts/types";
+import { envelopeMode, useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import { TimeTravelScrubber } from "./TimeTravelScrubber";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -28,26 +29,22 @@ export const CashflowPage: React.FC = () => {
     setAIPanelOpen,
   } = useAppStore();
 
-  const [timelineEnvelope, setTimelineEnvelope] = useState<Envelope<CashflowDay[]> | null>(null);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(3); // Start at Day 3 where cash dips!
-  const [loading, setLoading] = useState(true);
-
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getCashflowTimeline()
-      .then((res) => {
-        setTimelineEnvelope(res);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+  const { accepted, stale } = useAnalysisContext();
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
+  const load = useCallback(() => apiClient.getCashflowTimeline(), []);
+  const state = useEnvelope<CashflowDay[]>(load);
+  const { envelope: timelineEnvelope, loading, error, reload: loadData } = state;
+  const mode = envelopeMode(state, (rows) => rows.length === 0);
+  const money = (value: number | null | undefined) =>
+    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+  // Cash-flow statement lines come from the statement that was analysed. The
+  // dated timeline contract does not return them, so they are not invented.
+  const statementLine = (field: string) => {
+    const value = accepted?.input?.[field];
+    return value == null || value === "" ? null : Number(value);
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  if (loading || !timelineEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-64 bg-slate-200 rounded-card animate-pulse" />
@@ -56,16 +53,35 @@ export const CashflowPage: React.FC = () => {
     );
   }
 
-  const timeline = timelineEnvelope.data;
-  const currentDay = timeline.find((d) => d.dayIndex === selectedDayIndex) || timeline[0];
+  const timeline = timelineEnvelope?.data || [];
+  const missing = timelineEnvelope?.missing || [];
 
-  // Cash gap statistics for Shop 1
-  const minCashDay = timeline.reduce((min, cur) =>
-    cur.projectedCash < min.projectedCash ? cur : min
-  );
+  if (!timelineEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
+    return (
+      <StateRenderer
+        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
+        errorMessage={error || "อ่านตารางกระแสเงินสดจาก backend ไม่สำเร็จ"}
+        unavailableReason={accepted
+          ? "งบที่นำเข้าเป็นยอดรวมของงวด ไม่มีรายการรับ-จ่ายตามวันที่ · ระบบจะไม่ใช้ตารางของกิจการตัวอย่างมาแสดงแทน และจะไม่กระจายยอดรวมเป็นรายวัน"
+          : "ยังไม่มีรายการรับ-จ่ายตามวันที่สำหรับกิจการนี้"}
+        missingItems={missing}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("import")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
+
+  const currentDay = timeline.find((d) => d.dayIndex === selectedDayIndex) || timeline[0];
+  // Lowest balance in the returned series, and the days below the reserve line
+  // the backend returned. Both are selections over returned values.
+  const minCashDay = timeline.reduce((min, cur) => (cur.projectedCash < min.projectedCash ? cur : min));
+  const breachDays = timeline.filter((day) => day.projectedCash < day.reserveLine);
+  const defaultSme = missing.includes("sme_id_not_supplied_default_sme_selected");
 
   return (
-    <StateRenderer onRetry={loadData}>
+    <StateRenderer currentMode={stale ? "stale" : undefined} onRetry={loadData} onReanalyze={() => setCurrentPage("import")}>
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6 text-ink animate-fade-in">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderLine pb-4">
@@ -97,7 +113,7 @@ export const CashflowPage: React.FC = () => {
               className="px-4 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-semibold rounded-btn flex items-center gap-1.5 shadow-sm transition-all"
             >
               <Coins className="w-3.5 h-3.5" />
-              <span>จับคู่ทุนปิดจุดเงินขาด</span>
+              <span>จัดอันดับแหล่งทุนตามส่วนที่ขาด</span>
             </button>
           </div>
         </div>
@@ -111,15 +127,20 @@ export const CashflowPage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-bold text-danger uppercase tracking-wider">
-                  ตรวจพบช่วงเงินสดต่ำกว่าเงินสำรองปลอดภัย (Day 1–24 พ.ย.)
+                  {breachDays.length
+                    ? `ช่วงเงินสดต่ำกว่าเงินสำรอง ${breachDays.length} วัน (${breachDays[0].date} – ${breachDays[breachDays.length - 1].date})`
+                    : "ไม่พบวันที่เงินสดต่ำกว่าเงินสำรองในตารางนี้"}
                 </h3>
                 <span className="text-[10px] bg-white text-danger px-2 py-0.2 rounded border border-danger/30 font-bold">
-                  วิกฤติติดลบ
+                  {minCashDay.projectedCash < 0 ? "ติดลบ" : breachDays.length ? "ต่ำกว่าสำรอง" : "ไม่ติดลบ"}
                 </span>
               </div>
               <p className="text-xs text-red-900 mt-1 leading-relaxed">
-                เงินสดดิ่งลงต่ำสุดที่ <strong>-฿8,000</strong> ในวันที่ <strong>3 พ.ย.</strong>{" "}
-                (ขาดทุนหมุนเวียน 14,000 ฿ เมื่อเทียบกับเงินสำรอง 15,000 ฿) เนื่องจากต้องมัดจำวัตถุดิบและกล่องอาหารล่วงหน้าก่อนที่เงินจากลูกค้าจะเข้า
+                เงินสดต่ำสุดในตาราง <strong>{money(minCashDay.projectedCash)}</strong> วันที่{" "}
+                <strong>{minCashDay.date}</strong> เทียบเงินสำรอง {money(minCashDay.reserveLine)} ·{" "}
+                {timelineEnvelope.kind === "forecast" ? "เป็นประมาณการจากรายการที่มีวันกำหนด" : "จากรายการที่บันทึกไว้"}
+                {defaultSme ? " · ยังไม่ได้ระบุกิจการ ระบบเลือกกิจการเริ่มต้นให้" : ""}
+                {missing.length ? ` · ข้อมูลที่ยังขาด: ${missing.join(", ")}` : ""}
               </p>
             </div>
           </div>
@@ -127,10 +148,10 @@ export const CashflowPage: React.FC = () => {
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setSelectedDayIndex(3)}
+              onClick={() => setSelectedDayIndex(minCashDay.dayIndex)}
               className="px-3 py-1.5 bg-white border border-danger/40 text-danger text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors"
             >
-              ดูวันที่เงินดิ่ง (3 พ.ย.)
+              ดูวันที่เงินต่ำสุด ({minCashDay.date})
             </button>
             <button
               type="button"
@@ -161,10 +182,12 @@ export const CashflowPage: React.FC = () => {
               1. กระแสเงินสดจากการดำเนินงาน (Operating)
             </span>
             <div className="text-lg font-bold font-mono text-emerald-700 tabular-nums">
-              +฿12,000
+              {money(statementLine("operating_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
-              กำไรสุทธิโครงการหลังหักค่าของสด ค่าแรง และค่าส่งมอบ
+              {statementLine("operating_cash_flow") == null
+                ? "ต้องระบุ operating_cash_flow ในงบที่นำเข้า · ตารางรายวันไม่ได้คืนค่านี้"
+                : "ตามค่าที่ระบุในงบของงวดที่วิเคราะห์"}
             </p>
           </div>
 
@@ -173,10 +196,12 @@ export const CashflowPage: React.FC = () => {
               2. กระแสเงินสดจากการลงทุน (Investing)
             </span>
             <div className="text-lg font-bold font-mono text-ink tabular-nums">
-              -฿0.00
+              {money(statementLine("investing_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
-              ใช้ทรัพยากรร่วมผ่าน SME UNLOCK จึงไม่มีรายจ่ายลงทุนเครื่องจักรใหม่
+              {statementLine("investing_cash_flow") == null
+                ? "ต้องระบุ investing_cash_flow ในงบที่นำเข้า · ค่าว่างไม่ถูกตีความเป็นศูนย์"
+                : "ตามค่าที่ระบุในงบของงวดที่วิเคราะห์"}
             </p>
           </div>
 
@@ -185,10 +210,12 @@ export const CashflowPage: React.FC = () => {
               3. กระแสเงินสดจากการจัดหาเงิน (Financing)
             </span>
             <div className="text-lg font-bold font-mono text-brand tabular-nums">
-              +฿14,000 (เสนอใช้ Factoring)
+              {money(statementLine("financing_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
-              วงเงินเบิกล่วงหน้า 24 ชม. ปิดช่องว่างเงินสดวันที่ 1 พ.ย.
+              {statementLine("financing_cash_flow") == null
+                ? "ต้องระบุ financing_cash_flow ในงบที่นำเข้า · ยังไม่มีวงเงินใดถูกจัดหรืออนุมัติ"
+                : "ตามค่าที่ระบุในงบ · ไม่ใช่วงเงินที่ได้รับอนุมัติแล้ว"}
             </p>
           </div>
         </div>

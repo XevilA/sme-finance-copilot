@@ -38,6 +38,17 @@ export const TimeTravelScrubber: React.FC<TimeTravelScrubberProps> = ({
   const intervalRef = useRef<number | null>(null);
 
   const currentDay = timeline.find((d) => d.dayIndex === selectedDayIndex) || timeline[0];
+  // Track geometry follows the returned series instead of a fixed 30-day demo
+  // window, and the warning band marks the days that are actually below the
+  // reserve line the backend returned.
+  const span = Math.max(1, timeline.length - 1);
+  const breaches = timeline.reduce<number[]>((found, day, index) =>
+    day.projectedCash < day.reserveLine ? [...found, index] : found, []);
+  const firstBreach = breaches.length ? breaches[0] : -1;
+  const lastBreach = breaches.length ? breaches[breaches.length - 1] : -1;
+  // Dated rows are not one row per calendar day, so the scrubber steps through
+  // the positions that exist rather than assuming a contiguous 1..30 range.
+  const selectedIndex = Math.max(0, timeline.findIndex((day) => day.dayIndex === selectedDayIndex));
 
   // Play / Pause auto ticker
   useEffect(() => {
@@ -199,17 +210,19 @@ export const TimeTravelScrubber: React.FC<TimeTravelScrubberProps> = ({
       <div className="relative pt-6 pb-2">
         {/* Day Tick Track */}
         <div className="relative w-full h-3 bg-slate-200 rounded-full cursor-pointer flex items-center">
-          {/* Deficit warning band on timeline (Day 1 to Day 24 is below reserve!) */}
-          <div
-            className="absolute left-0 h-full bg-red-300/60 rounded-l-full border-r-2 border-red-400 pointer-events-none"
-            style={{ width: `${(24 / 30) * 100}%` }}
-            title="ช่วงวันที่เงินสดต่ำกว่าเงินสำรองปลอดภัย (1–24 พ.ย.)"
-          />
+          {/* Days below the reserve line, taken from the returned series */}
+          {firstBreach >= 0 && (
+            <div
+              className="absolute left-0 h-full bg-red-300/60 rounded-l-full border-r-2 border-red-400 pointer-events-none"
+              style={{ marginLeft: `${(firstBreach / span) * 100}%`, width: `${((lastBreach - firstBreach) / span) * 100}%` }}
+              title={`ช่วงวันที่เงินสดต่ำกว่าเงินสำรอง: ${timeline[firstBreach].date} ถึง ${timeline[lastBreach].date}`}
+            />
+          )}
 
           {/* Event Pins placed across timeline days */}
-          {timeline.map((day) => {
+          {timeline.map((day, index) => {
             if (day.events.length === 0) return null;
-            const leftPercent = ((day.dayIndex - 1) / 29) * 100;
+            const leftPercent = (index / span) * 100;
             return (
               <div
                 key={day.dayIndex}
@@ -229,31 +242,34 @@ export const TimeTravelScrubber: React.FC<TimeTravelScrubberProps> = ({
           {/* Moving Scrubber Capsule */}
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-brand border-2 border-white shadow-glow-primary z-30 transition-all pointer-events-none flex items-center justify-center text-[10px] text-white font-bold"
-            style={{ left: `${((selectedDayIndex - 1) / 29) * 100}%` }}
+            style={{ left: `${(selectedIndex / span) * 100}%` }}
           >
-            {selectedDayIndex}
+            {currentDay?.dayIndex ?? selectedDayIndex}
           </div>
         </div>
 
         {/* Date slider input fallback (Part B Rule #6: Non-drag alternative) */}
         <input
           type="range"
-          min="1"
-          max="30"
-          value={selectedDayIndex}
-          onChange={(e) => onSelectDay(parseInt(e.target.value, 10))}
+          min="0"
+          max={span}
+          value={selectedIndex}
+          onChange={(e) => {
+            const row = timeline[parseInt(e.target.value, 10)];
+            if (row) onSelectDay(row.dayIndex);
+          }}
           className="w-full opacity-0 cursor-pointer h-6 -mt-3 absolute inset-x-0 z-40"
           aria-label="เลือกวันที่ในอนาคต"
         />
 
         {/* Day Ticks Label */}
         <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-2">
-          <span>D1 <span className="hidden sm:inline">(วันนี้)</span></span>
-          <span>D5 <span className="hidden sm:inline">(มัดจำ 20%)</span></span>
-          <span>D10 <span className="hidden sm:inline">(ส่งมอบครบ)</span></span>
-          <span>D15 <span className="hidden sm:inline">(ค่าเช่า)</span></span>
-          <span>D25 <span className="hidden sm:inline">(รับ 80%)</span></span>
-          <span>D30</span>
+          <span>{timeline[0]?.date || "—"}</span>
+          <span className="hidden sm:inline">{timeline[Math.floor(timeline.length * 0.2)]?.date || ""}</span>
+          <span className="hidden sm:inline">{timeline[Math.floor(timeline.length * 0.4)]?.date || ""}</span>
+          <span className="hidden sm:inline">{timeline[Math.floor(timeline.length * 0.6)]?.date || ""}</span>
+          <span className="hidden sm:inline">{timeline[Math.floor(timeline.length * 0.8)]?.date || ""}</span>
+          <span>{timeline[timeline.length - 1]?.date || "—"}</span>
         </div>
       </div>
 
@@ -262,9 +278,11 @@ export const TimeTravelScrubber: React.FC<TimeTravelScrubberProps> = ({
         <div className="flex items-center gap-2">
           <Sliders className="w-4 h-4 text-brand" />
           <div>
-            <span className="font-bold text-ink">ลองปรับมัดจำผู้ว่าจ้าง:</span>
+            <span className="font-bold text-ink">ปรับมัดจำผู้ว่าจ้าง:</span>
             <span className="font-mono font-bold text-brand ml-1">{depositPercent}%</span>
-            <span className="text-ink-muted text-[11px] ml-1">(เดิม 20%)</span>
+            <span className="text-ink-muted text-[11px] ml-1">
+              (หน้านี้ยังไม่มีการคำนวณใหม่ · ใช้ตัวปรับมัดจำในห้องจำลองเพื่อให้ engine คำนวณจริง)
+            </span>
           </div>
         </div>
 
@@ -275,6 +293,8 @@ export const TimeTravelScrubber: React.FC<TimeTravelScrubberProps> = ({
             max="50"
             step="5"
             value={depositPercent}
+            disabled
+            title="การเปลี่ยนมัดจำต้องให้ backend คำนวณใหม่ · ใช้ได้ที่ห้องจำลอง (เฉพาะขอบเขตออเดอร์)"
             onChange={(e) => onDepositPercentChange(parseInt(e.target.value, 10))}
             className="w-32 accent-brand cursor-pointer"
           />

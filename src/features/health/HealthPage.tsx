@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { HealthIndicator, Envelope } from "@/api/contracts/types";
+import { HealthIndicator } from "@/api/contracts/types";
+import { envelopeMode, useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -18,27 +19,15 @@ import {
 
 export const HealthPage: React.FC = () => {
   const { setAIPanelOpen, setCurrentPage } = useAppStore();
-  const [indicatorsEnvelope, setIndicatorsEnvelope] = useState<Envelope<HealthIndicator[]> | null>(null);
+  const { stale } = useAnalysisContext();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [inspectFormulaId, setInspectFormulaId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => apiClient.getHealthIndicators(), []);
+  const state = useEnvelope<HealthIndicator[]>(load);
+  const { envelope: indicatorsEnvelope, loading, error, reload: loadData } = state;
+  const mode = envelopeMode(state, (rows) => rows.length === 0);
 
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getHealthIndicators()
-      .then((res) => {
-        setIndicatorsEnvelope(res);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  if (loading || !indicatorsEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
@@ -51,14 +40,29 @@ export const HealthPage: React.FC = () => {
     );
   }
 
-  const indicators = indicatorsEnvelope.data;
+  const indicators = indicatorsEnvelope?.data || [];
   const filtered =
     activeCategory === "all"
       ? indicators
       : indicators.filter((i) => i.category === activeCategory);
 
+  if (!indicatorsEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
+    return (
+      <StateRenderer
+        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
+        errorMessage={error || "อ่านตัวชี้วัดสุขภาพการเงินจาก backend ไม่สำเร็จ"}
+        unavailableReason="ยังไม่มีตัวชี้วัดสำหรับข้อมูลชุดนี้"
+        missingItems={indicatorsEnvelope?.missing || []}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("import")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
+
   return (
-    <StateRenderer onRetry={loadData}>
+    <StateRenderer currentMode={stale ? "stale" : undefined} onRetry={loadData} onReanalyze={() => setCurrentPage("import")}>
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6 text-ink animate-fade-in">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderLine pb-4">
@@ -70,7 +74,7 @@ export const HealthPage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 สุขภาพการเงิน 5 มิติ (Financial Health Diagnostics)
               </h1>
-              <DataKindBadge kind="actual" size="md" />
+              <DataKindBadge kind={indicatorsEnvelope.kind} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               ตรวจสภาพคล่อง ความสามารถทำกำไร ภาระหนี้ ประสิทธิภาพหมุนเวียน และการเติบโต
@@ -165,10 +169,10 @@ export const HealthPage: React.FC = () => {
                     <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1.5 my-2">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
                         <FileQuestion className="w-4 h-4 text-attention shrink-0" />
-                        <span>คำนวณไม่ได้ ขาด:</span>
+                        <span>{item.missingFields?.length ? "คำนวณไม่ได้ ขาด:" : "คำนวณไม่ได้"}</span>
                       </div>
                       <ul className="text-[11px] text-amber-800 list-disc pl-4 space-y-0.5">
-                        {item.missingFields?.map((mf, idx) => (
+                        {(item.missingFields?.length ? item.missingFields : [item.interpretation || "backend ไม่ได้ระบุรายการที่ขาด"]).map((mf, idx) => (
                           <li key={idx}>{mf}</li>
                         ))}
                       </ul>
@@ -184,7 +188,7 @@ export const HealthPage: React.FC = () => {
                     <div className="my-2">
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-2xl font-extrabold font-mono text-ink tabular-nums">
-                          {item.value}
+                          {item.value == null ? "ยังไม่มีข้อมูล" : item.value.toLocaleString("th-TH", { maximumFractionDigits: 4 })}
                         </span>
                         <span className="text-xs font-semibold text-ink-muted">{item.unit}</span>
                       </div>
@@ -213,7 +217,7 @@ export const HealthPage: React.FC = () => {
                     <span>{inspectFormulaId === item.id ? "ซ่อนสูตร" : "ดูสูตรที่ใช้"}</span>
                   </button>
 
-                  <DataKindBadge kind="actual" size="sm" />
+                  <DataKindBadge kind={indicatorsEnvelope.kind} size="sm" />
                 </div>
 
                 {/* Formula Popover Dropdown */}
