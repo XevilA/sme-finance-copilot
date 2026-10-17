@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient, OrderContext, OrderComparison, OrderScenario } from "@/api/client";
-import { ChaosScenario, Envelope } from "@/api/contracts/types";
+import { ChaosScenario, Envelope, SavedSimulationSummary } from "@/api/contracts/types";
 import { ChaosPlayback } from "./ChaosPlayback";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -24,10 +24,21 @@ export const SimulatorPage: React.FC = () => {
   } = useAppStore();
 
   const [chaosEnvelope, setChaosEnvelope] = useState<Envelope<ChaosScenario[]> | null>(null);
+  // Declared by the backend: arbitrary narrative chaos effects are not
+  // implemented, so the playback is presented as a stored catalogue reading.
+  const [chaosEffects, setChaosEffects] = useState<{ available: boolean; reason: string }>({
+    available: false,
+    reason: "ยังไม่ทราบความสามารถของ backend",
+  });
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>("chaos-shop-dropout");
   const [loading, setLoading] = useState(true);
 
   const [context, setContext] = useState<OrderContext | null>(null);
+  // Scope for saved plans. A saved read, list or replay without this is refused
+  // with HTTP 422, and a wrong project answers 404.
+  const [scope, setScope] = useState<{ projectId: string | null; orderRef: string | null }>({ projectId: null, orderRef: null });
+  const [savedPlans, setSavedPlans] = useState<SavedSimulationSummary[] | null>(null);
+  const [savedNote, setSavedNote] = useState("");
   const [comparison, setComparison] = useState<OrderComparison | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -61,8 +72,18 @@ export const SimulatorPage: React.FC = () => {
       return;
     }
     Promise.all([apiClient.getChaosScenarios(), apiClient.getOrderContext()])
-      .then(([chaos, value]) => {
+      .then(async ([chaos, value]) => {
         setChaosEnvelope(chaos); setContext(value.data); setBaseline(value.data);
+        const next = { projectId: value.projectId, orderRef: value.orderRef };
+        setScope(next);
+        await refreshSavedPlans(next);
+        const declared = await apiClient.getCapabilities()
+          .then((res) => res.data.arbitraryChaosEffects)
+          .catch(() => null);
+        setChaosEffects({
+          available: declared?.available === true,
+          reason: declared?.reason || "backend ไม่ได้ประกาศว่ารองรับผลกระทบแบบบรรยาย",
+        });
         setLoading(false);
       }).catch((err) => { setError(err.message); setLoading(false); });
   };
@@ -85,15 +106,45 @@ export const SimulatorPage: React.FC = () => {
     }, 300);
     return () => { clearTimeout(timer); ++sequence.current; };
   }, [context, simUnitPrice, simCostPerUnit, simDepositPercent, simCreditTermDays]);
+  // Scoped read of the plans already stored for this project or order.
+  const refreshSavedPlans = async (next: { projectId: string | null; orderRef: string | null }) => {
+    if (!next.projectId && !next.orderRef) { setSavedPlans(null); setSavedNote("ยังไม่ทราบ project/ออเดอร์ จึงอ่านแผนที่บันทึกไว้ไม่ได้"); return; }
+    try {
+      const list = await apiClient.listSimulations(next, 20);
+      setSavedPlans(list.data);
+      const replayable = list.data.filter((plan) => plan.replayAvailable).length;
+      setSavedNote(list.data.length
+        ? `แผนที่บันทึกไว้ ${list.data.length} แผน · replay ได้ ${replayable} แผน`
+        : "ยังไม่มีแผนที่บันทึกไว้สำหรับโครงการนี้");
+    } catch (err) { setSavedPlans(null); setSavedNote(`อ่านแผนที่บันทึกไว้ไม่สำเร็จ: ${(err as Error).message}`); }
+  };
   const handleReset = () => { if (context) setBaseline(context); resetSimulation(); };
   const handleSave = async () => {
-    if (!context || !comparison || pending || busySave.current) return;
+    if (!context || !comparison || pending || busySave.current) return; // No double submit.
     busySave.current = true; setSaving(true);
     try {
       const result = await apiClient.simulateOrder(context, scenario, true);
       if (!result.persisted || !result.simulationId) throw new Error("ยังบันทึกไม่ได้ กรุณาตรวจการเชื่อมต่อฐานข้อมูล");
-      addToast({ type: "success", title: "บันทึกแผนจำลองแล้ว", message: `Simulation ID: ${result.simulationId}` });
-    } catch (err) { addToast({ type: "error", title: "บันทึกไม่สำเร็จ", message: (err as Error).message }); }
+      const simulationId = result.simulationId;
+      // Read the stored row back in the same scope before reporting success.
+      const stored = await apiClient.readSimulation(simulationId, scope);
+      if (!stored.data?.resultHash || !stored.data.request || !stored.data.results) {
+        throw new Error("บันทึกแล้วแต่อ่านกลับไม่ครบ ยังไม่ยืนยันว่าเก็บสำเร็จ");
+      }
+      // Replay the saved snapshot to prove the stored plan reproduces.
+      const replay = await apiClient.replaySimulation(simulationId, { ...scope, inputRevision: result.context?.inputRevision ?? null });
+      const differences = replay.data.contextDifferences || [];
+      await refreshSavedPlans(scope);
+      addToast({
+        type: replay.data.reproduced && !differences.length ? "success" : "warning",
+        title: replay.data.reproduced ? "บันทึกและตรวจซ้ำแล้ว" : "บันทึกแล้ว แต่ replay ไม่ตรง",
+        message: `Simulation ID: ${simulationId} · engine ${stored.data.engine || "ยังไม่ทราบ"}`
+          + ` · resultHash ${stored.data.resultHash.slice(0, 12)}…`
+          + ` · replay ${replay.data.reproduced ? "ได้ผลเท่าเดิม" : "ได้ผลไม่เท่าเดิม"}`
+          + (differences.length ? ` · บริบทที่ต่าง: ${differences.join(", ")}` : ""),
+        duration: 12000,
+      });
+    } catch (err) { addToast({ type: "error", title: "บันทึกไม่สำเร็จ", message: (err as Error).message, duration: 10000 }); }
     finally { busySave.current = false; setSaving(false); }
   };
   if (!loading && !context && error && !apiClient.isDemoMode()) return <StateRenderer currentMode="error" errorMessage={error} onRetry={loadData}>{null}</StateRenderer>;
@@ -154,6 +205,9 @@ export const SimulatorPage: React.FC = () => {
           scenarios={chaosEnvelope.data}
           selectedScenarioId={selectedScenarioId}
           onSelectScenario={(id) => setSelectedScenarioId(id)}
+          source={chaosEnvelope.source}
+          effectsAvailable={chaosEffects.available}
+          effectsReason={chaosEffects.reason}
         />
 
         {/* Side-by-Side Comparison: แผนเดิม (Plan A) vs แผนจำลอง (Plan B) */}
@@ -277,7 +331,10 @@ export const SimulatorPage: React.FC = () => {
               <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
                 เปรียบเทียบผลลัพธ์: แผน A (เดิม) vs แผน B (จำลอง)
               </h3>
-              <span className="text-[11px] text-ink-muted">{context?.order_ref || "โหมดตัวอย่าง"} · เฉพาะออเดอร์</span>
+              <span className="text-[11px] text-ink-muted">
+                {context?.order_ref || "โหมดตัวอย่าง"} · เฉพาะออเดอร์
+                {savedNote ? ` · ${savedNote}` : ""}
+              </span>
             </div>
 
             <div className="space-y-3 text-xs">

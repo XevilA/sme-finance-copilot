@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient, OrderContext } from "@/api/client";
-import { SwarmOrder, SwarmProposal, Shop, StuckReasonType } from "@/api/contracts/types";
+import { OrderConstraints, SwarmOrder, SwarmProposal, Shop, StuckReasonType } from "@/api/contracts/types";
 import { ShopCard } from "@/components/signature/ShopCard";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -45,10 +45,33 @@ export const SwarmPage: React.FC = () => {
   const [context, setContext] = useState<OrderContext | null>(null);
   const [catalogue, setCatalogue] = useState<Shop[]>([]);
   const [eligibility, setEligibility] = useState<Record<string, { eligible: boolean; reasons: string[] }>>({});
+  // Stored order requirements. A null snapshot or a null field is unknown; an
+  // explicit [] means no type restriction and explicit null max_distance_km
+  // means no distance limit. Nothing here is back-filled by the client.
+  const [constraints, setConstraints] = useState<OrderConstraints | null>(null);
+  const [contextMissing, setContextMissing] = useState<string[]>([]);
+  const [proposalMissing, setProposalMissing] = useState<string[]>([]);
   const busy = useRef(false);
+  const sequence = useRef(0);
+  const unknown = (name: string) => contextMissing.includes(name) || proposalMissing.includes(name);
+  const requiredTypes = constraints?.required_business_types;
+  const typeRequirementText = unknown("required_business_types") || requiredTypes == null
+    ? "ยังไม่ได้บันทึกประเภทงานที่ต้องการ"
+    : requiredTypes.length === 0
+    ? "ไม่จำกัดประเภทธุรกิจ (บันทึกไว้ชัดเจน)"
+    : `ต้องเป็นประเภท: ${requiredTypes.join(", ")}`;
+  const distanceText = unknown("max_distance_km") || constraints?.max_distance_km === undefined
+    ? "ยังไม่ได้บันทึกรัศมีที่ยอมรับ"
+    : constraints?.max_distance_km === null
+    ? "ไม่จำกัดระยะทาง (บันทึกไว้ชัดเจน)"
+    : `รัศมีไม่เกิน ${constraints?.max_distance_km} กม.`;
+  const collectionText = unknown("collection_schedule") || constraints?.collection_schedule == null
+    ? "ยังไม่ได้บันทึกงวดรับเงิน"
+    : `งวดรับเงิน ${constraints?.collection_schedule.length} งวด`;
   const amount = (value: number) => value.toLocaleString("th-TH", { maximumFractionDigits: 2 });
   const applyProposal = (result: Awaited<ReturnType<typeof apiClient.assembleSwarm>>, pool: Shop[]) => {
     setProposal(result.data); setEligibility(result.audit.eligibility);
+    setProposalMissing(result.missing || []);
     setShops(pool.map((shop) => {
       const allocation = result.data.shops.find((item) => item.shopId === shop.id);
       const assessment = result.audit.eligibility[shop.id];
@@ -82,23 +105,43 @@ export const SwarmPage: React.FC = () => {
         }).catch((err) => setError(err.message)).finally(() => setLoading(false));
       return;
     }
+    const id = ++sequence.current;
     Promise.all([apiClient.getOrder(), apiClient.getShops(), apiClient.getOrderContext()])
       .then(async ([orderRes, shopsRes, contextRes]) => {
+        // The stored snapshot is authoritative. When the project carries no
+        // snapshot the requirements stay unknown rather than being assumed.
+        const snapshot = contextRes.projectId
+          ? await apiClient.getProjectConstraints(contextRes.projectId).then((res) => res.data).catch(() => null)
+          : null;
         const result = await apiClient.assembleSwarm(contextRes.data);
+        if (sequence.current !== id) return; // A newer scan already answered.
         setOrder(orderRes.data); setContext(contextRes.data); setCatalogue(shopsRes.data);
+        setConstraints(snapshot ?? contextRes.constraints ?? null);
+        setContextMissing(contextRes.missing || []);
         applyProposal(result, shopsRes.data);
-      }).catch((err) => setError(err.message)).finally(() => setLoading(false));
+      }).catch((err) => { if (sequence.current === id) setError(err.message); })
+      .finally(() => { if (sequence.current === id) setLoading(false); });
   };
   useEffect(loadData, []);
   const assemble = async (next: OrderContext, message: string) => {
-    if (busy.current) return;
+    if (busy.current) return; // One scan at a time; a repeat click is ignored.
     busy.current = true; setIsAssembling(true); setScanPulse(true);
+    const id = ++sequence.current;
     try {
       const result = await apiClient.assembleSwarm(next);
+      if (sequence.current !== id) return; // Discard a superseded scan's answer.
       setContext(next); applyProposal(result, catalogue.filter((shop) => next.shops.some((row) => row.shop_id === shop.id)));
       setSwappingShopId(null);
-      addToast({ type: "success", title: message, message: `จัดสรร ${result.data.totalCapacityAssigned} ต่อวัน · ขาดกำลังผลิต ${result.data.deficitBoxesPerDay} · ทุนที่ขาด ฿${amount(result.data.totalFundingGap)} ยังไม่จองโควตาหรือทรัพยากร` });
-    } catch (err) { addToast({ type: "error", title: "คำนวณไม่สำเร็จ", message: (err as Error).message }); }
+      const gaps = result.missing || [];
+      addToast({
+        type: gaps.length ? "warning" : "success",
+        title: message,
+        message: `จัดสรร ${result.data.totalCapacityAssigned} ต่อวัน · ขาดกำลังผลิต ${result.data.deficitBoxesPerDay} · ทุนที่ขาด ฿${amount(result.data.totalFundingGap)}`
+          + " · เป็นข้อเสนอแบบ preview (persist=false) ยังไม่จองโควตา ทรัพยากร หรือยืนยันทีม"
+          + (gaps.length ? ` · ข้อมูลโครงการที่ยังขาด: ${gaps.join(", ")}` : ""),
+        duration: gaps.length ? 11000 : undefined,
+      });
+    } catch (err) { if (sequence.current === id) addToast({ type: "error", title: "คำนวณไม่สำเร็จ", message: (err as Error).message }); }
     finally { busy.current = false; setIsAssembling(false); setScanPulse(false); }
   };
   const handleTriggerSwarmAssembly = () => {
@@ -168,7 +211,7 @@ export const SwarmPage: React.FC = () => {
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-slate-400">
-              ห้องควบคุมการจัดสรรคำสั่งซื้อขนาดใหญ่ ตรวจผู้สมัคร {shops.length} ร้าน · ข้อเสนอเบื้องต้น ยังไม่ยืนยันประเภทงานและระยะทาง
+              ห้องควบคุมการจัดสรรคำสั่งซื้อขนาดใหญ่ ตรวจผู้สมัคร {shops.length} ร้าน · {typeRequirementText} · {distanceText}
             </p>
           </div>
 
@@ -291,7 +334,9 @@ export const SwarmPage: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>ฉบับแผนงาน: <strong className="text-white font-mono">{proposal.version}</strong></span>
             <span className="text-slate-600">|</span>
-            <span className="text-slate-400 text-[11px]">ตรวจยอมรับเงื่อนไขล่วงหน้า</span>
+            <span className="text-slate-400 text-[11px]">
+              {proposalMissing.length ? `ข้อมูลโครงการที่ยังขาด ${proposalMissing.length} รายการ` : "เงื่อนไขโครงการบันทึกครบแล้ว"}
+            </span>
           </div>
         </div>
 
@@ -321,7 +366,7 @@ export const SwarmPage: React.FC = () => {
               className="px-4 py-2 bg-gradient-to-r from-rose-500 to-amber-500 hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg transition-all cursor-pointer"
             >
               <Zap className="w-3.5 h-3.5" />
-              <span>แก้ตรงนี้: จับคู่ทุนด่วน 24 ชม.</span>
+              <span>แก้ตรงนี้: จัดอันดับแหล่งทุนตามส่วนที่ขาด</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -412,8 +457,8 @@ export const SwarmPage: React.FC = () => {
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 border-t border-slate-800 pt-2 flex items-center justify-between">
-                <span>รับของ: <strong>ยังไม่ระบุเวลา</strong></span>
-                <span>ส่งถึงศูนย์ประชุม: <strong>ยังไม่ระบุเวลา</strong></span>
+                <span>งวดรับเงิน: <strong>{collectionText}</strong></span>
+                <span>พิกัดผู้ซื้อ: <strong>{constraints?.buyer_coordinates ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก"}</strong></span>
               </div>
             </div>
           </div>
@@ -625,7 +670,7 @@ export const SwarmPage: React.FC = () => {
                     <span>รับงาน {proposal.shops.length} ร้าน จากผู้สมัคร {shops.length} ร้าน</span>
                   </span>
                   <span className="text-slate-400 text-[11px]">
-                    ยังไม่มีข้อมูลระยะทางที่ยืนยันได้
+                    {distanceText}
                   </span>
                 </div>
 
@@ -745,7 +790,12 @@ export const SwarmPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">สถานะความพร้อม:</span>
                   <span className="font-bold text-amber-300 bg-amber-950/70 px-2 py-0.5 rounded-full border border-amber-800/80">
-                    {proposal.status === "ready" ? "ต้องตรวจเงื่อนไขก่อนรับงาน" : proposal.status} · ต้องเติมทุน {shortageCount} ร้าน
+                    {proposalMissing.length
+                      ? `ยังรับรองความเหมาะสมไม่ได้ (ขาด ${proposalMissing.length} เงื่อนไข)`
+                      : proposal.status === "ready"
+                      ? "ผ่านเกณฑ์ตัวเลขของ engine"
+                      : proposal.status}{" "}
+                    · ต้องเติมทุน {shortageCount} ร้าน
                   </span>
                 </div>
 

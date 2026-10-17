@@ -19,12 +19,20 @@ interface ChaosPlaybackProps {
   scenarios: ChaosScenario[];
   selectedScenarioId: string;
   onSelectScenario: (id: string) => void;
+  /** Envelope source of the scenario catalogue, e.g. stored_record. */
+  source?: string;
+  /** Whether the backend can recompute these narrative effects. */
+  effectsAvailable?: boolean;
+  effectsReason?: string;
 }
 
 export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
   scenarios,
   selectedScenarioId,
   onSelectScenario,
+  source = "ยังไม่ทราบที่มา",
+  effectsAvailable = false,
+  effectsReason = "backend ไม่ได้ประกาศว่ารองรับผลกระทบแบบบรรยาย",
 }) => {
   const { setCurrentPage, addToast } = useAppStore();
   const currentScenario =
@@ -61,9 +69,10 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
 
   const handleApplyContingency = (option: ContingencyOption) => {
     addToast({
-      type: "success",
-      title: "ใช้แผนสำรองสำเร็จ",
-      message: `เปิดใช้งาน: ${option.title}`,
+      type: "info",
+      title: "เปิดหน้าสำหรับดำเนินการต่อ",
+      message: `${option.title} · ยังไม่มีการเปิดใช้งาน จอง หรือบันทึกแผนสำรองใด ๆ ในระบบ (${effectsReason})`,
+      duration: 9000,
     });
     setCurrentPage(option.targetPage as any);
   };
@@ -86,7 +95,9 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
             <DataKindBadge kind="simulated" size="sm" />
           </div>
           <p className="text-xs text-slate-300 mt-0.5">
-            ทดสอบสมมติฐานความเสี่ยง 4 ช่วงเหตุการณ์: เกิดปัญหา → คลื่นลาม → เงินสดดิ่ง → ทางเลือกสำรอง
+            {effectsAvailable
+              ? "ทดสอบสมมติฐานความเสี่ยง 4 ช่วงเหตุการณ์: เกิดปัญหา → คลื่นลาม → เงินสดดิ่ง → ทางเลือกสำรอง"
+              : `อ่านสถานการณ์ที่บันทึกไว้ (${source}) ตัวเลขมาจากแคตตาล็อก ไม่ใช่การคำนวณใหม่จาก engine · ปรับราคา/ต้นทุน/มัดจำ/เครดิตด้านล่างเพื่อให้ engine คำนวณจริง`}
           </p>
         </div>
 
@@ -143,7 +154,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
           { num: 1, label: "1. เกิดปัญหา", desc: "จุดเกิดเหตุ Shockwave" },
           { num: 2, label: "2. จุดที่ได้รับผล", desc: "คลื่นลามตามเส้นเชื่อม" },
           { num: 3, label: "3. ช่วงเงินขาด", desc: "กราฟเงินสดดิ่งเหว" },
-          { num: 4, label: "4. ทางเลือกสำรอง", desc: "แผนสำรองอัตโนมัติ" },
+          { num: 4, label: "4. ทางเลือกสำรอง", desc: "ข้อเสนอที่บันทึกไว้" },
         ].map((ph) => (
           <button
             key={ph.num}
@@ -211,7 +222,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
               ))}
             </div>
             <p className="text-xs text-slate-300 text-center max-w-md mx-auto">
-              คลื่นความเสียหายแพร่กระจายกระทบกำลังผลิตรวมและการส่งมอบของรถควบคุมความเย็น
+              เส้นทางผลกระทบที่บันทึกไว้ในสถานการณ์นี้ · ยังไม่ได้คำนวณผลต่อการจัดสรรจริงจาก engine
             </p>
           </div>
         )}
@@ -224,20 +235,25 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
             </span>
             <div className="flex justify-center items-center gap-6">
               <div className="p-3 bg-red-950/40 rounded-xl border border-danger/40">
-                <span className="text-[10px] text-slate-400 block">เงินทุนหมุนเวียนที่ขาดเพิ่ม</span>
+                <span className="text-[10px] text-slate-400 block">
+                  {effectsAvailable ? "เงินทุนหมุนเวียนที่ขาดเพิ่ม" : "ค่าที่บันทึกไว้ในสถานการณ์ (ไม่ได้คำนวณใหม่)"}
+                </span>
                 <span className="text-2xl font-extrabold font-mono text-danger tabular-nums">
                   +฿{currentScenario.cashImpactAmount.toLocaleString()}
                 </span>
               </div>
               <div className="p-3 bg-red-950/40 rounded-xl border border-danger/40">
-                <span className="text-[10px] text-slate-400 block">วันที่เงินสดติดลบ</span>
+                <span className="text-[10px] text-slate-400 block">
+                  {currentScenario.deficitDays.length ? "วันที่เงินสดติดลบตามที่บันทึกไว้" : "วันที่เงินสดติดลบ"}
+                </span>
                 <span className="text-xl font-bold font-mono text-white">
-                  Day {currentScenario.deficitDays.join(", ")}
+                  {currentScenario.deficitDays.length ? `Day ${currentScenario.deficitDays.join(", ")}` : "ไม่ได้บันทึกไว้"}
                 </span>
               </div>
             </div>
             <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-              หากไม่ใช้แผนสำรอง โครงการจะเผชิญค่าปรับส่งมอบล่าช้า และทำให้ร้านอื่นในทีมไม่ได้รับเงินงวดสุดท้าย
+              {currentScenario.description} · ค่าปรับ ความล่าช้า และผลต่อร้านอื่นยังไม่มีสัญญาหรือข้อมูลรองรับ
+              ระบบจึงไม่คำนวณเพิ่มให้
             </p>
           </div>
         )}
@@ -246,7 +262,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
         {currentPhase === 4 && (
           <div className="space-y-3 animate-fade-in">
             <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">
-              ช่วงที่ 4: ทางเลือกสำรองเพื่อฟื้นฟูโครงการ (Contingency Options)
+              ช่วงที่ 4: ทางเลือกสำรองที่บันทึกไว้ (เป็นข้อเสนอให้พิจารณา ไม่ใช่การเปิดใช้งาน)
             </span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {currentScenario.contingencyOptions.map((opt) => (

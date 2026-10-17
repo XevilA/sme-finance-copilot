@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { FundingOption, Envelope } from "@/api/contracts/types";
+import { Capabilities, FundingEvaluation, FundingOption, Envelope } from "@/api/contracts/types";
+import { useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import { FundingChip } from "@/components/signature/FundingChip";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -20,39 +21,60 @@ import {
 
 export const FundingPage: React.FC = () => {
   const { setCurrentPage, addToast, selectedShopId } = useAppStore();
-  const [fundingEnvelope, setFundingEnvelope] = useState<Envelope<FundingOption[]> | null>(null);
-  const [selectedFundingId, setSelectedFundingId] = useState<string>("fund-factoring");
+  const { accepted, stale } = useAnalysisContext();
+  const [selectedFundingId, setSelectedFundingId] = useState<string>("");
   const [isComparing, setIsComparing] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   // Application Drawer
   const [isApplying, setIsApplying] = useState(false);
 
-  const loadData = () => {
-    setLoading(true);
-    apiClient
-      .getFundingOptions()
-      .then((res) => {
-        setFundingEnvelope(res);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
+  // With an imported statement the matcher grades that exact statement. Reading
+  // GET /funding/options instead would rank a stored seed SME's numbers.
+  const load = useCallback(async (): Promise<Envelope<FundingOption[]> & { evaluation?: FundingEvaluation }> => {
+    if (!accepted || apiClient.isDemoMode()) return apiClient.getFundingOptions();
+    const result = await apiClient.evaluateFunding(accepted.input, {
+      input_revision: accepted.revision,
+      sme_id: accepted.context.smeId,
+      project_id: accepted.context.projectId,
+    });
+    return { ...result, data: result.data.options, evaluation: result.data };
+  }, [accepted]);
+  const state = useEnvelope<FundingOption[]>(load as () => Promise<Envelope<FundingOption[]>>);
+  const { envelope: fundingEnvelope, loading, error, reload: loadData } = state;
+  const evaluation = (fundingEnvelope as (Envelope<FundingOption[]> & { evaluation?: FundingEvaluation }) | null)?.evaluation;
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const capabilityState = useEnvelope<Capabilities>(useCallback(
+    () => (apiClient.isDemoMode()
+      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      : apiClient.getCapabilities()),
+    []));
+  const canApply = capabilityState.envelope?.data.fundingApplication.available === true;
+  const applyBlockedReason = capabilityState.envelope?.data.fundingApplication.reason
+    || "backend ยังไม่มี operation สำหรับยื่นคำขอสินเชื่อ";
+
+  const amount = (value: string | number | null | undefined) =>
+    value == null || value === "" ? "ยังไม่มีข้อมูล" : `฿${Number(value).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+  // Values supplied in the statement being graded, shown as supplied figures.
+  const supplied = (field: string) => {
+    const value = accepted?.input?.[field];
+    return typeof value === "string" || typeof value === "number" ? value : null;
+  };
+  const overview = accepted?.result.views.overview.data;
+  const activeId = selectedFundingId || fundingEnvelope?.data[0]?.id || "";
 
   const handleApply = () => {
     setIsApplying(false);
+    // /capabilities declares fundingApplication unavailable: there is no actor,
+    // no persistence and no status transition behind this button.
     addToast({
-      type: "success",
-      title: "ส่งคำขอสินเชื่อเบื้องต้นสำเร็จ",
-      message: "เอกสาร PO ถูกส่งต่อไปยังผู้ให้ทุนเพื่อตรวจสอบความถูกต้องแล้ว",
+      type: "warning",
+      title: "ยังไม่รองรับการยื่นคำขอจริง",
+      message: `${applyBlockedReason} · ผลที่แสดงคือการจัดอันดับตามเกณฑ์ตัวเลขที่ส่งไป ไม่ใช่การอนุมัติสินเชื่อ`,
+      duration: 9000,
     });
   };
 
-  if (loading || !fundingEnvelope) {
+  if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
@@ -64,12 +86,37 @@ export const FundingPage: React.FC = () => {
     );
   }
 
-  const fundingOptions = fundingEnvelope.data;
-  const activeFunding =
-    fundingOptions.find((f) => f.id === selectedFundingId) || fundingOptions[0];
+  const fundingOptions = fundingEnvelope?.data || [];
+  const activeFunding = fundingOptions.find((f) => f.id === activeId) || fundingOptions[0];
+
+  if (!fundingEnvelope || error) {
+    return (
+      <StateRenderer currentMode="error" errorMessage={error || "อ่านทางเลือกแหล่งทุนจาก backend ไม่สำเร็จ"} onRetry={loadData}>
+        {null}
+      </StateRenderer>
+    );
+  }
+
+  // An explicit zero gap is a known zero: no candidates are needed. An unknown
+  // gap is null plus requested_amount in missing, which is not the same thing.
+  if (!activeFunding) {
+    return (
+      <StateRenderer
+        currentMode="unavailable"
+        unavailableReason={evaluation?.notRequired
+          ? "งบชุดนี้ไม่มีส่วนที่ขาด (funding gap = 0) จึงไม่มีการจัดอันดับแหล่งทุน"
+          : "ยังไม่มีทางเลือกแหล่งทุนที่ตรงเกณฑ์ของงบชุดนี้ · ต้องมีมูลค่าส่วนที่ขาดที่คำนวณได้ก่อน"}
+        missingItems={fundingEnvelope.missing}
+        onRetry={loadData}
+        onAddData={() => setCurrentPage("import")}
+      >
+        {null}
+      </StateRenderer>
+    );
+  }
 
   return (
-    <StateRenderer onRetry={loadData}>
+    <StateRenderer currentMode={stale ? "stale" : undefined} onRetry={loadData} onReanalyze={() => setCurrentPage("import")}>
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6 text-ink animate-fade-in">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderLine pb-4">
@@ -103,16 +150,20 @@ export const FundingPage: React.FC = () => {
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">
               ทุนหมุนเวียนต้องใช้รวม
             </span>
-            <span className="text-lg font-bold font-mono text-ink">฿47,500</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">ค่าของสด 2 ร้านแรก</span>
+            <span className="text-lg font-bold font-mono text-ink">{amount(supplied("working_capital_needed"))}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {supplied("working_capital_needed") == null ? "ขาด working_capital_needed ในงบ" : "ตามค่าที่ระบุในงบชุดนี้"}
+            </span>
           </div>
 
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">
               เงินสดในมือปัจจุบัน
             </span>
-            <span className="text-lg font-bold font-mono text-ink">฿18,000</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">รวม 2 ร้านที่ติดขัด</span>
+            <span className="text-lg font-bold font-mono text-ink">{amount(overview?.cashBalance)}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {overview?.cashBalance == null ? "ขาด cash_balance ในงบ" : `หลังกันสำรอง ${amount(overview?.usableCashAfterReserve)}`}
+            </span>
           </div>
 
           <div className="border-x border-slate-100 px-3">
@@ -120,10 +171,16 @@ export const FundingPage: React.FC = () => {
               ทุนที่ยังขาด (Funding Gap)
             </span>
             <span className="text-lg font-extrabold font-mono text-danger tabular-nums">
-              ฿29,500
+              {evaluation ? amount(evaluation.requestedAmount) : "ยังไม่มีข้อมูล"}
             </span>
             <span className="text-[10px] text-danger font-medium block mt-0.5">
-              ร้านบ้านข้าวหอม ฿14k · เจ๊ดาว ฿15.5k
+              {!evaluation
+                ? "นำเข้างบก่อนเพื่อคำนวณส่วนที่ขาด"
+                : evaluation.notRequired
+                ? "งบชุดนี้ไม่มีส่วนที่ขาด (ศูนย์ที่ทราบค่า)"
+                : evaluation.requestedAmount == null
+                ? "ยังคำนวณไม่ได้ ไม่ใช่ศูนย์"
+                : `เกรด ${evaluation.grade || "ยังไม่ทราบ"} คะแนน ${evaluation.gradeScore || "ยังไม่ทราบ"}`}
             </span>
           </div>
 
@@ -131,9 +188,17 @@ export const FundingPage: React.FC = () => {
             <span className="text-[10px] text-brand block uppercase tracking-wider font-semibold">
               วันที่ต้องมีเงินสดพร้อม
             </span>
-            <span className="text-lg font-bold font-mono text-brand">1 พ.ย. 2026</span>
+            <span className="text-lg font-bold font-mono text-brand">
+              {accepted?.result.views.forecast?.data?.first_shortfall_date
+                || accepted?.result.views.forecast?.data?.conditional_first_shortfall_date
+                || "ยังไม่มีข้อมูล"}
+            </span>
             <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
-              ต้องการเงินด่วนใน 24 ชม.
+              {accepted?.result.views.forecast?.data?.first_shortfall_date
+                ? "วันที่เงินสดต่ำกว่าศูนย์จากตารางที่มีวันกำหนด"
+                : accepted?.result.views.forecast?.data?.conditional_first_shortfall_date
+                ? "เป็นค่าตามเงื่อนไข ยังไม่ยืนยันวันรับเงินจริง"
+                : "ต้องมีตารางรับ-จ่ายตามวันที่ของกิจการนี้ก่อน"}
             </span>
           </div>
         </div>
@@ -163,9 +228,10 @@ export const FundingPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsApplying(true)}
+            title={canApply ? undefined : applyBlockedReason}
             className="px-3 py-1 bg-brand text-white font-semibold rounded-lg ml-auto flex items-center gap-1"
           >
-            <span>4. เตรียมยื่นคำขอ</span>
+            <span>{canApply ? "4. เตรียมยื่นคำขอ" : "4. ดูเอกสารที่ต้องเตรียม"}</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
@@ -226,8 +292,10 @@ export const FundingPage: React.FC = () => {
                 setSelectedFundingId(funding.id);
                 addToast({
                   type: "info",
-                  title: "จำลองค่างวด",
-                  message: `คำนวณค่างวดสำหรับ ${funding.name} เรียบร้อย`,
+                  title: `ค่างวดจาก backend · ${funding.name}`,
+                  message: `ผ่อน ${amount(funding.monthlyPayment)}/เดือน ${funding.termMonths} เดือน · คืนรวม ${amount(funding.totalRepayment)}`
+                    + (funding.postFundingDscr ? ` · DSCR หลังรับทุน ${funding.postFundingDscr}` : " · ยังไม่ทราบ DSCR หลังรับทุน"),
+                  duration: 9000,
                 });
               }}
               onApply={() => {
@@ -275,7 +343,9 @@ export const FundingPage: React.FC = () => {
           <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-brand-dark flex items-start gap-2">
             <Sparkles className="w-4 h-4 text-brand shrink-0 mt-0.5" />
             <div>
-              <strong>เหตุผลที่แนะนำทางเลือกนี้:</strong> {activeFunding.matchReason}
+              <strong>เกณฑ์ที่ใช้จัดอันดับ ({activeFunding.policyVersion || "ยังไม่ทราบเวอร์ชันเกณฑ์"}):</strong>{" "}
+              {activeFunding.matchReason}
+              {activeFunding.notice ? ` · ${activeFunding.notice}` : " · การจัดอันดับนี้ไม่ใช่การอนุมัติสินเชื่อ"}
             </div>
           </div>
         </div>
@@ -292,7 +362,7 @@ export const FundingPage: React.FC = () => {
             >
               <div className="flex items-center justify-between border-b border-borderLine pb-3">
                 <h3 className="font-display font-bold text-ink text-sm">
-                  ตรวจยืนยันคำขอเงินทุนหมุนเวียน (Verification Step)
+                  {canApply ? "ตรวจยืนยันคำขอเงินทุนหมุนเวียน (Verification Step)" : "สรุปทางเลือกที่เลือกไว้ (ยังไม่ยื่นคำขอ)"}
                 </h3>
                 <button
                   type="button"
@@ -305,16 +375,35 @@ export const FundingPage: React.FC = () => {
 
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <div className="font-bold text-ink">ผู้ยื่นคำขอ: ร้านบ้านข้าวหอม & เจ๊ดาวแกงปักษ์ใต้</div>
-                  <div className="text-ink-muted">วัตถุประสงค์: ซื้อวัตถุดิบอาหาร 300 กล่อง/วัน</div>
-                  <div className="font-mono font-bold text-brand">วงเงินที่ขอเบิก: ฿29,500</div>
+                  <div className="font-bold text-ink">
+                    งบที่ใช้จัดอันดับ: {overview?.shopName || "ยังไม่ได้นำเข้างบ"}
+                    {accepted?.context.smeId ? "" : " · ยังไม่ผูกกับกิจการในฐานข้อมูล"}
+                  </div>
+                  <div className="text-ink-muted">
+                    ทางเลือกที่เลือก: {activeFunding.name} ({activeFunding.provider}) · {activeFunding.typeLabel}
+                    {" · "}สถานะตามเกณฑ์: {activeFunding.status === "eligible" ? "ผ่านเกณฑ์ตัวเลข" : activeFunding.status === "requires_info" ? "ต้องข้อมูลเพิ่ม" : "ไม่ผ่านเกณฑ์"}
+                  </div>
+                  <div className="font-mono font-bold text-brand">
+                    ส่วนที่ขาดตามงบชุดนี้: {evaluation ? amount(evaluation.requestedAmount) : "ยังไม่มีข้อมูล"}
+                    {" · "}วงเงิน {amount(activeFunding.minAmount)}–{amount(activeFunding.maxAmount)}
+                  </div>
                 </div>
 
                 <div className="p-3 border border-slate-200 rounded-xl space-y-1 text-ink-muted">
-                  <span className="font-bold text-ink block">ข้อมูลที่จะเปิดเผยแก่ผู้ให้ทุน:</span>
-                  <p>✓ ใบสั่งซื้อยืนยัน (PO #STP-2026-091) จาก บจก.สยามเทคโนพาร์ค</p>
-                  <p>✓ สัญญาบันทึกข้อตกลงร่วมกลุ่ม 6 ร้านค้า</p>
-                  <p>✕ ข้อมูลสูตรอาหารและบัญชีส่วนตัวจะถูกปิดเป็นความลับ</p>
+                  <span className="font-bold text-ink block">
+                    {canApply ? "ข้อมูลที่จะเปิดเผยแก่ผู้ให้ทุน:" : "สถานะการยื่นคำขอในระบบนี้:"}
+                  </span>
+                  <p>
+                    {canApply
+                      ? "ระบบจะส่งงบชุดที่วิเคราะห์และผลการจัดอันดับให้ผู้ให้ทุนตรวจ"
+                      : `ยังไม่มีการยื่นคำขอ ลงนาม หรือส่งเอกสารใด ๆ · เหตุผลจาก /capabilities: ${applyBlockedReason}`}
+                  </p>
+                  <p>เอกสารที่ผู้ให้ทุนระบุ: {activeFunding.requiredDocs.length} รายการ (ดูรายการด้านหลังหน้านี้)</p>
+                  <p>
+                    {activeFunding.missing?.length
+                      ? `ข้อมูลที่ยังขาดสำหรับเกณฑ์นี้: ${activeFunding.missing.join(", ")}`
+                      : "ไม่มีรายการข้อมูลที่ขาดสำหรับเกณฑ์ตัวเลขของทางเลือกนี้"}
+                  </p>
                 </div>
               </div>
 
@@ -324,14 +413,16 @@ export const FundingPage: React.FC = () => {
                   onClick={() => setIsApplying(false)}
                   className="px-4 py-2 border border-slate-200 rounded-btn text-xs text-ink-muted hover:bg-slate-50"
                 >
-                  ยกเลิก
+                  {canApply ? "ยกเลิก" : "ปิด"}
                 </button>
                 <button
                   type="button"
                   onClick={handleApply}
+                  disabled={!canApply}
+                  title={canApply ? undefined : applyBlockedReason}
                   className="px-5 py-2 bg-brand text-white rounded-btn text-xs font-bold hover:bg-brand-dark transition-all shadow-sm"
                 >
-                  ยืนยันและส่งคำขอ
+                  {canApply ? "ยืนยันและส่งคำขอ" : "ยังไม่รองรับการส่งคำขอ"}
                 </button>
               </div>
             </div>
