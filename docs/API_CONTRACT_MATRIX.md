@@ -1,12 +1,13 @@
 # API Contract Matrix — Backend / AI ↔ Frontend
 
-Latest verified source: `4840723` on `main` (2026-10-18). The complete backend
-suite passed against the disposable PostgreSQL test database: **555 passed, 1
-skipped**. The single skip is the test that explicitly verifies behavior with
-the database disabled; database-backed feature tests ran. The test database
-uses synthetic seed data and is removed after the run. Historical block test
-counts and branch references below describe their original runs, not this
-latest verification. Current frontend instructions are in
+Latest verified backend source: `efd42db` on `main` (verified 2026-10-18; handoff
+docs refreshed in `4da3614`). The complete backend suite passed against the
+disposable PostgreSQL test database: **555 passed, 1 skipped**. The single skip
+is the test that explicitly verifies behavior with the database disabled;
+database-backed feature tests ran. The test database uses synthetic seed data
+and is removed after the run. Historical block test counts and branch references
+below describe their original runs, not this latest verification. Current
+frontend instructions are in
 [`frontend-integration.md`](frontend-integration.md).
 
 Provider hardening: stable SHA-256-derived advisory transaction lock, held on one
