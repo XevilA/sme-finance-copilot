@@ -12,15 +12,15 @@ assert.equal(databaseUnavailable(["net_income"]), false);
 assert.equal(missingDataLabel("assets"), "assets");
 for (const mode of ["error", "insufficient_data", "unavailable"] as const) {
   const html = renderToStaticMarkup(<StateRenderer currentMode={mode} missingItems={["database_disabled"]} onRetry={() => {}}>{null}</StateRenderer>);
-  assert.ok(html.includes("หน้านี้ต้องเชื่อมฐานข้อมูลออนไลน์ก่อน"));
-  assert.ok(html.includes("ตรวจการเชื่อมต่ออีกครั้ง"));
-  assert.ok(!html.includes("เพิ่มข้อมูลที่ยังขาด") && !html.includes("database_disabled"));
+  assert.ok(html.includes("This page requires an online database connection"));
+  assert.ok(html.includes("Check connection again"));
+  assert.ok(!html.includes("Add missing data") && !html.includes("database_disabled"));
 }
 const configError = renderToStaticMarkup(<StateRenderer currentMode="error" errorMessage="Order context requires DATABASE_URL">{null}</StateRenderer>);
-assert.ok(configError.includes("หน้านี้ต้องเชื่อมฐานข้อมูลออนไลน์ก่อน"));
+assert.ok(configError.includes("This page requires an online database connection"));
 const businessGap = renderToStaticMarkup(<StateRenderer currentMode="unavailable" missingItems={["product_sales_for_imported_statement"]}>{null}</StateRenderer>);
-assert.ok(businessGap.includes("ยอดขายแยกรายสินค้า"));
-assert.ok(!businessGap.includes("หน้านี้ต้องเชื่อมฐานข้อมูลออนไลน์ก่อน") && !businessGap.includes("ไปหน้านำเข้าข้อมูล"));
+assert.ok(businessGap.includes("Product-level sales for this period"));
+assert.ok(!businessGap.includes("This page requires an online database connection") && !businessGap.includes("Go to data import"));
 const genericError = renderToStaticMarkup(<StateRenderer currentMode="error" errorMessage="Connection failed">{null}</StateRenderer>);
-assert.ok(genericError.includes("การประมวลผลไม่สำเร็จ"));
+assert.ok(genericError.includes("Processing failed"));
 console.log("Availability states: absent database, business evidence, retry and generic errors passed.");

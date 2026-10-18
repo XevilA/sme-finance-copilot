@@ -15,17 +15,17 @@ assert.equal(draft.kind, "actual");
 assert.ok(!("period_start" in draft) && !("period_end" in draft), "Year labels must not invent accounting dates");
 assert.ok(!("cash_balance" in draft) && !("reported_liabilities_and_equity" in draft));
 assert.throws(() => statementDraft([]));
-assert.throws(() => statementDraft([balance, balance]), /หนึ่งคอลัมน์/);
+assert.throws(() => statementDraft([balance, balance]), /one column/);
 assert.throws(() => statementDraft([balance, { ...income, currency: "USD" }]), /THB/);
-assert.throws(() => statementDraft([balance, { ...income, sheet: "other business" }]), /ชีตและปีเดียวกัน/);
-assert.throws(() => statementDraft([balance, { ...income, period: { ...income.period, year: 2018 } }]), /ชีตและปีเดียวกัน/);
-assert.throws(() => statementDraft([{ ...balance, status: "invalid" }]), /ยังไม่พร้อม/);
-assert.throws(() => statementDraft([{ ...balance, status: "empty_template" }]), /ยังไม่พร้อม/);
-assert.throws(() => statementDraft([{ ...balance, period: { ...balance.period, year: null } }]), /ยังไม่พร้อม/);
+assert.throws(() => statementDraft([balance, { ...income, sheet: "other business" }]), /same sheet and fiscal year/);
+assert.throws(() => statementDraft([balance, { ...income, period: { ...income.period, year: 2018 } }]), /same sheet and fiscal year/);
+assert.throws(() => statementDraft([{ ...balance, status: "invalid" }]), /not ready to import/);
+assert.throws(() => statementDraft([{ ...balance, status: "empty_template" }]), /not ready to import/);
+assert.throws(() => statementDraft([{ ...balance, period: { ...balance.period, year: null } }]), /not ready to import/);
 assert.throws(() => statementDraft([
   { ...balance, period: { ...balance.period, periodEnd: "2019-12-31" } },
   { ...income, period: { ...income.period, periodEnd: "2019-09-28" } },
-]), /ไม่ตรงกัน/);
+]), /different period end dates/);
 assert.equal(statementDraft([{ ...balance, period: { ...balance.period, periodEnd: "2019-12-31" } }]).period_end, "2019-12-31");
 const unknownYear = { ...balance, status: "insufficient_data", period: { ...balance.period, year: null } };
 assert.equal(statementWithYear(unknownYear, "2562").period.year, 2019);
@@ -34,7 +34,7 @@ assert.equal(unknownYear.period.year, null, "Source metadata must not be mutated
 assert.equal(statementWithYear(balance, "2026").period.year, 2019, "Known years cannot be relabelled");
 assert.equal(statementDraft([statementWithYear(unknownYear, "2562"), income]).statement_year, "2019");
 for (const value of ["", "1", "20xx", "2019.5", "9999"]) assert.throws(() => statementWithYear(unknownYear, value));
-assert.throws(() => validateImportedPeriod({ statement_year: "2019", period_end: "2026-12-31" }), /วันสิ้นงวด/);
+assert.throws(() => validateImportedPeriod({ statement_year: "2019", period_end: "2026-12-31" }), /period end date must be in fiscal year/);
 assert.doesNotThrow(() => validateImportedPeriod({ statement_year: "2019", period_start: "2018-10-01", period_end: "2019-09-30" }));
-assert.throws(() => statementDraft([statementWithYear({ ...unknownYear, status: "empty_template" }, "2562")]), /ยังไม่พร้อม/);
+assert.throws(() => statementDraft([statementWithYear({ ...unknownYear, status: "empty_template" }, "2562")]), /not ready to import/);
 console.log("Statement import: matching source selection, unknown fields, dates and unsafe combinations passed.");
