@@ -467,7 +467,8 @@ export const apiClient = {
     return requestJson(`/cashflow/timeline`);
   },
 
-  async previewCashflow(input: CashflowPreviewInput): Promise<Envelope<CashflowDay[]>> {
+  /** Simulated schedule from rows the user typed. The backend never saves it. */
+  async previewCashflow(input: CashflowPreviewInput): Promise<Sourced<CashflowDay[]> & { persisted?: boolean }> {
     return postJson(`/cashflow/preview`, input);
   },
 
@@ -577,7 +578,8 @@ export const apiClient = {
     return requestJson(`/sales/channels`);
   },
 
-  async previewSales(input: SalesPreviewInput): Promise<Envelope<SalesPreviewResult>> {
+  /** Product/channel margins from rows the user typed. Not saved either. */
+  async previewSales(input: SalesPreviewInput): Promise<Sourced<SalesPreviewResult> & { persisted?: boolean }> {
     return postJson(`/sales/preview`, input);
   },
 

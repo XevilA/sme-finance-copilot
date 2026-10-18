@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { Capabilities, FunderProject } from "@/api/contracts/types";
+import { FunderProject } from "@/api/contracts/types";
 import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -24,14 +25,9 @@ export const FunderPage: React.FC = () => {
   const state = useEnvelope<FunderProject[]>(useCallback(() => apiClient.getFunderProjects(), []));
   const { envelope: funderEnvelope, loading, error, reload: loadData } = state;
   const mode = envelopeMode(state, (rows) => rows.length === 0);
-  const capabilityState = useEnvelope<Capabilities>(useCallback(
-    () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
-      : apiClient.getCapabilities()),
-    []));
-  const canRequestInfo = capabilityState.envelope?.data.funderInfoRequest.available === true;
-  const infoBlockedReason = capabilityState.envelope?.data.funderInfoRequest.reason
-    || "The backend does not support additional information requests yet.";
+  const capabilityState = useCapabilities();
+  const canRequestInfo = capabilityState.isAvailable("funderInfoRequest");
+  const infoBlockedReason = capabilityState.reasonFor("funderInfoRequest", "The backend does not support additional information requests yet.");
   const amount = (value: number | null | undefined) =>
     value == null ? "No data" : `฿${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   const rbacOff = (funderEnvelope?.missing || []).includes("rbac_not_enforced");
@@ -84,16 +80,10 @@ export const FunderPage: React.FC = () => {
     );
   }
 
-  // No endpoint supplies a funder's own budget, so the bar compares the user's
-  // selection against the total target funding of the listed projects. Both
-  // figures are sums of values the backend returned, and selecting a project
-  // allocates, reserves or commits nothing.
-  const allocatedBudget = projects.reduce((sum, proj) => sum + (proj.targetFunding || 0), 0);
-  const usedBudget = selectedProjectIds.reduce((sum, id) => {
-    const p = projects.find((proj) => proj.id === id);
-    return sum + (p?.targetFunding || 0);
-  }, 0);
-  const remainingBudget = allocatedBudget - usedBudget;
+  // ไม่มี endpoint ไหนส่งยอดรวมงบมาให้ จึงไม่บวก/ลบเงินเองใน React
+  // แสดงแค่จำนวนโครงการที่เลือก และยอดเป้าหมายของแต่ละโครงการตามที่ backend ส่งมา
+  const selectedProjects = projects.filter((proj) => selectedProjectIds.includes(proj.id));
+  const selectedShare = projects.length ? (selectedProjects.length / projects.length) * 100 : 0;
 
   return (
     <StateRenderer onRetry={loadData}>
@@ -108,7 +98,7 @@ export const FunderPage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 Funder & Investor Workspace
               </h1>
-              <DataKindBadge kind="forecast" size="md" />
+              <DataKindBadge kind={funderEnvelope?.kind ?? "forecast"} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               Review saved projects and evidence levels · Selections and totals are local review aids, not actual funding allocations.
@@ -135,31 +125,25 @@ export const FunderPage: React.FC = () => {
                 Selected in this browser · Not saved and no funds allocated
               </span>
               <h3 className="text-sm font-display font-bold text-ink">
-                Total target funding for listed projects: {amount(allocatedBudget)}
+                {selectedProjects.length} of {projects.length} listed projects selected
               </h3>
             </div>
-            <div className="flex items-center gap-4 text-xs font-mono">
-              <div>
-                <span className="text-[10px] text-ink-muted block">Selected target total:</span>
-                <span className="font-bold text-brand">{amount(usedBudget)}</span>
-              </div>
-              <div className="border-l border-slate-200 pl-4">
-                <span className="text-[10px] text-ink-muted block">Unselected project total:</span>
-                <span className={`font-bold ${remainingBudget < 0 ? "text-danger" : "text-emerald-700"}`}>
-                  {amount(remainingBudget)}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+              {selectedProjects.length === 0 && <span className="text-ink-muted font-sans">No project selected yet</span>}
+              {selectedProjects.map((proj) => (
+                <span key={proj.id} className="rounded-chip border border-brand/30 bg-brand/5 px-2 py-0.5">
+                  <span className="font-sans">{proj.title}</span>: <span className="font-bold text-brand">{amount(proj.targetFunding)}</span>
                 </span>
-              </div>
+              ))}
             </div>
           </div>
 
           {/* Allocation Progress Bar */}
           <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                remainingBudget < 0 ? "bg-danger" : "bg-brand"
-              }`}
+              className="h-full rounded-full transition-all duration-500 bg-brand"
               style={{
-                width: `${Math.min(100, (usedBudget / allocatedBudget) * 100)}%`,
+                width: `${selectedShare}%`,
               }}
             />
           </div>
@@ -170,7 +154,7 @@ export const FunderPage: React.FC = () => {
               {rbacOff ? " · Access enforcement is off; displayed roles do not verify identity." : ""}
             </span>
             <span className="font-mono">
-              {Math.round((usedBudget / allocatedBudget) * 100)}% of listed target funding
+              {selectedProjects.length}/{projects.length} projects
             </span>
           </div>
         </div>
@@ -208,7 +192,7 @@ export const FunderPage: React.FC = () => {
                       >
                         {proj.evidenceLevelBadge}
                       </span>
-                      <DataKindBadge kind="forecast" size="sm" />
+                      <DataKindBadge kind={funderEnvelope?.kind ?? "forecast"} size="sm" />
                     </div>
 
                     <h4 className="font-display font-bold text-xs text-ink leading-snug mb-1">

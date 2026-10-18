@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { Capabilities, UnlockResource } from "@/api/contracts/types";
+import { UnlockResource } from "@/api/contracts/types";
 import { OrderComparison, OrderContext } from "@/api/client";
 import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { ResourceTile } from "@/components/signature/ResourceTile";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -42,14 +43,9 @@ export const UnlockPage: React.FC = () => {
   const state = useEnvelope<UnlockResource[]>(useCallback(() => apiClient.getUnlockResources(), []));
   const { envelope: resourcesEnvelope, loading, error, reload: loadData } = state;
   const mode = envelopeMode(state, (rows) => rows.length === 0);
-  const capabilityState = useEnvelope<Capabilities>(useCallback(
-    () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
-      : apiClient.getCapabilities()),
-    []));
-  const canReserve = capabilityState.envelope?.data.resourceReservation.available === true;
-  const reserveBlockedReason = capabilityState.envelope?.data.resourceReservation.reason
-    || "The backend does not support resource reservations yet.";
+  const capabilityState = useCapabilities();
+  const canReserve = capabilityState.isAvailable("resourceReservation");
+  const reserveBlockedReason = capabilityState.reasonFor("resourceReservation", "The backend does not support resource reservations yet.");
 
   // Taking a resource out of the plan is recomputed by the engine through
   // POST /simulate/order with unavailable_resource_ids. The browser does not

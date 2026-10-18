@@ -3,6 +3,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { AIResponse } from "@/api/contracts/types";
 import { useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
+import { hasKey, TranslationKey, useT } from "@/i18n";
 import {
   Sparkles,
   X,
@@ -27,6 +28,7 @@ export const AIPanel: React.FC = () => {
   } = useAppStore();
 
   const { accepted, stale } = useAnalysisContext();
+  const t = useT();
   const [selectedRefId, setSelectedRefId] = useState<string | null>(null);
   const load = useCallback(
     () => (isAIPanelOpen ? apiClient.getAIExplanation(currentPage) : Promise.reject(new Error("panel closed"))),
@@ -41,11 +43,11 @@ export const AIPanel: React.FC = () => {
   const shown: AIResponse | null = isAIPanelOpen && !loading
     ? aiData || {
         pageId: currentPage,
-        summary: error ? "Could not load the explanation from the backend" : "No explanation is available for this page yet",
-        reasoning: error || "The backend did not return an explanation for this page · Try importing data or opening another page",
+        summary: error ? t("ai.loadError") : t("ai.none"),
+        reasoning: error || t("ai.noneReason"),
         dataUsed: [],
         suggestions: [],
-        unknowns: [error ? `Error: ${error}` : "The backend did not return an explanation for this page"],
+        unknowns: [error ? t("ai.errorPrefix", { error }) : t("ai.noneShort")],
       }
     : null;
   const aiWarning = aiData?.warning || accepted?.result.data.aiWarning || null;
@@ -75,19 +77,10 @@ export const AIPanel: React.FC = () => {
     }
   };
 
-  const quickQuestions: Record<string, string[]> = {
-    overview: ["Why is cash decreasing?", "Can we fulfill this order with our available working capital?", "Which expense has the biggest impact?"],
-    swarm: ["Why were these six shops selected?", "How can we cover the ฿29,500 funding gap?", "Can we replace a shop with a backup?"],
-    cashflow: ["On which dates could cash go negative?", "Would shorter payment terms improve cash flow?", "Why are payments arriving late?"],
-    health: ["What does a 1.15 current ratio indicate?", "Why can't DIO be calculated?", "Where should we reduce costs?"],
-    funding: ["Why is invoice factoring recommended?", "What is the total interest?", "Which documents are required?"],
-  };
-
-  const currentQuestions = quickQuestions[currentPage] || [
-    "Where is the cash going?",
-    "Is this order profitable?",
-    "Can we reduce the funding needed?",
-  ];
+  // คำถามตัวอย่าง (ยังถามจริงไม่ได้) แปลตามภาษา
+  const questionPages = ["overview", "swarm", "cashflow", "health", "funding"];
+  const questionPage = questionPages.includes(currentPage) ? currentPage : "default";
+  const currentQuestions = [1, 2, 3].map((n) => t(`aiq.${questionPage}.${n}` as TranslationKey));
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-soft-lg border-l border-borderLine flex flex-col animate-slide-in">
@@ -99,15 +92,15 @@ export const AIPanel: React.FC = () => {
           </div>
           <div>
             <h3 className="font-display font-bold text-ink text-sm flex items-center gap-1.5">
-              <span>SME Copilot Intelligence</span>
+              <span>{t("ai.title")}</span>
               <span className="text-[10px] bg-brand/10 text-brand px-1.5 py-0.2 rounded font-normal">
-                {aiMode === "rules" ? "Rules-based (deterministic)" : aiMode ? `Mode: ${aiMode}` : "Mode unavailable"}
+                {aiMode === "rules" ? t("ai.rules") : aiMode ? t("ai.mode", { mode: aiMode }) : t("ai.modeUnavailable")}
               </span>
             </h3>
             <p className="text-[11px] text-ink-muted">
-              Explaining page: {currentPage}
-              {aiData?.policyVersion ? ` · Policy ${aiData.policyVersion}` : ""}
-              {aiWarning ? ` · Using rules-based results instead of a model: ${aiWarning}` : ""}
+              {t("ai.explaining", { page: hasKey(`nav.${currentPage}`) ? t(`nav.${currentPage}` as TranslationKey) : currentPage })}
+              {aiData?.policyVersion ? ` · ${t("ai.policy", { v: aiData.policyVersion })}` : ""}
+              {aiWarning ? ` · ${t("ai.warning", { warning: aiWarning })}` : ""}
             </p>
           </div>
         </div>
@@ -116,7 +109,7 @@ export const AIPanel: React.FC = () => {
           type="button"
           onClick={() => setAIPanelOpen(false)}
           className="p-1.5 text-ink-muted hover:text-ink hover:bg-slate-100 rounded-lg transition-colors"
-          title="Close panel (Esc)"
+          title={t("ai.close")}
         >
           <X className="w-4 h-4" />
         </button>
@@ -127,8 +120,8 @@ export const AIPanel: React.FC = () => {
         <div className="p-2.5 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
           <span>
             {stale
-              ? "Source data changed after analysis; these results are based on the previous version."
-              : "There are unsaved simulation changes; these results use the original data."}
+              ? t("ai.stale")
+              : t("ai.unsaved")}
           </span>
           <button
             type="button"
@@ -136,7 +129,7 @@ export const AIPanel: React.FC = () => {
             className="px-2 py-0.5 bg-brand text-white text-[10px] font-medium rounded hover:bg-brand-dark flex items-center gap-1"
           >
             <RefreshCw className="w-2.5 h-2.5" />
-            <span>Reanalyze</span>
+            <span>{t("stateR.reanalyze")}</span>
           </button>
         </div>
       )}
@@ -151,11 +144,28 @@ export const AIPanel: React.FC = () => {
           </div>
         ) : shown ? (
           <>
+            {(error || !accepted) && (
+              <div className={`p-3 rounded-xl border text-[11px] space-y-2 ${error ? "bg-rose-50 border-rose-200 text-rose-900" : "bg-slate-50 border-borderLine text-ink-muted"}`}>
+                <p>
+                  {error
+                    ? t("ai.loadErrorLong")
+                    : t("ai.notOwnData")}
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {error && <button type="button" onClick={state.reload} className="font-semibold underline">{t("common.tryAgain")}</button>}
+                  {!accepted && (
+                    <button type="button" onClick={() => { setAIPanelOpen(false); setCurrentPage("import"); }} className="font-semibold underline">
+                      {t("ai.importCta")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             {/* 1. Summary & Reasoning */}
             <div className="bg-slate-50 p-3.5 rounded-card border border-slate-100">
               <span className="text-[10px] font-bold text-brand uppercase tracking-wider block mb-1.5 flex items-center gap-1">
                 <FileText className="w-3.5 h-3.5" />
-                Financial Cause-and-Effect Summary
+                {t("ai.summary")}
               </span>
               <p className="text-ink font-medium leading-relaxed mb-2">{shown.summary}</p>
               <p className="text-ink-muted leading-relaxed text-[11px] border-t border-slate-200/80 pt-2">
@@ -168,12 +178,12 @@ export const AIPanel: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold text-ink uppercase tracking-wider flex items-center gap-1">
                   <Target className="w-3.5 h-3.5 text-brand" />
-                  Evidence Used in This Calculation
+                  {t("ai.evidence")}
                 </span>
                 <span className="text-[10px] text-brand font-medium">
                   {!shown.dataUsed.length
-                    ? "No supporting figures are available"
-                    : selectedRefId ? "Highlighting evidence" : "Click to highlight the source"}
+                    ? t("ai.noEvidence")
+                    : selectedRefId ? t("ai.highlighting") : t("ai.clickHighlight")}
                 </span>
               </div>
 
@@ -181,7 +191,11 @@ export const AIPanel: React.FC = () => {
                 {shown.dataUsed.map((item) => (
                   <div
                     key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedRefId === item.id}
                     onClick={() => handleHighlightEvidence(item)}
+                    onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleHighlightEvidence(item); } }}
                     className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
                       selectedRefId === item.id
                         ? "bg-brand/10 border-brand text-brand ring-2 ring-brand/30 shadow-sm"
@@ -210,7 +224,7 @@ export const AIPanel: React.FC = () => {
             <div>
               <span className="text-[11px] font-bold text-ink uppercase tracking-wider block mb-2 flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-resource-dark" />
-                Strategic Recommendations
+                {t("ai.recommendations")}
               </span>
               <div className="space-y-2">
                 {shown.suggestions.map((sug, idx) => {
@@ -227,10 +241,10 @@ export const AIPanel: React.FC = () => {
                         type="button"
                         onClick={() => { if (target) setCurrentPage(target as never); }}
                         disabled={!target}
-                        title={target ? undefined : "The backend did not provide a destination page for this recommendation"}
+                        title={target ? undefined : t("ai.noTargetTitle")}
                         className="text-[11px] font-bold text-resource-dark hover:underline flex items-center gap-1"
                       >
-                        <span>{target ? label || `Go to ${target}` : "No destination page specified"}</span>
+                        <span>{target ? label || t("ai.goTo", { page: target }) : t("ai.noTarget")}</span>
                         <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
@@ -243,10 +257,10 @@ export const AIPanel: React.FC = () => {
             <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-200 text-amber-900">
               <span className="text-[10px] font-bold uppercase tracking-wider block mb-1 flex items-center gap-1">
                 <HelpCircle className="w-3.5 h-3.5 text-attention" />
-                What the System Does Not Know (Uncertainties)
+                {t("ai.unknowns")}
               </span>
               <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
-                {(shown.unknowns.length ? shown.unknowns : ["The backend did not list unknowns for this data set."]).map((unk, idx) => (
+                {(shown.unknowns.length ? shown.unknowns : [t("ai.noUnknowns")]).map((unk, idx) => (
                   <li key={idx}>{unk}</li>
                 ))}
               </ul>
@@ -258,7 +272,7 @@ export const AIPanel: React.FC = () => {
       {/* Quick Prompt Questions */}
       <div className="p-3 bg-slate-50 border-t border-borderLine space-y-1.5">
         <span className="text-[10px] font-bold text-ink-muted uppercase block">
-          Suggested questions (Q&A is not supported yet; these are example questions):
+          {t("ai.suggested")}
         </span>
         <div className="flex flex-wrap gap-1.5">
           {currentQuestions.map((q, idx) => (
@@ -266,7 +280,7 @@ export const AIPanel: React.FC = () => {
               key={idx}
               type="button"
               disabled
-              title="Q&A is not available yet · GET /ai/explain returns only a rules-based explanation for this page"
+              title={t("ai.qaTitle")}
               className="text-[10px] bg-white border border-slate-200 hover:border-brand hover:text-brand px-2.5 py-1 rounded-chip text-ink transition-colors text-left"
             >
               {q}

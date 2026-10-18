@@ -78,7 +78,7 @@ export const CostPage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 Cost Breakdown & Investment Appraisal
               </h1>
-              <DataKindBadge kind="actual" size="md" />
+              <DataKindBadge kind={costEnvelope?.kind ?? "actual"} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               Unit cost structure, break-even analysis, and Plan A vs. Plan B investment comparison.

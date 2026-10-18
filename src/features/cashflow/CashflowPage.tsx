@@ -2,11 +2,13 @@ import React, { useState, useCallback } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { CashflowDay } from "@/api/contracts/types";
-import type { CashflowPreviewInput } from "@/api/contracts/types";
 import { envelopeMode, useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import { TimeTravelScrubber } from "./TimeTravelScrubber";
+import { CashflowPreviewForm } from "./CashflowPreviewForm";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
+import { missingDataLabel } from "@/api/dataAvailability";
+import { useT } from "@/i18n";
 import {
   TrendingUp,
   TrendingDown,
@@ -31,36 +33,40 @@ export const CashflowPage: React.FC = () => {
   } = useAppStore();
 
   const { accepted, stale } = useAnalysisContext();
+  const t = useT();
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
-  const [cashRows, setCashRows] = useState<CashflowPreviewInput["events"]>([
-    { date: "", type: "receive_payment", title: "", amount: "", isInflow: true, partner: "" },
-  ]);
-  const [openingCash, setOpeningCash] = useState("");
-  const [cashReserve, setCashReserve] = useState("");
-  const [cashPreview, setCashPreview] = useState<CashflowDay[] | null>(null);
-  const [cashPreviewError, setCashPreviewError] = useState("");
-  const [cashPreviewLoading, setCashPreviewLoading] = useState(false);
-  const [cashAsOf, setCashAsOf] = useState("");
   const load = useCallback(() => apiClient.getCashflowTimeline(), []);
   const state = useEnvelope<CashflowDay[]>(load);
   const { envelope: timelineEnvelope, loading, error, reload: loadData } = state;
   const mode = envelopeMode(state, (rows) => rows.length === 0);
   const money = (value: number | null | undefined) =>
-    value == null ? "No data" : `฿${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+    value == null ? t("common.noData") : `฿${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   // Cash-flow statement lines come from the statement that was analysed. The
   // dated timeline contract does not return them, so they are not invented.
   const statementLine = (field: string) => {
     const value = accepted?.input?.[field];
     return value == null || value === "" ? null : Number(value);
   };
-  const today = new Date().toISOString().slice(0, 10);
-  const asOfDate = cashAsOf || accepted?.input.period_end || today;
+  const inputText = (field: string) => {
+    const value = accepted?.input?.[field];
+    return value == null || value === "" ? undefined : String(value);
+  };
+  // ฟอร์ม preview ใช้ได้ทั้งตอนมีและไม่มี timeline ที่บันทึกไว้
+  const previewForm = (
+    <CashflowPreviewForm
+      key={accepted?.revision || "no-statement"}
+      defaultAsOf={accepted?.input.period_end}
+      defaultOpeningCash={inputText("cash_balance")}
+      defaultReserve={inputText("minimum_cash_reserve")}
+    />
+  );
 
   if (loading) {
     return (
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
-        <div className="h-64 bg-slate-200 rounded-card animate-pulse" />
-        <div className="h-96 bg-slate-200 rounded-card animate-pulse" />
+      <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6" role="status" aria-label={t("cash.loadingLabel")}>
+        <p className="text-xs text-ink-muted">{t("cash.loading")}</p>
+        <div className="h-64 skeleton rounded-card" />
+        <div className="h-96 skeleton rounded-card" />
       </div>
     );
   }
@@ -70,10 +76,10 @@ export const CashflowPage: React.FC = () => {
 
   if (!timelineEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
     const reportedLines = [
-      { field: "cash_balance", label: "Cash balance at period end" },
-      { field: "operating_cash_flow", label: "Operating cash flow" },
-      { field: "investing_cash_flow", label: "Investing cash flow" },
-      { field: "financing_cash_flow", label: "Financing cash flow" },
+      { field: "cash_balance", label: t("cash.line.balance") },
+      { field: "operating_cash_flow", label: t("missing.operating_cash_flow") },
+      { field: "investing_cash_flow", label: t("missing.investing_cash_flow") },
+      { field: "financing_cash_flow", label: t("missing.financing_cash_flow") },
     ].map((line) => ({ ...line, value: statementLine(line.field) }))
       .filter((line) => line.value !== null);
 
@@ -81,67 +87,44 @@ export const CashflowPage: React.FC = () => {
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-5 text-ink animate-fade-in">
         <div className="border-b border-borderLine pb-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-display font-bold text-ink">Cash & Cash Flow (Cash Flow Forecast)</h1>
+            <h1 className="text-xl font-display font-bold text-ink">{t("cash.title")}</h1>
             <DataKindBadge kind={accepted?.input.kind ?? "simulated"} size="md" />
           </div>
           <p className="text-xs text-ink-muted mt-1">
             {accepted
-              ? `Statement period: ${accepted.input.period_start} – ${accepted.input.period_end}. These are reported totals, not a dated cash forecast.`
-              : "No statement is selected. Enter opening cash and dated events below to create a simulated preview."}
+              ? t("cash.periodNote", { start: accepted.input.period_start, end: accepted.input.period_end })
+              : t("cash.noStatement")}
           </p>
         </div>
         {reportedLines.length > 0 && (
-          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Reported cash flow totals">
+          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3" aria-label={t("cash.reportedTotals")}>
             {reportedLines.map((line) => (
               <div key={line.field} className="p-4 rounded-card bg-white border border-borderLine">
                 <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">{line.label}</span>
                 <div className="mt-2 text-lg font-bold font-mono tabular-nums">{money(line.value)}</div>
-                <span className="text-[10px] text-ink-muted">Reported in the imported statement</span>
+                <span className="text-[10px] text-ink-muted">{t("common.reportedInStatement")}</span>
               </div>
             ))}
           </section>
         )}
-        <section className="p-4 lg:p-6 rounded-card bg-white border border-borderLine space-y-4">
-          <div>
-            <h2 className="font-display font-bold text-sm text-ink">Build a dated cash flow preview</h2>
-            <p className="text-xs text-ink-muted mt-1">Enter the opening cash, reserve, and dated receipts or payments. Preview inputs are not saved to the shared database.</p>
+        <div className={`rounded-xl border p-3 text-xs ${mode === "error" ? "border-rose-200 bg-rose-50 text-rose-950" : "border-amber-200 bg-amber-50 text-amber-950"}`} role="status">
+          <div className="font-semibold">
+            {mode === "error" ? t("cash.loadError")
+              : mode === "unavailable" ? t("cash.unavailable")
+              : t("cash.noDated")}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label className="text-xs font-semibold">As-of date<input required type="date" value={asOfDate} onChange={(e) => setCashAsOf(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
-            <label className="text-xs font-semibold">Opening cash (THB)<input required min="0" type="number" step="0.01" value={openingCash || String(accepted?.input.cash_balance ?? "")} onChange={(e) => setOpeningCash(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
-            <label className="text-xs font-semibold">Minimum cash reserve (THB)<input required min="0" type="number" step="0.01" value={cashReserve || String(accepted?.input.minimum_cash_reserve ?? "")} onChange={(e) => setCashReserve(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
-          </div>
-          <div className="space-y-3">
-            {cashRows.map((row, index) => <div key={index} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 p-3 rounded-xl bg-slate-50">
-              <label className="text-[11px] font-semibold">Date<input required type="date" min={new Date(new Date(asOfDate).getTime() + 86400000).toISOString().slice(0, 10)} max={new Date(new Date(asOfDate).getTime() + 90 * 86400000).toISOString().slice(0, 10)} value={row.date} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, date: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
-              <label className="text-[11px] font-semibold">Flow<select value={row.isInflow ? "in" : "out"} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, isInflow: e.target.value === "in", type: e.target.value === "in" ? "receive_payment" : "pay_obligations" } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal"><option value="in">Cash in</option><option value="out">Cash out</option></select></label>
-              <label className="text-[11px] font-semibold">Description<input required maxLength={120} value={row.title} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
-              <label className="text-[11px] font-semibold">Amount (THB)<input required min="0" type="number" step="0.01" value={row.amount} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, amount: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
-              <label className="text-[11px] font-semibold">Customer / supplier<input maxLength={120} value={row.partner || ""} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, partner: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
-              <button type="button" disabled={cashRows.length < 2} onClick={() => setCashRows((rows) => rows.filter((_, i) => i !== index))} className="self-end rounded border border-borderLine px-3 py-2 text-xs disabled:opacity-40">Remove row</button>
-            </div>)}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setCashRows((rows) => [...rows, { date: "", type: "receive_payment", title: "", amount: "", isInflow: true, partner: "" }])} className="rounded-btn border border-brand/30 px-3 py-2 text-xs font-semibold text-brand">+ Add cash event</button>
-            <button type="button" disabled={cashPreviewLoading || (!openingCash && accepted?.input.cash_balance == null) || (!cashReserve && accepted?.input.minimum_cash_reserve == null)} onClick={async () => {
-              setCashPreviewLoading(true); setCashPreviewError("");
-              try {
-                const result = await apiClient.previewCashflow({ as_of: asOfDate, opening_cash: openingCash || String(accepted?.input.cash_balance ?? ""), reserve: cashReserve || String(accepted?.input.minimum_cash_reserve ?? ""), events: cashRows });
-                setCashPreview(result.data);
-              } catch (error) { setCashPreviewError(error instanceof Error ? error.message : "Could not calculate preview"); }
-              finally { setCashPreviewLoading(false); }
-            }} className="rounded-btn bg-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{cashPreviewLoading ? "Calculating…" : "Calculate preview"}</button>
-          </div>
-          {cashPreviewError && <p role="alert" className="text-xs text-danger">{cashPreviewError}</p>}
-          {cashPreview && <div className="overflow-x-auto"><p className="text-xs font-semibold text-brand mb-2">Simulated preview · not saved</p><table className="w-full text-xs"><thead><tr className="text-left border-b"><th className="p-2">Date</th><th className="p-2">Cash in</th><th className="p-2">Cash out</th><th className="p-2">Projected balance</th><th className="p-2">Reserve status</th></tr></thead><tbody>{cashPreview.map((day) => <tr key={day.date} className="border-b border-slate-100"><td className="p-2">{day.date}</td><td className="p-2">฿{day.inflow.toLocaleString()}</td><td className="p-2">฿{day.outflow.toLocaleString()}</td><td className="p-2 font-bold">฿{day.projectedCash.toLocaleString()}</td><td className="p-2">{day.isDeficit ? `Below reserve by ฿${day.deficitAmount?.toLocaleString()}` : "Above reserve"}</td></tr>)}</tbody></table></div>}
-        </section>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="status">
-          <div className="font-semibold">Saved cash timeline is unavailable</div>
           <p className="mt-1">{error || (accepted
-            ? "The imported statement has period totals but no dated cash events. The preview above uses only the dates and amounts you enter."
-            : "No database-backed cash events are available. You can still calculate a preview above from your own dated inputs.")}</p>
-          <button type="button" onClick={loadData} className="mt-2 font-semibold underline">Retry saved timeline</button>
+            ? t("cash.statementOnly")
+            : t("cash.noDbEvents"))}</p>
+          {missing.length > 0 && (
+            <p className="mt-1 text-[11px]">{t("common.missingList", { list: missing.map(missingDataLabel).join(", ") })}</p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-3">
+            <button type="button" onClick={loadData} className="font-semibold underline">{t("common.tryLoadingAgain")}</button>
+            {!accepted && <button type="button" onClick={() => setCurrentPage("import")} className="font-semibold underline">{t("common.importStatement")}</button>}
+          </div>
         </div>
+        {previewForm}
       </div>
     );
   }
@@ -161,12 +144,12 @@ export const CashflowPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-display font-bold text-ink">
-                Cash & Cash Flow (Cash Flow Forecast)
+                {t("cash.title")}
               </h1>
-              <DataKindBadge kind="forecast" size="md" />
+              <DataKindBadge kind={timelineEnvelope.kind} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              Review cash inflows and outflows, upcoming obligations, and future balances with Time Travel.
+              {t("cash.subtitle")}
             </p>
           </div>
 
@@ -177,7 +160,7 @@ export const CashflowPage: React.FC = () => {
               className="px-3.5 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-bold rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Ask AI to identify cash shortfalls</span>
+              <span>{t("cash.askAi")}</span>
             </button>
 
             <button
@@ -186,34 +169,33 @@ export const CashflowPage: React.FC = () => {
               className="px-4 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-semibold rounded-btn flex items-center gap-1.5 shadow-sm transition-all"
             >
               <Coins className="w-3.5 h-3.5" />
-              <span>Rank funders against the shortfall</span>
+              <span>{t("cash.rankFunders")}</span>
             </button>
           </div>
         </div>
 
         {/* Cash Shortage Spotlight Banner */}
-        <div className="p-4 rounded-card bg-red-50 border-2 border-danger flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-soft-sm">
+        <div className={`p-4 rounded-card border-2 flex ${breachDays.length ? "bg-red-50 border-danger" : "bg-emerald-50 border-emerald-300"} flex-col md:flex-row md:items-center justify-between gap-4 shadow-soft-sm`}>
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-danger text-white flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5" />
+            <div className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 ${breachDays.length ? "bg-danger" : "bg-emerald-600"}`}>
+              {breachDays.length ? <AlertTriangle className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold text-danger uppercase tracking-wider">
+                <h3 className={`text-xs font-bold uppercase tracking-wider ${breachDays.length ? "text-danger" : "text-emerald-800"}`}>
                   {breachDays.length
-                    ? `Cash is below the reserve for ${breachDays.length} days (${breachDays[0].date} – ${breachDays[breachDays.length - 1].date})`
-                    : "Cash stays above the reserve throughout this schedule"}
+                    ? t("cash.belowDays", { n: breachDays.length, from: breachDays[0].date, to: breachDays[breachDays.length - 1].date })
+                    : t("cash.staysAbove")}
                 </h3>
-                <span className="text-[10px] bg-white text-danger px-2 py-0.2 rounded border border-danger/30 font-bold">
-                  {minCashDay.projectedCash < 0 ? "Negative" : breachDays.length ? "Below reserve" : "Not negative"}
+                <span className={`text-[10px] bg-white px-2 py-0.2 rounded border font-bold ${breachDays.length ? "text-danger border-danger/30" : "text-emerald-700 border-emerald-300"}`}>
+                  {minCashDay.projectedCash < 0 ? t("cash.negative") : breachDays.length ? t("chart.belowReserve") : t("cash.notNegative")}
                 </span>
               </div>
-              <p className="text-xs text-red-900 mt-1 leading-relaxed">
-                Lowest scheduled cash balance: <strong>{money(minCashDay.projectedCash)}</strong> on{" "}
-                <strong>{minCashDay.date}</strong> · Reserve: {money(minCashDay.reserveLine)} ·{" "}
-                {timelineEnvelope.kind === "forecast" ? "Forecast based on dated transactions" : "Based on saved transactions"}
-                {defaultSme ? " · No business selected; the default business is shown" : ""}
-                {missing.length ? ` · Missing data: ${missing.join(", ")}` : ""}
+              <p className={`text-xs mt-1 leading-relaxed ${breachDays.length ? "text-red-900" : "text-emerald-900"}`}>
+                {t("cash.lowestLine", { amount: money(minCashDay.projectedCash), date: minCashDay.date, reserve: money(minCashDay.reserveLine) })}{" "}·{" "}
+                {timelineEnvelope.kind === "forecast" ? t("cash.basedForecast") : t("cash.basedSaved")}
+                {defaultSme ? ` · ${t("cash.defaultSme")}` : ""}
+                {missing.length ? ` · ${t("common.missingList", { list: missing.map(missingDataLabel).join(", ") })}` : ""}
               </p>
             </div>
           </div>
@@ -224,14 +206,14 @@ export const CashflowPage: React.FC = () => {
               onClick={() => setSelectedDayIndex(minCashDay.dayIndex)}
               className="px-3 py-1.5 bg-white border border-danger/40 text-danger text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors"
             >
-              View lowest-cash date ({minCashDay.date})
+              {t("cash.viewLowest", { date: minCashDay.date })}
             </button>
             <button
               type="button"
               onClick={() => setCurrentPage("funding")}
               className="px-4 py-1.5 bg-danger text-white text-xs font-bold rounded-lg hover:bg-danger-dark transition-all flex items-center gap-1 shadow-sm"
             >
-              <span>Open mitigation plan</span>
+              <span>{t("cash.mitigation")}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -252,43 +234,43 @@ export const CashflowPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-card bg-white border border-borderLine">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              1. Operating cash flow
+              1. {t("missing.operating_cash_flow")}
             </span>
             <div className="text-lg font-bold font-mono text-emerald-700 tabular-nums">
               {money(statementLine("operating_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
               {statementLine("operating_cash_flow") == null
-                ? "Add operating_cash_flow to the imported statement · The daily schedule does not calculate this figure."
-                : "Based on the value reported for this period."}
+                ? t("cash.addOperating")
+                : t("cash.basedReported")}
             </p>
           </div>
 
           <div className="p-4 rounded-card bg-white border border-borderLine">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              2. Investing cash flow
+              2. {t("missing.investing_cash_flow")}
             </span>
             <div className="text-lg font-bold font-mono text-ink tabular-nums">
               {money(statementLine("investing_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
               {statementLine("investing_cash_flow") == null
-                ? "Add investing_cash_flow to the imported statement · A blank value is not treated as zero."
-                : "Based on the value reported for this period."}
+                ? t("cash.addInvesting")
+                : t("cash.basedReported")}
             </p>
           </div>
 
           <div className="p-4 rounded-card bg-white border border-borderLine">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              3. Financing cash flow
+              3. {t("missing.financing_cash_flow")}
             </span>
             <div className="text-lg font-bold font-mono text-brand tabular-nums">
               {money(statementLine("financing_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
               {statementLine("financing_cash_flow") == null
-                ? "Add financing_cash_flow to the imported statement · No facility has been allocated or approved."
-                : "Based on the reported value · This is not an approved credit facility."}
+                ? t("cash.addFinancing")
+                : t("cash.notCredit")}
             </p>
           </div>
         </div>
@@ -298,16 +280,16 @@ export const CashflowPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-display font-bold text-ink flex items-center gap-2">
               <Calendar className="w-4 h-4 text-brand" />
-              <span>Cash transactions on {currentDay.date}</span>
+              <span>{t("cash.txOn", { date: currentDay.date })}</span>
             </h3>
             <span className="text-xs text-ink-muted">
-              {currentDay.events.length} transactions today
+              {t("cash.txCount", { n: currentDay.events.length })}
             </span>
           </div>
 
           {currentDay.events.length === 0 ? (
             <div className="p-8 text-center text-xs text-ink-muted bg-slate-50 rounded-xl">
-              No cash transactions on {currentDay.date}
+              {t("cash.noTxOn", { date: currentDay.date })}
             </div>
           ) : (
             <div className="space-y-2">
@@ -320,7 +302,7 @@ export const CashflowPage: React.FC = () => {
                     <div className="font-semibold text-ink flex items-center gap-2">
                       <span>{ev.title}</span>
                       <span className="text-[10px] bg-slate-200 px-1.5 py-0.2 rounded font-normal text-slate-600">
-                        {ev.partner || "Internal"}
+                        {ev.partner || t("cash.internal")}
                       </span>
                     </div>
                     <div className="text-[11px] text-ink-muted">{ev.impactReason}</div>
@@ -341,6 +323,9 @@ export const CashflowPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* เพิ่ม preview ให้ลองใส่รายการเองได้ แม้จะมี timeline จริงอยู่แล้ว */}
+        {previewForm}
       </div>
     </StateRenderer>
   );

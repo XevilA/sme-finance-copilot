@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 # asyncpg takes TLS settings as a connect argument, not as a query parameter, and
 # rejects the libpq spellings that hosted Postgres add to the URL it hands out.
-LIBPQ_ONLY_PARAMS = frozenset({"sslmode", "sslrootcert", "sslcert", "sslkey", "target_session_attrs"})
+# Neon's copied connection string also carries channel_binding=require, which
+# asyncpg.connect() rejects as an unknown keyword argument.
+LIBPQ_ONLY_PARAMS = frozenset({"sslmode", "sslrootcert", "sslcert", "sslkey", "target_session_attrs", "channel_binding"})
 REQUIRED_SSL_MODES = frozenset({"require", "verify-ca", "verify-full", "prefer", "allow"})
 
 

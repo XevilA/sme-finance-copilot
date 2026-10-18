@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { Capabilities, ProjectRecord } from "@/api/contracts/types";
+import { ProjectRecord } from "@/api/contracts/types";
 import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
+import { CapabilityList } from "@/components/ui/CapabilityList";
 import {
   FileCheck2,
   Calendar,
@@ -25,14 +27,9 @@ export const ProjectsPage: React.FC = () => {
   const state = useEnvelope<ProjectRecord[]>(useCallback(() => apiClient.getProjectRecords(), []));
   const { envelope: projectsEnvelope, loading, error, reload: loadData } = state;
   const mode = envelopeMode(state, (rows) => rows.length === 0);
-  const capabilityState = useEnvelope<Capabilities>(useCallback(
-    () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
-      : apiClient.getCapabilities()),
-    []));
-  const canExport = capabilityState.envelope?.data.reportExport.available === true;
-  const exportBlockedReason = capabilityState.envelope?.data.reportExport.reason
-    || "The backend does not support report file generation yet.";
+  const capabilityState = useCapabilities();
+  const canExport = capabilityState.isAvailable("reportExport");
+  const exportBlockedReason = capabilityState.reasonFor("reportExport", "The backend does not support report file generation yet.");
 
   const handleExportPoster = () => {
     // /capabilities declares reportExport unavailable: no file is generated and
@@ -47,7 +44,7 @@ export const ProjectsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6" role="status" aria-label="Loading projects">
         <div className="h-40 bg-slate-200 rounded-card animate-pulse" />
         <div className="h-96 bg-slate-200 rounded-card animate-pulse" />
       </div>
@@ -58,15 +55,20 @@ export const ProjectsPage: React.FC = () => {
 
   if (!projectsEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
     return (
-      <StateRenderer
-        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "Could not load projects from the backend"}
-        unavailableReason="No projects have been saved in the database."
-        missingItems={projectsEnvelope?.missing || []}
-        onRetry={loadData}
-      >
-        {null}
-      </StateRenderer>
+      <div className="pb-4">
+        <StateRenderer
+          currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
+          errorMessage={error || "Could not load projects from the backend"}
+          unavailableReason="No projects have been saved in the database."
+          missingItems={projectsEnvelope?.missing || []}
+          onRetry={loadData}
+        >
+          {null}
+        </StateRenderer>
+        <div className="mx-4">
+          <CapabilityList />
+        </div>
+      </div>
     );
   }
 
@@ -85,7 +87,7 @@ export const ProjectsPage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 Projects & Actual Performance Reports (Post-Mortem)
               </h1>
-              <DataKindBadge kind="actual" size="md" />
+              <DataKindBadge kind={projectsEnvelope.kind} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               Track delivery schedules, record actual transactions, and compare results after each project.
@@ -196,7 +198,7 @@ export const ProjectsPage: React.FC = () => {
                   Were all items delivered? How did costs compare with the forecast? How much cash did each shop retain?
                 </p>
               </div>
-              <DataKindBadge kind="actual" size="sm" />
+              <DataKindBadge kind={projectsEnvelope.kind} size="sm" />
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
@@ -205,7 +207,7 @@ export const ProjectsPage: React.FC = () => {
                 <span className="text-xl font-bold font-mono text-emerald-700">
                   {activeProj.postMortem.unitsFulfillmentPercent}%
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">1,500 / 1,500 boxes</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">{activeProj.postMortem.actualUnits.toLocaleString()} / {activeProj.postMortem.plannedUnits.toLocaleString()} units</span>
               </div>
 
               <div className="p-3 bg-slate-50 rounded-xl">
@@ -213,7 +215,7 @@ export const ProjectsPage: React.FC = () => {
                 <span className="text-xl font-bold font-mono text-emerald-700">
                   {activeProj.postMortem.costVariancePercent}%
                 </span>
-                <span className="text-[10px] text-emerald-600 block mt-0.5">฿2,500 under plan</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Plan ฿{activeProj.postMortem.plannedCost.toLocaleString()} · Actual ฿{activeProj.postMortem.actualCost.toLocaleString()}</span>
               </div>
 
               <div className="p-3 bg-slate-50 rounded-xl">
@@ -221,15 +223,16 @@ export const ProjectsPage: React.FC = () => {
                 <span className="text-xl font-bold font-mono text-ink">
                   +{activeProj.postMortem.paymentDelayDays} days
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Payment received Oct 21</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Payment received {activeProj.postMortem.actualPaymentDate || "date not recorded"}</span>
               </div>
 
               <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl">
-                <span className="text-[10px] font-bold text-brand block">Total net profit distributed</span>
+                <span className="text-[10px] font-bold text-brand block">Net profit by shop</span>
                 <span className="text-xl font-extrabold font-mono text-brand">
-                  ฿{activeProj.postMortem.shopNetProfits.reduce((s, p) => s + p.profit, 0).toLocaleString()}
+                  {activeProj.postMortem.shopNetProfits.length} shops
                 </span>
-                <span className="text-[10px] text-brand/80 block mt-0.5">Distributed to 4 shops</span>
+                {/* backend ไม่ได้ส่งยอดรวมมา เลยไม่บวกเองใน React ดูรายร้านด้านล่าง */}
+                <span className="text-[10px] text-brand/80 block mt-0.5">See each shop below · total not provided by the backend</span>
               </div>
             </div>
 
@@ -249,6 +252,8 @@ export const ProjectsPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        <CapabilityList />
       </div>
     </StateRenderer>
   );

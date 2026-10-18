@@ -139,10 +139,142 @@ body {
   -webkit-backdrop-filter: blur(16px);
 }
 
+/* --- ลูกเล่นเพิ่ม: เข้าหน้า / ผลลัพธ์ทยอยขึ้น / skeleton แบบ shimmer --- */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+@keyframes softPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.animate-page-in {
+  animation: pageIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* ใช้คู่กับ style={{ animationDelay }} เพื่อให้ทยอยขึ้นทีละอัน */
+.animate-rise {
+  animation: rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-soft-pulse {
+  animation: softPulse 1.6s ease-in-out 2;
+}
+.skeleton {
+  background-color: #e2e8f0;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0) 100%);
+  background-size: 400px 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.3s linear infinite;
+}
+.press {
+  transition: transform 0.12s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+/* เงาตอน hover ใช้เฉพาะเครื่องที่มีเมาส์ จอสัมผัสจะได้ไม่มีเงาค้างหลังแตะ */
+@media (hover: hover) {
+  .press:hover:not(:disabled) {
+    box-shadow: 0 6px 16px -8px rgba(108, 76, 241, 0.55);
+  }
+}
+
+/* กราฟ: เส้นค่อย ๆ วาด / จุดเด้งขึ้น / แท่งยืดออกจากเส้น 0 */
+@keyframes chartDraw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes chartDot {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes chartGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.chart-draw {
+  stroke-dasharray: 1;
+  animation: chartDraw 0.9s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.chart-dot {
+  animation: chartDot 0.3s ease-out both;
+  transition: r 0.15s ease;
+}
+.chart-grow-right, .chart-grow-left {
+  transform-box: view-box;
+  animation: chartGrow 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* เส้นเชื่อมใน diagram หน้า Overview + จุดวิ่ง */
+.flow-link {
+  position: relative;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: rgba(108, 76, 241, 0.7);
+}
+.flow-link-resource { background: rgba(22, 193, 176, 0.7); }
+.flow-link-bottleneck {
+  background: repeating-linear-gradient(90deg, #E5484D 0 5px, transparent 5px 9px);
+}
+.flow-link.is-active::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 8px 2px rgba(155, 130, 255, 0.8);
+  animation: flowDot 1.8s linear infinite;
+}
+.flow-link.is-reverse::after { animation-direction: reverse; }
+.flow-link-bottleneck.is-active::after { background: #FCA5A5; box-shadow: 0 0 8px 2px rgba(229, 72, 77, 0.8); }
+@keyframes flowDot {
+  from { left: 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  to { left: calc(100% - 6px); opacity: 0; }
+}
+
+/* จุดแสงวิ่งลงตามรางใน flow มือถือ */
+.rail-dot {
+  box-shadow: 0 0 10px 3px rgba(155, 130, 255, 0.85);
+  animation: railDot 3.2s ease-in-out infinite;
+}
+@keyframes railDot {
+  0% { top: 1rem; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: calc(100% - 1.5rem); opacity: 0; }
+}
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ปุ่ม "ลดการเคลื่อนไหว" ในแอป (เดิมใส่ class ไว้แต่ไม่มี CSS รองรับ) */
+.reduce-motion *, .reduce-motion ::before, .reduce-motion ::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Reduced motion overrides (Rule #10) */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

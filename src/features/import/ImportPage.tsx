@@ -7,6 +7,9 @@ import { StateRenderer } from "@/components/ui/StateRenderer";
 import { StatementRecord, validateImportedPeriod } from "@/api/statementImport";
 import { missingDataLabel } from "@/api/dataAvailability";
 import { StatementPreview } from "./StatementPreview";
+import { useAnalysisContext } from "@/hooks/useEnvelope";
+import { TranslationKey, useT } from "@/i18n";
+import { Sparkles, LayoutDashboard } from "lucide-react";
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -21,7 +24,9 @@ import {
 } from "lucide-react";
 
 export const ImportPage: React.FC = () => {
-  const { setCurrentPage, addToast } = useAppStore();
+  const { setCurrentPage, addToast, setAIPanelOpen } = useAppStore();
+  const { accepted, stale } = useAnalysisContext();
+  const t = useT();
   const [activeTab, setActiveTab] = useState<"upload" | "manual" | "saved">("manual");
   const [activeSection, setActiveSection] = useState<number>(1);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -107,7 +112,7 @@ export const ImportPage: React.FC = () => {
     { id: 6, title: "6. Fresh Inventory", status: "incomplete" }, // Shows Rule #3 demonstration!
     { id: 7, title: "7. Loan Payments & Due Dates", status: "incomplete" },
     { id: 8, title: "8. Products & Sales Mix", status: "incomplete" },
-  ].map((section) => ({ ...section, status: fields.some((field) => field.section === section.id)
+  ].map((section) => ({ ...section, title: t(`importSec.${section.id}` as TranslationKey), status: fields.some((field) => field.section === section.id)
     && fields.filter((field) => field.section === section.id && !field.key.startsWith("loan.")).every((field) => draft[field.key]?.trim())
     ? "complete" : "incomplete" }));
 
@@ -164,15 +169,15 @@ export const ImportPage: React.FC = () => {
       const missingSummary = missingFields.slice(0, 3).map(missingDataLabel).join(", ");
       addToast({
         type: gap ? "warning" : "success",
-        title: gap ? "Analysis complete, but data is incomplete" : "Analysis complete",
+        title: gap ? t("import.toast.incomplete") : t("import.toast.complete"),
         message: gap
-          ? `Grade ${result.data.grading?.grade || "Unknown"} · Missing: ${missingSummary || `${gap} data items`}${gap > 3 ? `, and ${gap - 3} more` : ""}. Missing values are never assumed to be zero.`
-          : `Grade ${result.data.grading?.grade || "Unknown"} · This analyzed data set is now used across all pages.`,
+          ? t("import.toast.missing", { grade: result.data.grading?.grade || t("common.unknown"), list: missingSummary || t("import.nItems", { n: gap }), more: gap > 3 ? t("import.andMore", { n: gap - 3 }) : "" })
+          : t("import.toast.ok", { grade: result.data.grading?.grade || t("common.unknown") }),
         duration: gap ? 9000 : undefined,
       });
       setCurrentPage("overview");
     } catch (error) {
-      addToast({ type: "error", title: "Validation notice", message: error instanceof Error ? error.message : "Could not calculate the data.", duration: 10000 });
+      addToast({ type: "error", title: t("import.validation"), message: error instanceof Error ? error.message : t("import.calcFailed"), duration: 10000 });
     } finally {
       busy.current = false;
       setIsAnalyzing(false);
@@ -189,47 +194,82 @@ export const ImportPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-display font-bold text-ink">
-              Business Data & Import
+              {t("import.title")}
             </h1>
-            <DataKindBadge kind="actual" size="md" />
+            <DataKindBadge kind={draft.kind === "forecast" || draft.kind === "simulated" ? draft.kind : "actual"} size="md" />
           </div>
           <p className="text-xs text-ink-muted mt-0.5">
-            Upload an Excel spreadsheet (.xlsx) or complete the 8-category form to create your business data.
+            {t("import.subtitle")}
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+        <div className="flex w-full sm:w-auto items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
           <button
             type="button"
             onClick={() => setActiveTab("upload")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg transition-all ${
               activeTab === "upload" ? "bg-white text-brand shadow-2xs" : "text-ink-muted"
             }`}
           >
-            Upload Excel file
+            {t("import.tabUpload")}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("manual")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg transition-all ${
               activeTab === "manual" ? "bg-white text-brand shadow-2xs" : "text-ink-muted"
             }`}
           >
-            Enter data manually (8 categories)
+            {t("import.tabManual")}
           </button>
         </div>
       </div>
 
+      {/* สถานะผลวิเคราะห์ล่าสุด + ปุ่มไปขั้นตอนถัดไป */}
+      {accepted && (
+        <div role="status" className={`animate-rise p-4 rounded-card border flex flex-col md:flex-row md:items-center justify-between gap-3 ${stale ? "bg-amber-50 border-amber-300" : "bg-emerald-50 border-emerald-200"}`}>
+          <div className="text-xs space-y-0.5">
+            <div className="flex flex-wrap items-center gap-2 font-bold text-ink">
+              {stale ? <AlertTriangle className="w-4 h-4 text-attention" /> : <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+              <span>{stale ? t("import.status.stale") : t("import.status.ready")}</span>
+              <DataKindBadge kind={accepted.input.kind} />
+            </div>
+            <p className="text-ink-muted">
+              {t("import.status.period", { start: accepted.input.period_start, end: accepted.input.period_end })}
+              {" · "}{t("import.status.grade", { grade: accepted.result.data.grading?.grade ?? t("common.notAvailable") })}
+              {accepted.result.missing?.length ? ` · ${t("import.status.missing", { n: accepted.result.missing.length })}` : ""}
+              {stale ? ` · ${t("import.status.staleNote")}` : ""}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            {stale && (
+              <button type="button" disabled={isAnalyzing} onClick={handleStartAnalysis}
+                className="px-3 py-2 bg-brand text-white rounded-btn text-xs font-semibold disabled:opacity-50">
+                {t("import.analyzeAgain")}
+              </button>
+            )}
+            <button type="button" onClick={() => setCurrentPage("overview")}
+              className="px-3 py-2 bg-white border border-borderLine rounded-btn text-xs font-semibold flex items-center justify-center gap-1.5">
+              <LayoutDashboard className="w-3.5 h-3.5" /> {t("import.viewOverview")}
+            </button>
+            <button type="button" onClick={() => setAIPanelOpen(true)}
+              className="px-3 py-2 bg-brand/10 border border-brand/30 text-brand rounded-btn text-xs font-semibold flex items-center justify-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> {t("import.explainAi")}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mode 1: File Dropzone & Column Mapping */}
       {activeTab === "upload" ? (
         <div className="space-y-6">
-          <div className="p-8 border-2 border-dashed border-borderLine hover:border-brand rounded-card bg-white text-center space-y-3 transition-colors cursor-pointer"
-            role="button" tabIndex={0} aria-label="Drop a file here or click to choose a file"
+          <div className="p-5 sm:p-8 border-2 border-dashed border-borderLine hover:border-brand rounded-card bg-white text-center space-y-3 transition-colors cursor-pointer"
+            role="button" tabIndex={0} aria-label={t("import.drop")}
             onClick={() => !busy.current && fileInput.current?.click()}
             onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); fileInput.current?.click(); } }}
             onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
-            onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length !== 1) { addToast({ type: "error", title: "Validation notice", message: "Please select one file at a time." }); return; } void runAnalysis(event.dataTransfer.files[0]); }}>
+            onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length !== 1) { addToast({ type: "error", title: t("import.validation"), message: t("import.oneFile") }); return; } void runAnalysis(event.dataTransfer.files[0]); }}>
             <input ref={fileInput} type="file" accept=".xlsx" hidden disabled={isAnalyzing}
               onClick={(event) => event.stopPropagation()}
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void runAnalysis(file); }} />
@@ -238,28 +278,28 @@ export const ImportPage: React.FC = () => {
             </div>
             <div>
               <h3 className="font-display font-bold text-sm text-ink">
-                Drop a file here or click to choose a file
+                {t("import.drop")}
               </h3>
               <p className="text-xs text-ink-muted mt-0.5">
-                Supports .XLSX financial templates and Thai/English multi-statement workbooks up to 4 MiB
+                {t("import.supports")}
               </p>
             </div>
-            <div className="flex items-center justify-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <button
                 type="button"
                 className="px-4 py-2 bg-brand text-white text-xs font-bold rounded-btn hover:bg-brand-dark"
                 disabled={isAnalyzing}
                 onClick={(event) => { event.stopPropagation(); fileInput.current?.click(); }}
               >
-                Choose a file
+                {t("import.choose")}
               </button>
               <button
                 type="button"
                 className="px-3.5 py-2 border border-slate-200 text-ink text-xs font-medium rounded-btn hover:bg-slate-50 flex items-center gap-1.5"
-                onClick={(event) => { event.stopPropagation(); void apiClient.downloadTemplate().catch((error) => addToast({ type: "error", title: "Template download failed", message: error.message })); }}
+                onClick={(event) => { event.stopPropagation(); void apiClient.downloadTemplate().catch((error) => addToast({ type: "error", title: t("import.templateFailed"), message: error.message })); }}
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Download sample template</span>
+                <span>{t("import.template")}</span>
               </button>
             </div>
           </div>
@@ -270,31 +310,30 @@ export const ImportPage: React.FC = () => {
             setStatementRecords(null);
             setActiveSection(1);
             setActiveTab("manual");
-            addToast({ type: "warning", title: "Statement selected", message: "Review the figures and enter any missing period start/end dates before confirming the analysis.", duration: 10000 });
+            addToast({ type: "warning", title: t("import.statementSelected"), message: t("import.reviewFigures"), duration: 10000 });
           }} />}
 
           {/* Template layout the parser actually reads (no automatic mapping) */}
           <div className="bg-white p-5 rounded-card border border-borderLine space-y-3">
             <h4 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-              Financial templates can be analyzed immediately. For multi-statement files, select a data set and review it in the form first · 7 fields are required
-              (currency, kind, period_start, period_end, assets, liabilities, equity) และ assets = liabilities + equity
+              {t("import.templateRules")}
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">Sheets read</span>
+                <span className="text-[10px] text-ink-muted block">{t("import.sheetsRead")}</span>
                 <span className="font-bold text-ink">Financials</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">Columns A / B</span>
+                <span className="text-[10px] text-ink-muted block">{t("import.columns")}</span>
                 <span className="font-bold text-ink">field ↔ value</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">Template data rows</span>
-                <span className="font-bold text-ink">41 field names</span>
+                <span className="text-[10px] text-ink-muted block">{t("import.dataRows")}</span>
+                <span className="font-bold text-ink">{t("import.fieldNames")}</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">Blank = unknown</span>
-                <span className="font-bold text-ink">Never converted to 0</span>
+                <span className="text-[10px] text-ink-muted block">{t("import.blankUnknown")}</span>
+                <span className="font-bold text-ink">{t("import.neverZero")}</span>
               </div>
             </div>
           </div>
@@ -303,9 +342,9 @@ export const ImportPage: React.FC = () => {
         /* Mode 2: 8-Section Long Manual Form with Sticky Nav */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Sticky Left Section Nav */}
-          <div className="lg:col-span-4 bg-white p-4 rounded-card border border-borderLine shadow-soft-sm sticky top-24 space-y-2">
+          <div className="lg:col-span-4 bg-white p-4 rounded-card border border-borderLine shadow-soft-sm lg:sticky lg:top-24 space-y-2">
             <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider block px-1">
-              8 Financial Data Categories
+              {t("import.categories")}
             </span>
             <div className="space-y-1">
               {sections.map((sec) => (
@@ -337,68 +376,68 @@ export const ImportPage: React.FC = () => {
                 disabled={isAnalyzing}
                 className="w-full py-2.5 bg-brand hover:bg-brand-dark text-white rounded-btn text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
               >
-                <span>{isAnalyzing ? "Processing..." : "Confirm data and analyze"}</span>
+                <span>{isAnalyzing ? t("import.processing") : t("import.confirm")}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
           {/* Form Content Area */}
-          <div className="lg:col-span-8 bg-white p-6 rounded-card border border-borderLine shadow-soft-sm space-y-6">
+          <div className="lg:col-span-8 bg-white p-4 sm:p-6 rounded-card border border-borderLine shadow-soft-sm space-y-6">
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <h3 className="font-display font-bold text-sm text-ink">
-                Section {activeSection}: {sections.find((s) => s.id === activeSection)?.title}
+                {t("import.section", { n: activeSection, title: sections.find((s) => s.id === activeSection)?.title || "" })}
               </h3>
-              <span className="text-xs text-ink-muted font-medium">Draft saved automatically</span>
+              <span className="text-xs text-ink-muted font-medium">{t("import.draftSaved")}</span>
             </div>
 
-            {draft.statement_year && <p className="text-xs text-brand">Imported statement year: {draft.statement_year} · Set the period end date to match this year.</p>}
+            {draft.statement_year && <p className="text-xs text-brand">{t("import.statementYear", { year: draft.statement_year })}</p>}
 
             {/* Fields Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="font-bold text-ink block mb-1">Business / shop name</label>
+                <label className="font-bold text-ink block mb-1">{t("import.shopName")}</label>
                 <input
                   type="text"
-                  name="shop_name" aria-label="Business / shop name" value={draft.shop_name || ""}
+                  name="shop_name" aria-label={t("import.shopName")} value={draft.shop_name || ""}
                   onChange={(event) => updateDraft("shop_name", event.target.value)} maxLength={200} disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">Total revenue for period (฿)</label>
+                <label className="font-bold text-ink block mb-1">{t("import.revenue")}</label>
                 <input
                   type="number"
-                  name="revenue" aria-label="Total revenue for period (฿)" value={draft.revenue || ""}
+                  name="revenue" aria-label={t("import.revenue")} value={draft.revenue || ""}
                   onChange={(event) => updateDraft("revenue", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">Ending cash balance (฿)</label>
+                <label className="font-bold text-ink block mb-1">{t("import.cashBalance")}</label>
                 <input
                   type="number"
-                  name="cash_balance" aria-label="Ending cash balance (฿)" value={draft.cash_balance || ""}
+                  name="cash_balance" aria-label={t("import.cashBalance")} value={draft.cash_balance || ""}
                   onChange={(event) => updateDraft("cash_balance", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">Minimum cash reserve (฿)</label>
+                <label className="font-bold text-ink block mb-1">{t("import.minReserve")}</label>
                 <input
                   type="number"
-                  name="minimum_cash_reserve" aria-label="Minimum cash reserve (฿)" value={draft.minimum_cash_reserve || ""}
+                  name="minimum_cash_reserve" aria-label={t("import.minReserve")} value={draft.minimum_cash_reserve || ""}
                   onChange={(event) => updateDraft("minimum_cash_reserve", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
               </div>
               {fields.filter((field) => field.section === activeSection).map((field) => (
                 <div key={field.key}>
-                  <label htmlFor={`financial-${field.key}`} className="font-bold text-ink block mb-1">{field.label}</label>
-                  <input id={`financial-${field.key}`} name={field.key} aria-label={field.label}
+                  <label htmlFor={`financial-${field.key}`} className="font-bold text-ink block mb-1">{t(`field.${field.key}` as TranslationKey)}</label>
+                  <input id={`financial-${field.key}`} name={field.key} aria-label={t(`field.${field.key}` as TranslationKey)}
                     type={field.type === "integer" ? "number" : field.type || "number"}
                     value={draft[field.key] || ""} required={field.required} disabled={isAnalyzing}
                     step={field.type === "date" || field.type === "integer" ? "1" : field.key === "loan.annual_interest_rate" ? "any" : "0.01"}
@@ -415,10 +454,10 @@ export const ImportPage: React.FC = () => {
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-attention mt-0.5 shrink-0" />
               <div>
-                <strong>Validation notice:</strong>{" "}
+                <strong>{t("import.validationColon")}</strong>{" "}
                 {emptyInSection.length
-                  ? `${emptyInSection.length} fields are blank in this section (${emptyInSection.join(", ")}). They will be sent as "Unknown"; values are never assumed to be 0.`
-                  : "This section is complete. Blank fields in other sections will be sent as \"Unknown\", not 0."}
+                  ? t("import.blankFields", { n: emptyInSection.length, list: emptyInSection.join(", ") })
+                  : t("import.sectionComplete")}
               </div>
             </div>
           </div>
@@ -434,12 +473,12 @@ export const ImportPage: React.FC = () => {
             </div>
             <div>
               <h3 className="font-display font-bold text-ink text-sm">
-                Analyzing business data
+                {t("import.analyzing")}
               </h3>
               <p className="text-xs text-ink-muted mt-1">
-                {analysisStep === "reading" && "1/3: Reading the data structure and rows..."}
-                {analysisStep === "validating" && "2/3: Validating balances and relationships..."}
-                {analysisStep === "analyzing" && "3/3: Calculating financial health and cash flow..."}
+                {analysisStep === "reading" && t("import.step1")}
+                {analysisStep === "validating" && t("import.step2")}
+                {analysisStep === "analyzing" && t("import.step3")}
               </p>
             </div>
           </div>
