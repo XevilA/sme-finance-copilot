@@ -5,9 +5,10 @@
 > Neon แล้ว, health `persistence=true`, 27 tables, bootstrap `off`; production
 > HTTP acceptance และ scoped simulation replay ผ่าน. หน้า UI 3 และ 6–13 โหลดได้.
 > ไฟล์ผู้ใช้ถูก preview อย่างเดียว; งบฐานะไทยยังต้องยืนยันปี `ปี 1`/`ปี 2`.
-> UI performance deploy `dpl_7uw9grWcMGmhkxHAQxEkp2ixPHQZ` แยก feature pages
-> โหลดตามการเปิด และ entry JS 215.42 KB (65.57 KB gzip); Google Fonts โหลดแบบ
-> asynchronous.
+> UI/API performance deploy `dpl_ComDKTnJf5B44PnUybCiqWWgTyos` ตั้ง Function
+> region `sin1` ใกล้ Neon Singapore; production API overview/projects วัดได้ 0.29 /
+> 0.26 วินาที (`sin1::sin1`). แยก feature pages โหลดตามการเปิด; entry JS 215.42 KB
+> (65.57 KB gzip); Google Fonts โหลดแบบ asynchronous. Browser ตรวจหน้า 1, 3, 13 ผ่าน.
 > ใช้ project link ที่อยู่ใน `.vercel/project.json` (ignored/local) สำหรับ deploy:
 >
 > ```bat

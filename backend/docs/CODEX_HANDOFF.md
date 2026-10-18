@@ -3,13 +3,21 @@
 ## ปรับความเร็ว UI — 2026-10-18
 
 เว็บ prototype production อัปเดตแล้ว (Vercel deployment
-`dpl_7uw9grWcMGmhkxHAQxEkp2ixPHQZ`). แยก 13 หน้าธุรกิจและ panel ขนาดใหญ่เป็น
+`dpl_ComDKTnJf5B44PnUybCiqWWgTyos`). ตั้ง Vercel Function region เป็น `sin1`
+เพื่อให้ compute อยู่ภูมิภาคเดียวกับ Neon Singapore; ก่อนแก้ request มาจาก Singapore
+edge แต่ function ไปรัน `iad1` ทำให้ API ของหน้าส่วนใหญ่รอข้ามภูมิภาค. หลัง deploy
+ตรวจ `GET /api/v1/overview` และ `/projects` ได้ HTTP 200 ที่ 0.29 และ 0.26 วินาที
+ตามลำดับ (`x-vercel-id` ยืนยัน `sin1::sin1`). เปิดหน้า 1, 3 และ 13 ผ่าน browser
+หลังแก้ได้และแสดงข้อมูลครบ.
+
+แยก 13 หน้าธุรกิจและ panel ขนาดใหญ่เป็น
 โหลดตามการเปิดหน้า; หน้าแรกไม่ดึง Simulator/Import/SWARM ทุกหน้าไปพร้อมกัน.
 entry JavaScript ของ production build เหลือ 215.42 KB (65.57 KB gzip) จาก
 562,343 bytes ใน build ก่อนปรับ. ตัด Anuphan ที่ไม่ได้ใช้ และปรับ Google Fonts
 ให้โหลดแบบไม่บล็อก render. Production browser เปิดหน้าแรกและหน้า Import ได้.
 
-`pnpm build` และ TypeScript ผ่าน. Source/UI change บันทึกใน Git แล้ว;
+`pnpm build` และ TypeScript ผ่าน. Source/UI change ก่อนหน้าและ region change รอบนี้
+ถูก deploy แล้ว;
 Vercel Git auto-deploy ยังไม่ได้เชื่อม.
 
 ## รอบล่าสุด — Prototype online และทดสอบ workbook 2026-10-18

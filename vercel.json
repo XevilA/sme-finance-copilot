@@ -7,6 +7,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
+      "regions": ["sin1"],
       "excludeFiles": "{node_modules/**,src/**,dist/**,.mypy_cache/**,**/.pytest_cache/**,**/.ruff_cache/**,.worktrees/**,backend/.env*,backend/.venv/**,backend/.deps/**,backend/uploads/**,backend/templates/**,backend/tests/**,backend/docs/**,**/__pycache__/**}"
     }
   },
