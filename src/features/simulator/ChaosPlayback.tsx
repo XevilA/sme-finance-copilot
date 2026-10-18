@@ -39,10 +39,10 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
     scenarios.find((s) => s.id === selectedScenarioId) || scenarios[0];
 
   // 4-Phase Cinematic Playback State
-  // Phase 1: เกิดปัญหา (Shockwave at trigger node)
-  // Phase 2: จุดที่ได้รับผล (Propagation along link paths)
-  // Phase 3: ช่วงเงินขาด (Cash dive & deficit spike)
-  // Phase 4: ทางเลือกสำรอง (Contingency options slide in)
+  // Phase 1: Trigger event and shockwave at the affected node.
+  // Phase 2: Propagate the effect along connected paths.
+  // Phase 3: Show the cash impact and any resulting deficit.
+  // Phase 4: Present explicit contingency options.
   const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3 | 4>(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
