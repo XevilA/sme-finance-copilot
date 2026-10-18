@@ -70,31 +70,17 @@ export const SalesPage: React.FC = () => {
     || (productMode === "unavailable" && channelMode === "unavailable")
     || (products.length === 0 && channels.length === 0)) {
     const unavailable = productMode === "unavailable" || channelMode === "unavailable";
-    const unavailableState = (
-      <StateRenderer
-        currentMode={error ? "error" : unavailable ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "Could not load product and channel sales from the backend"}
-        unavailableReason={accepted
-          ? "This statement has period totals only. Product and channel records are needed for a breakdown; importing the same summary again will not create those details."
-          : "No products or sales channels have been recorded."}
-        missingItems={[...(productsEnvelope?.missing || []), ...(channelsEnvelope?.missing || [])]}
-        onRetry={loadData}
-        onAddData={accepted ? undefined : () => setCurrentPage("import")}
-      >
-        {null}
-      </StateRenderer>
-    );
-    if (!accepted) return unavailableState;
-
     return (
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-5 text-ink animate-fade-in">
         <div className="border-b border-borderLine pb-4">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-display font-bold text-ink">Sales & Products (Sales & Channel Profitability)</h1>
-            <DataKindBadge kind={accepted.input.kind} size="md" />
+            <DataKindBadge kind={accepted?.input.kind ?? "simulated"} size="md" />
           </div>
           <p className="text-xs text-ink-muted mt-1">
-            Statement period: {accepted.input.period_start} – {accepted.input.period_end}. Totals below are reported values; no product or channel split is inferred.
+            {accepted
+              ? `Statement period: ${accepted.input.period_start} – ${accepted.input.period_end}. Totals below are reported values; no product or channel split is inferred.`
+              : "No statement is selected. Enter product and channel details below to calculate a simulated preview."}
           </p>
         </div>
         {reportedTotals.length > 0 && (
@@ -156,7 +142,15 @@ export const SalesPage: React.FC = () => {
           {salesPreviewError && <p role="alert" className="text-xs text-danger">{salesPreviewError}</p>}
           {salesPreview && <div className="space-y-3"><p className="text-xs font-semibold text-brand">Simulated preview · not saved</p><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th className="p-2">Product</th><th className="p-2">Units</th><th className="p-2">Profit</th><th className="p-2">Margin</th><th className="p-2">Velocity</th></tr></thead><tbody>{salesPreview.products.map((product) => <tr key={product.id} className="border-b border-slate-100"><td className="p-2">{product.name}</td><td className="p-2">{product.unitsSold}</td><td className="p-2">฿{product.profit.toLocaleString()}</td><td className="p-2">{product.profitMarginPercent}%</td><td className="p-2">{product.velocity}</td></tr>)}</tbody></table></div><div className="grid grid-cols-1 md:grid-cols-3 gap-2">{salesPreview.channels.map((channel) => <div key={channel.channel} className="rounded-lg border border-borderLine p-3 text-xs"><b>{channel.channel}</b><div className="mt-1">Net profit: ฿{channel.netProfit.toLocaleString()} ({channel.netMarginPercent}%)</div></div>)}</div></div>}
         </section>
-        {unavailableState}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="status">
+          <div className="font-semibold">Saved product and channel records are unavailable</div>
+          <p className="mt-1">{error || (accepted
+            ? "This statement has period totals only. The preview above uses only the product and channel details you enter."
+            : unavailable
+              ? "No database-backed sales records are available. You can still calculate a preview above from your own inputs."
+              : "No product or channel records are saved yet. You can still calculate a preview above from your own inputs.")}</p>
+          <button type="button" onClick={loadData} className="mt-2 font-semibold underline">Retry saved records</button>
+        </div>
       </div>
     );
   }

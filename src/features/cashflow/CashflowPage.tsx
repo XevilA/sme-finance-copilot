@@ -40,6 +40,7 @@ export const CashflowPage: React.FC = () => {
   const [cashPreview, setCashPreview] = useState<CashflowDay[] | null>(null);
   const [cashPreviewError, setCashPreviewError] = useState("");
   const [cashPreviewLoading, setCashPreviewLoading] = useState(false);
+  const [cashAsOf, setCashAsOf] = useState("");
   const load = useCallback(() => apiClient.getCashflowTimeline(), []);
   const state = useEnvelope<CashflowDay[]>(load);
   const { envelope: timelineEnvelope, loading, error, reload: loadData } = state;
@@ -52,6 +53,8 @@ export const CashflowPage: React.FC = () => {
     const value = accepted?.input?.[field];
     return value == null || value === "" ? null : Number(value);
   };
+  const today = new Date().toISOString().slice(0, 10);
+  const asOfDate = cashAsOf || accepted?.input.period_end || today;
 
   if (loading) {
     return (
@@ -66,22 +69,6 @@ export const CashflowPage: React.FC = () => {
   const missing = timelineEnvelope?.missing || [];
 
   if (!timelineEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
-    const unavailableState = (
-      <StateRenderer
-        currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "Could not load the cash flow schedule from the backend"}
-        unavailableReason={accepted
-          ? "The imported statement contains period totals but no dated cash transactions. Add confirmed receipt and payment dates to see the timeline; importing the same summary again will not create dates."
-          : "No dated cash transactions are available for this business."}
-        missingItems={missing}
-        onRetry={loadData}
-        onAddData={accepted ? undefined : () => setCurrentPage("import")}
-      >
-        {null}
-      </StateRenderer>
-    );
-    if (!accepted) return unavailableState;
-
     const reportedLines = [
       { field: "cash_balance", label: "Cash balance at period end" },
       { field: "operating_cash_flow", label: "Operating cash flow" },
@@ -95,10 +82,12 @@ export const CashflowPage: React.FC = () => {
         <div className="border-b border-borderLine pb-4">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-display font-bold text-ink">Cash & Cash Flow (Cash Flow Forecast)</h1>
-            <DataKindBadge kind={accepted.input.kind} size="md" />
+            <DataKindBadge kind={accepted?.input.kind ?? "simulated"} size="md" />
           </div>
           <p className="text-xs text-ink-muted mt-1">
-            Statement period: {accepted.input.period_start} – {accepted.input.period_end}. These are reported totals, not a dated cash forecast.
+            {accepted
+              ? `Statement period: ${accepted.input.period_start} – ${accepted.input.period_end}. These are reported totals, not a dated cash forecast.`
+              : "No statement is selected. Enter opening cash and dated events below to create a simulated preview."}
           </p>
         </div>
         {reportedLines.length > 0 && (
@@ -118,13 +107,13 @@ export const CashflowPage: React.FC = () => {
             <p className="text-xs text-ink-muted mt-1">Enter the opening cash, reserve, and dated receipts or payments. Preview inputs are not saved to the shared database.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label className="text-xs font-semibold">As-of date<input required type="date" value={accepted.input.period_end} readOnly className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
-            <label className="text-xs font-semibold">Opening cash (THB)<input required min="0" type="number" step="0.01" value={openingCash || String(accepted.input.cash_balance ?? "")} onChange={(e) => setOpeningCash(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
-            <label className="text-xs font-semibold">Minimum cash reserve (THB)<input required min="0" type="number" step="0.01" value={cashReserve || String(accepted.input.minimum_cash_reserve ?? "")} onChange={(e) => setCashReserve(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
+            <label className="text-xs font-semibold">As-of date<input required type="date" value={asOfDate} onChange={(e) => setCashAsOf(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
+            <label className="text-xs font-semibold">Opening cash (THB)<input required min="0" type="number" step="0.01" value={openingCash || String(accepted?.input.cash_balance ?? "")} onChange={(e) => setOpeningCash(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
+            <label className="text-xs font-semibold">Minimum cash reserve (THB)<input required min="0" type="number" step="0.01" value={cashReserve || String(accepted?.input.minimum_cash_reserve ?? "")} onChange={(e) => setCashReserve(e.target.value)} className="mt-1 w-full rounded-lg border border-borderLine p-2 font-normal" /></label>
           </div>
           <div className="space-y-3">
             {cashRows.map((row, index) => <div key={index} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 p-3 rounded-xl bg-slate-50">
-              <label className="text-[11px] font-semibold">Date<input required type="date" min={new Date(new Date(accepted.input.period_end).getTime() + 86400000).toISOString().slice(0, 10)} max={new Date(new Date(accepted.input.period_end).getTime() + 90 * 86400000).toISOString().slice(0, 10)} value={row.date} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, date: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Date<input required type="date" min={new Date(new Date(asOfDate).getTime() + 86400000).toISOString().slice(0, 10)} max={new Date(new Date(asOfDate).getTime() + 90 * 86400000).toISOString().slice(0, 10)} value={row.date} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, date: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
               <label className="text-[11px] font-semibold">Flow<select value={row.isInflow ? "in" : "out"} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, isInflow: e.target.value === "in", type: e.target.value === "in" ? "receive_payment" : "pay_obligations" } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal"><option value="in">Cash in</option><option value="out">Cash out</option></select></label>
               <label className="text-[11px] font-semibold">Description<input required maxLength={120} value={row.title} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
               <label className="text-[11px] font-semibold">Amount (THB)<input required min="0" type="number" step="0.01" value={row.amount} onChange={(e) => setCashRows((rows) => rows.map((item, i) => i === index ? { ...item, amount: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
@@ -134,10 +123,10 @@ export const CashflowPage: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setCashRows((rows) => [...rows, { date: "", type: "receive_payment", title: "", amount: "", isInflow: true, partner: "" }])} className="rounded-btn border border-brand/30 px-3 py-2 text-xs font-semibold text-brand">+ Add cash event</button>
-            <button type="button" disabled={cashPreviewLoading || !openingCash && accepted.input.cash_balance == null || !cashReserve && accepted.input.minimum_cash_reserve == null} onClick={async () => {
+            <button type="button" disabled={cashPreviewLoading || (!openingCash && accepted?.input.cash_balance == null) || (!cashReserve && accepted?.input.minimum_cash_reserve == null)} onClick={async () => {
               setCashPreviewLoading(true); setCashPreviewError("");
               try {
-                const result = await apiClient.previewCashflow({ as_of: accepted.input.period_end, opening_cash: openingCash || String(accepted.input.cash_balance ?? ""), reserve: cashReserve || String(accepted.input.minimum_cash_reserve ?? ""), events: cashRows });
+                const result = await apiClient.previewCashflow({ as_of: asOfDate, opening_cash: openingCash || String(accepted?.input.cash_balance ?? ""), reserve: cashReserve || String(accepted?.input.minimum_cash_reserve ?? ""), events: cashRows });
                 setCashPreview(result.data);
               } catch (error) { setCashPreviewError(error instanceof Error ? error.message : "Could not calculate preview"); }
               finally { setCashPreviewLoading(false); }
@@ -146,7 +135,13 @@ export const CashflowPage: React.FC = () => {
           {cashPreviewError && <p role="alert" className="text-xs text-danger">{cashPreviewError}</p>}
           {cashPreview && <div className="overflow-x-auto"><p className="text-xs font-semibold text-brand mb-2">Simulated preview · not saved</p><table className="w-full text-xs"><thead><tr className="text-left border-b"><th className="p-2">Date</th><th className="p-2">Cash in</th><th className="p-2">Cash out</th><th className="p-2">Projected balance</th><th className="p-2">Reserve status</th></tr></thead><tbody>{cashPreview.map((day) => <tr key={day.date} className="border-b border-slate-100"><td className="p-2">{day.date}</td><td className="p-2">฿{day.inflow.toLocaleString()}</td><td className="p-2">฿{day.outflow.toLocaleString()}</td><td className="p-2 font-bold">฿{day.projectedCash.toLocaleString()}</td><td className="p-2">{day.isDeficit ? `Below reserve by ฿${day.deficitAmount?.toLocaleString()}` : "Above reserve"}</td></tr>)}</tbody></table></div>}
         </section>
-        {unavailableState}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="status">
+          <div className="font-semibold">Saved cash timeline is unavailable</div>
+          <p className="mt-1">{error || (accepted
+            ? "The imported statement has period totals but no dated cash events. The preview above uses only the dates and amounts you enter."
+            : "No database-backed cash events are available. You can still calculate a preview above from your own dated inputs.")}</p>
+          <button type="button" onClick={loadData} className="mt-2 font-semibold underline">Retry saved timeline</button>
+        </div>
       </div>
     );
   }
