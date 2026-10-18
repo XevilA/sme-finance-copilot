@@ -6,13 +6,15 @@ database is reachable; the shape and no-404 guarantees are checked either way.
 """
 
 import asyncio
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import delete, text
 
 from app.db import DB_ENABLED, session_scope
 from app.main import app
+from app.models import SwarmProject
 
 client = TestClient(app)
 
@@ -346,8 +348,33 @@ def test_funder_projects_recommendation_follows_the_evidence():
 
 @needs_db
 def test_funder_projects_without_evidence_are_not_recommended():
-    rows = get("/funder/projects")["data"]
-    bare = [row for row in rows if not row["evidenceDocuments"]]
-    assert bare, "expected at least one project with no evidence rows"
-    for row in bare:
+    project_id = uuid.uuid4()
+    order_ref = f"NO-EVIDENCE-{project_id.hex}"
+
+    async def create(session):
+        session.add(SwarmProject(
+            id=project_id,
+            order_ref=order_ref,
+            buyer_name="Synthetic buyer without evidence",
+            target_capacity=10,
+            unit_price=100,
+            duration_days=2,
+            payment_terms_days=30,
+        ))
+
+    async def cleanup(session):
+        await session.execute(delete(SwarmProject).where(SwarmProject.id == project_id))
+
+    async def run(operation):
+        async with session_scope() as session:
+            await operation(session)
+
+    asyncio.run(run(create))
+    try:
+        rows = get("/funder/projects")["data"]
+        row = next(item for item in rows if item["id"] == str(project_id))
+        assert row["evidenceDocuments"] == []
         assert row["recommendationDecision"] == "insufficient_data"
+        assert row["allocationRecommended"] is False
+    finally:
+        asyncio.run(run(cleanup))

@@ -61,6 +61,14 @@ backend/.venv/Scripts/python.exe -m pytest -c backend/pytest.ini -q
 
 Database-dependent backend tests are skipped when `DATABASE_URL` is unset. Run the persistence and end-to-end database checks against a dedicated test database, not the public demo database. A stateless test run does not certify database integration.
 
+For the full backend suite, install/start Docker Desktop or Docker Engine and run the isolated PostgreSQL test runner:
+
+```powershell
+backend/.venv/Scripts/python.exe backend/scripts/test_with_postgres.py
+```
+
+It starts PostgreSQL on loopback port 55432 with schema and synthetic fixtures, overrides any `DATABASE_URL` from `.env`, runs pytest, then removes the temporary database container. On macOS/Linux, use `backend/.venv/bin/python backend/scripts/test_with_postgres.py`.
+
 ## Frontend developer: read only these two docs
 
 1. [Frontend Integration: API and AI](docs/frontend-integration.md) — start here for setup, the upload-to-analysis flow, AI behavior, and how to connect screens through `apiClient`.

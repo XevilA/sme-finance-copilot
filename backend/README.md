@@ -24,7 +24,13 @@ pnpm build
 pnpm test:invariants
 ```
 
-The Python tests need the dependencies from `backend/requirements.txt`. Database integration tests need a reachable PostgreSQL database configured with `DATABASE_URL`.
+The Python tests need the dependencies from `backend/requirements.txt`. The plain pytest command skips database tests if no database is reachable. To run all tests against a disposable local PostgreSQL instance (Docker required), use:
+
+```powershell
+backend/.venv/Scripts/python.exe backend/scripts/test_with_postgres.py
+```
+
+The runner binds the test database to loopback port 55432, loads only synthetic fixtures, overrides any `.env` database URL, and removes the temporary container after the run. Never run test fixtures against the public demo database.
 
 ## Read next
 

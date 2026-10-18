@@ -143,6 +143,14 @@ def test_without_an_sme_neither_context_input_is_claimed_to_be_empty():
 @needs_db
 def test_a_confirmed_schedule_puts_the_dated_forecast_findings_on_the_page():
     params = {"sme_id": RUNG_CHAROEN, "schedule_complete_through": CONFIRMED_THROUGH}
+    # The forecast endpoint projects dated receivables/payables into cash_events;
+    # overview and AI explain then consume those persisted forecast events.
+    forecast = client.get("/api/v1/forecast", params={
+        **params, "as_of": "2026-09-30",
+    })
+    assert forecast.status_code == 200
+    assert forecast.json()["projectedFromObligations"]["events"] > 0
+
     overview = client.get("/api/v1/overview", params=params).json()
     assert {"forecast_cash_shortfall", "forecast_minimum_cash", "forecast_horizon_balances"} <= action_ids(overview)
 

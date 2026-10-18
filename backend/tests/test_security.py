@@ -10,12 +10,15 @@ import os
 import subprocess
 import sys
 import time
+import asyncio
 from pathlib import Path
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
-from app.db import DB_ENABLED
+from app.db import DB_ENABLED, session_scope
 from app.main import app
 from app.security import (
     AuthConfigError,
@@ -32,13 +35,9 @@ client = TestClient(app)
 BACKEND = Path(__file__).resolve().parents[1]
 SECRET = "t" * 40
 
-# The password for the demo login user is read from the environment and never
-# written into the repository, so no credential string ships with the code.
-# Set it alongside the account:
-#   python backend/scripts/set_password.py fund@example.test
-#   DEMO_LOGIN_PASSWORD=... pytest
-DEMO_EMAIL = os.getenv("DEMO_LOGIN_EMAIL", "fund@example.test")
-DEMO_PASSWORD = os.getenv("DEMO_LOGIN_PASSWORD", "")
+TEST_AUTH_USER_ID = uuid.UUID("aaaaaaaa-0000-4000-8000-000000000003")
+TEST_AUTH_EMAIL = "security-test-user@example.test"
+TEST_AUTH_PASSWORD = "security-test-password"
 
 
 # --- passwords ---------------------------------------------------------------
@@ -285,14 +284,17 @@ print(json.dumps(out))
 
 
 def run_enforced(extra_env: dict | None = None) -> dict:
-    env = {
+    env = os.environ.copy()
+    env.update({
         "RBAC_ENFORCED": "true",
         "AUTH_SECRET": SECRET,
         "PATH": "",
         "SYSTEMROOT": "C:\\Windows",
-    }
+        "DB_BOOTSTRAP": "off",
+        "DB_POOL": "null",
+    })
     env.update(extra_env or {})
-    script = ENFORCED_SCRIPT % {"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
+    script = ENFORCED_SCRIPT % {"email": TEST_AUTH_EMAIL, "password": TEST_AUTH_PASSWORD}
     completed = subprocess.run(
         [sys.executable, "-c", script],
         cwd=BACKEND, capture_output=True, text=True, env=env, timeout=180,
@@ -301,16 +303,44 @@ def run_enforced(extra_env: dict | None = None) -> dict:
     return json.loads(completed.stdout.strip().splitlines()[-1])
 
 
-needs_demo_login = pytest.mark.skipif(
-    not DB_ENABLED or not DEMO_PASSWORD,
-    reason="set DEMO_LOGIN_PASSWORD and run scripts/set_password.py for the demo user",
-)
+@pytest.fixture
+def test_auth_user():
+    """Create an isolated account so enforced-auth tests never need demo credentials."""
+    if not DB_ENABLED:
+        pytest.skip("Requires PostgreSQL")
+
+    async def run(operation):
+        async with session_scope() as session:
+            await operation(session)
+
+    async def create(session):
+        await session.execute(text("""
+            INSERT INTO users (id, email, full_name, role, investor_id, password_hash, active)
+            VALUES (:id, :email, :name, 'investor', 'cccccccc-0000-4000-8000-000000000001', :hash, TRUE)
+            ON CONFLICT (id) DO UPDATE SET
+                email = EXCLUDED.email, full_name = EXCLUDED.full_name,
+                role = EXCLUDED.role, password_hash = EXCLUDED.password_hash,
+                investor_id = EXCLUDED.investor_id, active = TRUE, tokens_valid_from = NULL
+        """), {
+            "id": TEST_AUTH_USER_ID,
+            "email": TEST_AUTH_EMAIL,
+            "name": "Synthetic security test user",
+            "hash": hash_password(TEST_AUTH_PASSWORD),
+        })
+
+    async def cleanup(session):
+        await session.execute(text("DELETE FROM users WHERE id = :id"), {"id": TEST_AUTH_USER_ID})
+
+    asyncio.run(run(create))
+    try:
+        yield
+    finally:
+        asyncio.run(run(cleanup))
 
 
-@needs_demo_login
-def test_enforced_identity_requires_a_signed_token():
+def test_enforced_identity_requires_a_signed_token(test_auth_user):
     result = run_enforced()
-    assert result["login"] == 200, "DEMO_LOGIN_PASSWORD does not match the stored password"
+    assert result["login"] == 200
 
     assert result["auth"] == {"enforced": True, "secretConfigured": True, "devHeaderAccepted": False}
     assert result["no_header"] == 401
@@ -330,8 +360,7 @@ def test_enforced_identity_requires_a_signed_token():
     assert result["funder_as_investor"] is True
 
 
-@needs_demo_login
-def test_dev_header_is_opt_in_and_declared():
+def test_dev_header_is_opt_in_and_declared(test_auth_user):
     """The escape hatch works, and an instance using it cannot look secure."""
     result = run_enforced({"AUTH_DEV_HEADER": "true"})
     assert result["login"] == 200

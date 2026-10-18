@@ -140,7 +140,13 @@ node_modules/.bin/tsx scripts/test-data-availability.tsx
 backend/.venv/Scripts/python.exe -m pytest -c backend/pytest.ini -q
 ```
 
-The backend suite skips tests that require PostgreSQL when `DATABASE_URL` is unset. A successful stateless run therefore does not certify database integration. Use a dedicated test database for persistence/integration tests; do not run fixture writes against the public demo database.
+The default backend command skips tests that need PostgreSQL when `DATABASE_URL` is unset. For the full suite, start Docker Desktop/Engine and run the disposable, loopback-only test database runner:
+
+```powershell
+backend/.venv/Scripts/python.exe backend/scripts/test_with_postgres.py
+```
+
+On macOS/Linux, use `backend/.venv/bin/python backend/scripts/test_with_postgres.py`. The runner loads only synthetic schema/seed data, overrides any `DATABASE_URL` from `.env`, and tears down its temporary database after pytest exits. Never point test fixtures at the public demo database.
 
 ## Contract references
 

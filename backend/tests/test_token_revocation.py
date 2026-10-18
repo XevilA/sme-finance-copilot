@@ -458,11 +458,19 @@ print(json.dumps(out))
 
 
 def run_enforced(email: str, password: str) -> dict:
+    child_env = os.environ.copy()
+    child_env.update({
+        "RBAC_ENFORCED": "true",
+        "AUTH_SECRET": SECRET,
+        "DB_BOOTSTRAP": "off",
+        "DB_POOL": "null",
+        "PATH": "",
+        "SYSTEMROOT": "C:\\\\Windows",
+    })
     completed = subprocess.run(
         [sys.executable, "-c", ENFORCED_SCRIPT % {"email": email, "password": password}],
         cwd=BACKEND, capture_output=True, text=True, timeout=180,
-        env={"RBAC_ENFORCED": "true", "AUTH_SECRET": SECRET,
-             "PATH": "", "SYSTEMROOT": "C:\\\\Windows"},
+        env=child_env,
     )
     assert completed.returncode == 0, completed.stderr[-2000:]
     return json.loads(completed.stdout.strip().splitlines()[-1])
