@@ -1,10 +1,13 @@
 # API Contract Matrix — Backend / AI ↔ Frontend
 
-Latest verified runtime: `f23c09e`, 2026-10-17. Backend-only integration into main;
-frontend integration deferred by the user while Claude is rate limited.
-Final measured suite: **545 passed / 3 skipped with PostgreSQL; 426 / 122 without
-DB**. Older block measurements below are history. Schema still 27 tables,
-43 main `/api/*` paths (+ v1 aliases, 4 v1-only paths and /health).
+Latest verified source: `4840723` on `main` (2026-10-18). The complete backend
+suite passed against the disposable PostgreSQL test database: **555 passed, 1
+skipped**. The single skip is the test that explicitly verifies behavior with
+the database disabled; database-backed feature tests ran. The test database
+uses synthetic seed data and is removed after the run. Historical block test
+counts and branch references below describe their original runs, not this
+latest verification. Current frontend instructions are in
+[`frontend-integration.md`](frontend-integration.md).
 
 Provider hardening: stable SHA-256-derived advisory transaction lock, held on one
 session through fetch, cache/backoff persistence and commit. Concurrency tests
@@ -20,11 +23,9 @@ Stored required dependencies are authoritative even when POST swarm receives
 inline shops with resources=[]; clients cannot erase a required offered truck.
 Saving a mixed known/unknown shop set does not persist only a subset.
 
-**Frontend dependency:** existing CostPage.tsx:105 directly calls
-currentMonthlyFixedCost.toLocaleString(); it must accept null before partial-input
-Cost can be used in the browser. No frontend files were changed in this backend
-handover. Claude must also wire imported funding/forecast, active revisions,
-saved reads/replay and unavailable business actions to the contracts below.
+The Cost page now renders nullable financial values safely. For all views,
+continue to treat an unknown value as `null` and preserve the response's
+`missing` fields rather than displaying an invented zero.
 
 Final prototype validation (`f23c09e`): StatementRequest rejects coverage earlier
 than input.period_end with 422; unsupported 90-day forecast calendar returns 422
