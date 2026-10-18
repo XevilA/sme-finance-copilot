@@ -4,6 +4,8 @@ This guide summarizes what the current prototype can demonstrate and where the U
 
 **Concurrent-test status:** the automated suite verifies function and database correctness, not load capacity. No concurrent-user load test has been run, so the prototype is suitable for supervised testing with synthetic data, but must not be represented as capacity-tested for a large simultaneous audience. Database-backed endpoints share the demo catalogue and depend on the hosted PostgreSQL connection limit. Check `/health` before the event and keep a demo operator available to handle retries or temporary unavailable states.
 
+**Live smoke check (2026-10-18):** `/health` reported `persistence=true`, `bootstrap=off`, `auth.enforced=false`, and `auth.secretConfigured=false`. `GET /api/v1/funding/options?amount=50000` returned HTTP 200 with `status=ok` and `source=stored_record`, confirming the deployed Funding route could query its PostgreSQL catalogue at check time. `/api/v1/simulator/context` and a `persist=false` `/api/v1/simulate/order` preview both returned HTTP 200; the preview used `order-what-if/v2` and returned `insufficient_data` with four missing order-context fields (`buyer_coordinates`, `collection_schedule`, `max_distance_km`, `required_business_types`). Industry Trends returned HTTP 200 with `status=unavailable`, provider timeout, and no cached articles. Do not present Industry Trends as live-ready until a later successful provider fetch is observed. No saved simulation was written to the public database during this check.
+
 ## Eight feature areas
 
 | # | Feature | Prototype status | Group-test status | Frontend behavior |
