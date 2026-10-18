@@ -59,6 +59,7 @@ def test_gate_lock_spans_sessions_until_backoff_commit_and_does_not_leak():
 def test_route_keeps_the_lock_during_fetch_and_updates_backoff_without_network(monkeypatch):
     from app.routers import insights
     from app.industry import analyze_industry_articles
+    monkeypatch.setenv("PROVIDER_BACKOFF_BASE_SECONDS", "1")
     provider = "synthetic-route-" + uuid.uuid4().hex
     monkeypatch.setattr(insights, "PROVIDER", provider)
     calls = []
@@ -74,9 +75,11 @@ def test_route_keeps_the_lock_during_fetch_and_updates_backoff_without_network(m
         client = TestClient(app)
         first = client.get("/api/industry/trends").json()
         assert first["data"]["sourceError"] == "synthetic_timeout"
+        assert first["data"]["retryAfterSeconds"] == 1
         assert first["providerGate"]["consecutiveFailures"] == 1
         second = client.get("/api/industry/trends").json()
         assert second["data"]["sourceError"] == "provider_gate_closed"
+        assert second["data"]["retryAfterSeconds"] >= 1
         assert len(calls) == 1
         assert second["data"]["articles"] == []
     finally:

@@ -150,18 +150,23 @@ async def industry_trends(
                 sector, as_of=as_of, cached_articles=cached, force_refresh=force_refresh
             )
             stored = 0
+            retry_after = result.get("retry_after_seconds")
             if result.get("articles"):
                 stored = await upsert_articles(session, result["articles"])
             if result.get("source_status") in {"unavailable", "error"}:
-                await fetch_state.record_failure(
+                # Return the effective backoff (including the provider's
+                # Retry-After) so clients do not immediately repeat a failed
+                # upstream request.
+                retry_after = await fetch_state.record_failure(
                     session, PROVIDER,
                     str(result.get("source_error") or "unavailable"),
-                    result.get("retry_after_seconds"),
+                    retry_after,
                 )
             else:
                 await fetch_state.record_success(session, PROVIDER)
             provider_status = await fetch_state.status(session, PROVIDER)
-            return _trends_response(sector, result, as_of, cached, stored, provider_status)
+            return _trends_response(sector, result, as_of, cached, stored, provider_status,
+                                    retry_after=retry_after)
         finally:
             await fetch_state.release(session, PROVIDER)
 
