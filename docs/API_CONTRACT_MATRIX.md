@@ -31,7 +31,8 @@ than input.period_end with 422; unsupported 90-day forecast calendar returns 422
 instead of 500. `/capabilities` reports deterministicAnalysis mode=rules and
 savedSimulationReplay.available follows DATABASE_URL configuration. This flag is
 a configured capability, not a database liveness probe. Current quick start:
-[PROTOTYPE_TODAY.md](../backend/docs/PROTOTYPE_TODAY.md).
+[backend README](../backend/README.md); consolidated route and calculation
+reference: [API and math](../backend/docs/API_AND_MATH.md).
 
 ## Backend integration block 1 — implemented 2026-10-17
 
@@ -171,7 +172,7 @@ continues to record rejected upload metadata as before.
 อัปเดต 2026-10-16 · ตรวจ source `48d9385` + validation regression repair ในรอบนี้ และ HTTP จริง · base URL `/api/v1`.
 นี่คือ contract ที่มีอยู่ ไม่ใช่ design wishlist. รายการ `/import/upload`, `/import/validate`,
 `/import/confirm` เดิมไม่มี route จริง ให้ใช้ upload/manual/analyze ด้านล่าง.
-ดู [แผนส่งต่อ](../backend/docs/FRONTEND_INTEGRATION_HANDOFF.md) สำหรับงานที่ยังไม่ implement.
+ดู [สถานะฟีเจอร์และแผนส่งต่อ](../backend/docs/DEMO_HANDOFF.md) สำหรับงานที่ยังไม่ implement.
 
 FinancialInput ปัจจุบันมี 39 top-level fields (7 required / 32 optional); inventory เป็น
 optional nullable และ Excel รองรับชื่อ Inventory/Stock/สินค้าคงเหลือ/สต็อก. Import ยังรับ
@@ -297,4 +298,4 @@ read-only, no SME/project identity required. `format=financials` returns validat
 FinancialInput/grade. `persisted=false` always. Invalid/unsupported files: 422;
 over 5 MiB: 413. Browser limit: 4 MiB on Vercel. Selection is transferred to the
 manual review form, then submitted to the existing manual validation/analyze
-contracts. See [Excel import fix](../backend/docs/EXCEL_IMPORT_FIX.md).
+contracts. See [workbook and input rules](../backend/docs/API_AND_MATH.md#financial-input-and-workbook-formats).

@@ -2,9 +2,9 @@
 
 Branch `codex/demo-frontend`, based on main `9eebb41`. Worktree
 `.worktrees/demo-frontend`. Owned here: `src/**`, the frontend wiring scripts
-`scripts/test-*-wiring.mjs`, `backend/docs/progress.md` and this file. No
-Codex-owned backend file, backend test, contract matrix or readiness document
-was changed.
+`scripts/test-*-wiring.mjs` and this file. The backend interface is described in
+the consolidated [API and math reference](../backend/docs/API_AND_MATH.md) and
+[demo handoff](../backend/docs/DEMO_HANDOFF.md).
 
 The website now runs against the real backend: import → calculation →
 overview/health/cost/AI → funding → SWARM → simulator → save and read a plan

@@ -13,7 +13,6 @@ import {
   Coins,
   ArrowRight,
   AlertTriangle,
-  Sparkles,
   Play,
   RotateCcw,
 } from "lucide-react";
@@ -52,11 +51,6 @@ export const HeroAssembly: React.FC = () => {
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: Headline, Description & CTAs */}
         <div className="lg:col-span-5 space-y-4 text-left">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-chip bg-brand/20 border border-brand/40 text-brand-glow text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Opportunity Studio</span>
-          </div>
-
           <h1 className="text-3xl md:text-4xl font-display font-extrabold text-white leading-tight">
             Understand Your Finances. See the Opportunity. <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-glow via-white to-resource">

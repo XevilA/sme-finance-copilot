@@ -17,10 +17,9 @@ Import/Overview/order Simulator/SWARM ต่อ operation จริงบาง�
 ทีมอนุญาตให้ CODEX แก้ frontend wiring ที่จำเป็น **โดยคง UI เดิม** ไม่จำกัดห้าไฟล์เดิม.
 งานหลักตอนนี้คือ backend/AI/API/contracts/integration; ทีม frontend รับ presentation ต่อ
 
-- [สถานะทั้งแปดโมดูลและงานส่งต่อ](backend/docs/FRONTEND_INTEGRATION_HANDOFF.md)
+- [สถานะฟีเจอร์และคู่มือส่งต่อ frontend](backend/docs/DEMO_HANDOFF.md)
 - [API ที่มีจริงและ request shapes](docs/API_CONTRACT_MATRIX.md)
-- [เริ่มทดสอบและข้อจำกัดปัจจุบัน](backend/docs/TESTER_READINESS_CURRENT.md)
-- [กติกาทำงานและ work list §4](backend/docs/AI_DEVELOPMENT_GUIDELINES.md)
+- [เริ่ม backend และ API/math reference](backend/README.md) · [รายละเอียด API และสูตร](backend/docs/API_AND_MATH.md)
 
 ตรวจ source `48d9385` + validation regression repair ในรอบนี้: 510/3 tests มี DB, 410/103 ไม่มี DB, 36 main API paths,
 27 tables, 16 read contracts. Build 1955 modules / CSS index-DEindwiw.css / JS index-CBenrrOQ.js.
