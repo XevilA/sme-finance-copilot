@@ -50,49 +50,49 @@ export const StoryModeModal: React.FC = () => {
 
   const scenes = [
     {
-      act: "ฉากที่ 1",
-      title: "โอกาสทางธุรกิจขนาดใหญ่: คำสั่งซื้ออาหาร 300 กล่อง/วัน",
-      subtitle: "โจทย์จาก บจก.สยามเทคโนพาร์ค ระยะเวลา 10 วันทำการ รวม 3,000 กล่อง งบประมาณ 255,000 ฿",
-      highlightMetric: "300 กล่อง/วัน × 10 วัน",
-      metricLabel: "มูลค่าโครงการรวม ฿255,000",
+      act: "Scene 1",
+      title: "A Large Business Opportunity: 300 Meal Boxes per Day",
+      subtitle: "An example request from Siam Technopark Co. · 10 business days · 3,000 boxes · Budget ฿255,000",
+      highlightMetric: "300 boxes/day × 10 days",
+      metricLabel: "Total project value ฿255,000",
       content: (
         <div className="bg-navy-surface p-6 rounded-card border border-navy-border space-y-4 max-w-xl mx-auto text-left">
           <div className="flex items-center justify-between">
             <span className="text-xs text-brand-glow font-semibold tracking-wider uppercase">
-              ความท้าทายของ SME ทั่วไป
+              A Common Challenge for SMEs
             </span>
             <DataKindBadge kind="actual" size="sm" />
           </div>
           <p className="text-sm text-slate-200 leading-relaxed">
-            ร้านอาหารรายย่อยเดี่ยวๆ ไม่สามารถรับงานใหญ่ระดับ 300 กล่อง/วัน ได้ด้วยตัวเองเนื่องจากกำลังผลิตและพื้นที่ครัวมีจำกัด (เฉลี่ยทำได้เพียง 50–70 กล่อง/วัน) หากปฏิเสธก็จะสูญเสียโอกาสรายได้ก้อนโต
+            A small restaurant may not be able to fulfill a large order of 300 boxes per day on its own because production capacity and kitchen space are limited (typically 50–70 boxes per day). Declining the order could mean missing a major revenue opportunity.
           </p>
           <div className="p-3 bg-navy-card rounded-xl border border-navy-border flex items-center justify-between text-xs">
-            <span className="text-slate-300">มาตรฐานที่กำหนด:</span>
-            <span className="text-white font-medium">กล่องรักษ์โลกย่อยสลายได้ · ส่งถึงจุดก่อน 11:15 น.</span>
+            <span className="text-slate-300">Requirements:</span>
+            <span className="text-white font-medium">Eco-friendly, biodegradable boxes · Delivered before 11:15 AM</span>
           </div>
         </div>
       ),
     },
     {
-      act: "ฉากที่ 2",
-      title: "SME SWARM รวมทีม: ระบบประกอบ 6 ร้านร่วมรับงาน",
-      subtitle: "ระบบกวาดร้านที่มีกำลังผลิตว่างในรัศมีใกล้เคียง แบ่งงานร้านละ 50 กล่อง/วัน",
-      highlightMetric: "6 ร้าน × 50 กล่อง",
-      metricLabel: "กำลังผลิตรวม 300 กล่อง/วัน (ครบ 100%)",
+      act: "Scene 2",
+      title: "SME SWARM Team Assembly: Six Shops Join the Order",
+      subtitle: "The system finds nearby shops with available capacity and assigns 50 boxes per day to each.",
+      highlightMetric: "6 shops × 50 boxes",
+      metricLabel: "Total capacity: 300 boxes/day (100%)",
       content: (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto text-left">
           {[
-            { name: "ร้านบ้านข้าวหอม", role: "ข้าวหอมไก่อบ", gap: "ขาด ฿14,000" },
-            { name: "ครัวป้าสมร", role: "กะเพราโบราณ", gap: "เงินสดพร้อม" },
-            { name: "เจ๊ดาวแกงปักษ์ใต้", role: "แกงใต้รสเด็ด", gap: "ขาด ฿15,500" },
-            { name: "เฮียฮงหมูกรอบ", role: "หมูกรอบเตาถ่าน", gap: "เงินสดพร้อม" },
-            { name: "ครัวสวนผัก", role: "อกไก่ออร์แกนิค", gap: "เงินสดพร้อม" },
-            { name: "ปิ่นโตแม่เพ็ญ", role: "พะโล้คุณย่า", gap: "เงินสดพร้อม" },
+            { name: "Baan Khao Hom", role: "Roasted chicken with jasmine rice", gap: "Shortfall ฿14,000" },
+            { name: "Pa Samorn Kitchen", role: "Traditional basil pork", gap: "Cash ready" },
+            { name: "Jae Dao Southern Curry", role: "Southern-style curry", gap: "Shortfall ฿15,500" },
+            { name: "Hia Hong Crispy Pork", role: "Charcoal-roasted crispy pork", gap: "Cash ready" },
+            { name: "Garden Greens Kitchen", role: "Organic chicken breast", gap: "Cash ready" },
+            { name: "Mae Phen Bento", role: "Grandma's five-spice eggs", gap: "Cash ready" },
           ].map((s, idx) => (
             <div key={idx} className="p-3 rounded-xl bg-navy-surface border border-navy-border text-xs">
               <div className="font-semibold text-white truncate">{s.name}</div>
-              <div className="text-[11px] text-slate-400">{s.role} (50 กล่อง)</div>
-              <div className={`text-[10px] mt-2 font-mono font-bold ${s.gap.includes("ขาด") ? "text-danger" : "text-emerald-400"}`}>
+              <div className="text-[11px] text-slate-400">{s.role} (50 boxes)</div>
+              <div className={`text-[10px] mt-2 font-mono font-bold ${s.gap.includes("Shortfall") ? "text-danger" : "text-emerald-400"}`}>
                 {s.gap}
               </div>
             </div>
@@ -101,105 +101,105 @@ export const StoryModeModal: React.FC = () => {
       ),
     },
     {
-      act: "ฉากที่ 3",
-      title: "จุดสะดุดของโครงการ: 2 ร้านขาดเงินทุนหมุนเวียนล่วงหน้า",
-      subtitle: "ระบบเจาะลึกกระแสเงินสดรายร้าน พบว่ามี 2 ร้านไม่สามารถเริ่มผลิตได้หากไม่มีเงินก้อนแรก",
+      act: "Scene 3",
+      title: "The Project Bottleneck: Two Shops Need Working Capital Up Front",
+      subtitle: "A shop-level cash flow review indicates that two shops cannot begin production without an initial cash injection.",
       highlightMetric: "฿29,500",
-      metricLabel: "เงินสดหมุนเวียนที่ยังขาดรวม (ร้านบ้านข้าวหอม + เจ๊ดาว)",
+      metricLabel: "Total working-capital shortfall (Baan Khao Hom + Jae Dao)",
       content: (
         <div className="bg-navy-surface p-6 rounded-card border border-danger/40 max-w-xl mx-auto text-left space-y-4 shadow-glow-danger">
           <div className="flex items-center gap-2 text-danger font-bold text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>โครงการติดตรงไหน (Bottleneck Spotlight)</span>
+            <span>Project bottleneck</span>
           </div>
           <p className="text-xs text-slate-200 leading-relaxed">
-            แม้คำนวณแล้วทุกร้านจะได้กำไรสุทธิเฉลี่ย 11,000–12,500 บาท แต่ร้านบ้านข้าวหอมต้องจ่ายค่าข้าวและเนื้อไก่สด 18,000 บาท ในวันแรก ขณะที่มีเงินสดติดตัวเพียง 10,000 บาท (ขาด 14,000 ฿) และเจ๊ดาวขาด 15,500 ฿
+            Although each shop is projected to earn ฿11,000–12,500 in net profit, Baan Khao Hom needs to pay ฿18,000 for rice and fresh chicken on day one but has only ฿10,000 in cash (a ฿14,000 gap). Jae Dao has a ฿15,500 gap.
           </p>
           <div className="p-3 bg-red-950/40 rounded-xl border border-danger/30 text-xs text-red-200 flex items-center justify-between">
-            <span>สถานะระบบ:</span>
-            <span className="font-bold text-danger">ห้ามกดเริ่มงานจนกว่าจะปิดช่องว่างเงินทุน</span>
+            <span>System status:</span>
+            <span className="font-bold text-danger">Do not start until the funding gap is covered</span>
           </div>
         </div>
       ),
     },
     {
-      act: "ฉากที่ 4",
-      title: "ปลดล็อกเงินทุน: เชื่อมต่อ Invoice Factoring ใน 24 ชม.",
-      subtitle: "ใช้ใบสั่งซื้อ (PO) ที่ยืนยันแล้ว ขอเบิกเงินสดล่วงหน้า 85% โดยไม่ต้องใช้หลักทรัพย์ค้ำประกัน",
-      highlightMetric: "24 ชั่วโมง",
-      metricLabel: "อนุมัติเงินสด ฿29,500 ดอกเบี้ย 8.5% ต่อปี",
+      act: "Scene 4",
+      title: "Unlock Funding: Connect to Invoice Factoring in 24 Hours",
+      subtitle: "Use a confirmed purchase order (PO) to request 85% of the cash up front without collateral.",
+      highlightMetric: "24 hours",
+      metricLabel: "฿29,500 cash approved · 8.5% annual interest",
       content: (
         <div className="bg-navy-surface p-6 rounded-card border border-resource/40 max-w-xl mx-auto text-left space-y-4 shadow-glow-resource">
           <div className="flex items-center gap-2 text-resource font-bold text-sm">
             <Coins className="w-4 h-4 shrink-0" />
-            <span>จับคู่ทุนสำเร็จ: แฟกทอริงเฉพาะโครงการ</span>
+            <span>Funding match: Project-specific factoring</span>
           </div>
           <p className="text-xs text-slate-200 leading-relaxed">
-            ผู้ให้ทุนปล่อยเงินหมุนเวียน 14,000 บาทให้ร้านบ้านข้าวหอม และ 15,500 บาทให้เจ๊ดาว ทำให้ทั้ง 6 ร้านมีเงินสดในมือครอบคลุมค่าวัตถุดิบตั้งแต่วันแรก โครงการพร้อมเดินเครื่อง 100%
+            The funder provides ฿14,000 in working capital to Baan Khao Hom and ฿15,500 to Jae Dao, allowing all six shops to cover ingredient costs from day one. The project is ready to proceed at full capacity.
           </p>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2.5 rounded-lg bg-navy-card border border-navy-border">
-              <span className="text-slate-400 block text-[10px]">ดอกเบี้ยรวมตลอดงาน</span>
-              <span className="text-white font-bold font-mono">฿209.50 (คิดตามวันจริง)</span>
+              <span className="text-slate-400 block text-[10px]">Total interest for project</span>
+              <span className="text-white font-bold font-mono">฿209.50 (calculated by actual days)</span>
             </div>
             <div className="p-2.5 rounded-lg bg-navy-card border border-navy-border">
-              <span className="text-slate-400 block text-[10px]">วันรับเงินสด</span>
-              <span className="text-resource font-bold">1 พ.ย. (ทันรอบวัตถุดิบ)</span>
+              <span className="text-slate-400 block text-[10px]">Cash disbursement date</span>
+              <span className="text-resource font-bold">Nov 1 (before ingredient purchasing)</span>
             </div>
           </div>
         </div>
       ),
     },
     {
-      act: "ฉากที่ 5",
-      title: "ซ้อมรับมือวิกฤติ: จำลองร้านถอนตัวกะทันหัน",
-      subtitle: "ระบบทดสอบฉากจำลอง (Chaos Rehearsal) หากเจ๊ดาวถอนตัวกะทันหันในวันที่ 2",
-      highlightMetric: "4 ช่วงเหตุการณ์",
-      metricLabel: "เกิดเหตุ → ลามตามเส้น → เงินสดดิ่ง → ทางเลือกสำรอง",
+      act: "Scene 5",
+      title: "Crisis Rehearsal: Simulate a Shop's Sudden Withdrawal",
+      subtitle: "Chaos Rehearsal scenario: Jae Dao withdraws unexpectedly on day two.",
+      highlightMetric: "4 event phases",
+      metricLabel: "Disruption → Propagation → Cash impact → Contingency",
       content: (
         <div className="bg-navy-surface p-6 rounded-card border border-attention/40 max-w-xl mx-auto text-left space-y-4">
           <div className="flex items-center gap-2 text-attention font-bold text-sm">
             <Sparkles className="w-4 h-4 shrink-0" />
-            <span>แผนสำรองอัตโนมัติ (Contingency Option)</span>
+            <span>Contingency option</span>
           </div>
           <p className="text-xs text-slate-200 leading-relaxed">
-            คลื่นสีแดงไหลไปตามเส้นเชื่อมโยง แสดงให้เห็นว่าหากไม่ทำอะไร งานจะขาด 50 กล่อง/วัน และเสียค่าปรับส่งช้า 10,000 บาท แต่ระบบดึง 'ครัวร่มไทร' (ร้านสำรองอันดับ 1) เข้ามาสลับแทนที่ได้ในคลิกเดียว
+            The red wave follows the links to show the impact: without action, the project would be short 50 boxes per day and incur a ฿10,000 late fee. The system can bring in Rom Sai Kitchen, the top-ranked backup, with one click.
           </p>
           <div className="p-3 bg-navy-card rounded-xl border border-navy-border flex items-center justify-between text-xs">
-            <span className="text-slate-300">ผลการซ้อมแผนพัง:</span>
-            <span className="text-emerald-400 font-bold">ป้องกันความเสียหายได้ 100%</span>
+            <span className="text-slate-300">Rehearsal result:</span>
+            <span className="text-emerald-400 font-bold">100% of the projected impact avoided</span>
           </div>
         </div>
       ),
     },
     {
-      act: "ฉากที่ 6",
-      title: "บทสรุปและผลสัมฤทธิ์: ทุกร้านเหลือกำไรจริง",
-      subtitle: "ส่งมอบครบ 3,000 กล่อง ได้รับเงินชำระครบถ้วน ปิดโครงการตามมาตรฐาน ESG",
+      act: "Scene 6",
+      title: "Outcome: Every Shop Retains a Profit",
+      subtitle: "All 3,000 boxes delivered, full payment received, and the project completed to ESG standards.",
       highlightMetric: "฿69,000",
-      metricLabel: "กำไรสุทธิรวมที่กระจายสู่ 6 ชุมชน (เฉลี่ย ฿11,500/ร้าน)",
+      metricLabel: "Total net profit across 6 communities (average ฿11,500 per shop)",
       content: (
         <div className="bg-navy-surface p-6 rounded-card border border-brand/40 max-w-xl mx-auto text-left space-y-4 shadow-glow-primary">
           <div className="flex items-center gap-2 text-brand-glow font-bold text-sm">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>ตัวชี้วัดเป้าหมายในบทนำเสนอ (ยังไม่ได้วัดจากระบบ)</span>
+            <span>Presentation targets (not measured by the system)</span>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="p-3 rounded-xl bg-navy-card border border-navy-border">
-              <span className="text-[10px] text-slate-400 block">อัตราส่งมอบตรงเวลา (เป้าหมาย)</span>
-              <span className="text-sm font-bold text-emerald-400">ยังไม่ได้วัด</span>
+              <span className="text-[10px] text-slate-400 block">On-time delivery rate (target)</span>
+              <span className="text-sm font-bold text-emerald-400">Not measured</span>
             </div>
             <div className="p-3 rounded-xl bg-navy-card border border-navy-border">
-              <span className="text-[10px] text-slate-400 block">ต้นทุนโลจิสติกส์ลดลง (เป้าหมาย)</span>
-              <span className="text-sm font-bold text-resource">ยังไม่ได้วัด</span>
+              <span className="text-[10px] text-slate-400 block">Logistics cost reduction (target)</span>
+              <span className="text-sm font-bold text-resource">Not measured</span>
             </div>
             <div className="p-3 rounded-xl bg-navy-card border border-navy-border">
-              <span className="text-[10px] text-slate-400 block">หนี้เสีย (NPL) (เป้าหมาย)</span>
-              <span className="text-sm font-bold text-emerald-400">ยังไม่ได้วัด</span>
+              <span className="text-[10px] text-slate-400 block">Non-performing loans (NPL) (target)</span>
+              <span className="text-sm font-bold text-emerald-400">Not measured</span>
             </div>
           </div>
           <p className="text-xs text-slate-300 text-center leading-relaxed">
-            "SME Finance Copilot เปลี่ยนจากการอ่านรายงานแห้งๆ เป็นห้องประกอบโอกาสธุรกิจที่จับต้องได้จริง"
+            "SME Finance Copilot turns static reports into a practical studio for building business opportunities."
           </p>
         </div>
       ),
@@ -217,7 +217,7 @@ export const StoryModeModal: React.FC = () => {
             STORY MODE
           </span>
           <span className="text-xs text-slate-400 font-medium">
-            บทนำเสนอที่เขียนไว้ล่วงหน้า · ตัวเลขในฉากเป็นตัวอย่างประกอบคำบรรยาย ไม่ใช่ผลคำนวณจากระบบ
+            Prewritten presentation · Scene figures are illustrative examples, not system-generated calculations.
           </span>
         </div>
 
@@ -235,7 +235,7 @@ export const StoryModeModal: React.FC = () => {
                   ? "w-2 bg-emerald-400"
                   : "w-2 bg-navy-border"
               }`}
-              title={`ฉากที่ ${idx + 1}`}
+              title={`Scene ${idx + 1}`}
             />
           ))}
         </div>
@@ -245,7 +245,7 @@ export const StoryModeModal: React.FC = () => {
           onClick={() => setStoryModeOpen(false)}
           className="p-1.5 text-slate-400 hover:text-white hover:bg-navy-surface rounded-lg transition-colors flex items-center gap-1 text-xs"
         >
-          <span>ออกจากโหมดเล่า (Esc)</span>
+          <span>Exit Story Mode (Esc)</span>
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -286,7 +286,7 @@ export const StoryModeModal: React.FC = () => {
           className="text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>เริ่มใหม่จากฉาก 1</span>
+          <span>Restart from Scene 1</span>
         </button>
 
         <div className="flex items-center gap-3">
@@ -297,7 +297,7 @@ export const StoryModeModal: React.FC = () => {
             className="px-4 py-2 rounded-btn bg-navy-surface border border-navy-border text-slate-200 hover:bg-navy-card disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1 transition-all"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>ย้อนกลับ (←)</span>
+            <span>Back (←)</span>
           </button>
 
           <span className="font-mono text-slate-400">
@@ -315,13 +315,13 @@ export const StoryModeModal: React.FC = () => {
             }}
             className="px-5 py-2 rounded-btn bg-brand hover:bg-brand-dark text-white font-semibold flex items-center gap-1 shadow-glow-primary transition-all"
           >
-            <span>{storyCurrentScene === scenes.length ? "เสร็จสิ้น (ออก)" : "ถัดไป (→ / Space)"}</span>
+            <span>{storyCurrentScene === scenes.length ? "Finish (exit)" : "Next (→ / Space)"}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         <div className="text-[11px] text-slate-500 font-mono">
-          กด Spacebar หรือลูกศรขวาเพื่อไปต่อ
+          Press Spacebar or the right arrow to continue
         </div>
       </div>
     </div>

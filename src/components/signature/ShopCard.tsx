@@ -98,7 +98,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
               }`}
             >
               <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-              พร้อม
+              Ready
             </span>
           )}
           {shop.status === "review" && (
@@ -110,7 +110,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
               }`}
             >
               <AlertTriangle className="w-3 h-3 text-amber-500" />
-              ต้องตรวจ
+              Review
             </span>
           )}
           {shop.status === "blocked" && (
@@ -122,7 +122,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
               }`}
             >
               <XCircle className="w-3 h-3 text-danger" />
-              ติดปัญหา
+              Issue
             </span>
           )}
         </div>
@@ -137,7 +137,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
         }`}
       >
         <div className="flex items-center justify-between text-xs mb-1.5">
-          <span className={isDark ? "text-slate-400" : "text-ink-muted"}>กำลังผลิตใช้งาน</span>
+          <span className={isDark ? "text-slate-400" : "text-ink-muted"}>Capacity used</span>
           <span className={`font-mono font-medium ${isDark ? "text-slate-200" : "text-ink"}`}>
             {shop.capacityUsed} / {shop.capacityTotal} {shop.unit}
           </span>
@@ -156,7 +156,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
                 : "bg-resource-light text-resource-dark border border-resource/20"
             }`}
           >
-            ว่าง {shop.capacityAvailable} {shop.unit}
+            Available {shop.capacityAvailable} {shop.unit === "กล่อง/วัน" ? "boxes/day" : shop.unit}
           </span>
           <span className={`flex items-center gap-0.5 text-[11px] ${isDark ? "text-slate-400" : "text-ink-muted"}`}>
             <MapPin className="w-3 h-3" />
@@ -172,25 +172,25 @@ export const ShopCard: React.FC<ShopCardProps> = ({
         }`}
       >
         <div className="flex flex-col">
-          <span className={`text-[11px] ${isDark ? "text-slate-400" : "text-ink-muted"}`}>เงินหมุนเวียนที่ต้องใช้</span>
+          <span className={`text-[11px] ${isDark ? "text-slate-400" : "text-ink-muted"}`}>Working capital required</span>
           <div className="flex items-center gap-1 mt-0.5">
             <Coins className={`w-3.5 h-3.5 ${isDark ? "text-slate-400" : "text-ink-muted"}`} />
             <span className={`text-xs font-semibold font-mono tabular-nums ${isDark ? "text-white" : "text-ink"}`}>
-              ฿{shop.workingCapitalNeeded.toLocaleString()}
+              ฿{shop.workingCapitalNeeded.toLocaleString("en-US")}
             </span>
           </div>
         </div>
 
         {isShortage ? (
           <div className="flex flex-col items-end">
-            <span className="text-[11px] text-danger font-medium">ทุนที่ยังขาด</span>
+            <span className="text-[11px] text-danger font-medium">Funding gap</span>
             <span className="text-xs font-bold text-danger bg-danger-light px-2 py-0.5 rounded-chip border border-danger/20 font-mono tabular-nums mt-0.5 shadow-2xs">
-              ขาด ฿{shop.fundingGap.toLocaleString()}
+              Shortfall ฿{shop.fundingGap.toLocaleString("en-US")}
             </span>
           </div>
         ) : (
           <div className="flex flex-col items-end">
-            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">สภาพคล่อง</span>
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Liquidity</span>
             <span
               className={`text-xs font-medium px-2 py-0.5 rounded-chip border mt-0.5 ${
                 isDark
@@ -198,7 +198,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
                   : "bg-emerald-50 text-emerald-700 border-emerald-200"
               }`}
             >
-              ครอบคลุม
+              Covered
             </span>
           </div>
         )}
@@ -219,7 +219,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
                 e.stopPropagation();
                 onSwapShop();
               }}
-              title="สลับร้านคู่นี้กับร้านสำรอง"
+              title="Replace this shop with a backup"
               className={`px-2 py-1 rounded-lg transition-colors text-xs flex items-center gap-1 font-medium ${
                 isDark
                   ? "text-slate-300 hover:text-white hover:bg-slate-700/60"
@@ -227,7 +227,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
               }`}
             >
               <RefreshCw className="w-3 h-3" />
-              <span>สลับ</span>
+              <span>Replace</span>
             </button>
           )}
           {onViewFinance && (
@@ -243,7 +243,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
                   : "text-brand hover:bg-brand/10"
               }`}
             >
-              <span>ดูเงินร้านนี้</span>
+              <span>View shop finances</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}

@@ -117,7 +117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       isMobileMenuOpen: false,
       selectedShopId: context?.shopId || state.selectedShopId,
       selectedOrderId: context?.orderId || state.selectedOrderId,
-      contextPill: context?.shopId ? `ร้านที่เลือก: ${context.shopId}` : null,
+      contextPill: context?.shopId ? `Selected shop: ${context.shopId}` : null,
     }));
   },
   setUserRole: (role) => set({ userRole: role }),

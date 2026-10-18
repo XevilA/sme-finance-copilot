@@ -76,11 +76,11 @@ export const ResourceTile: React.FC<ResourceTileProps> = ({
         {resource.status === "confirmed" ? (
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-resource-dark bg-resource-light px-2 py-0.5 rounded-chip border border-resource/20">
             <CheckCircle className="w-3 h-3" />
-            ยืนยันแล้ว
+            Confirmed
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-chip border border-amber-200">
-            เสนอให้ใช้
+            Offered
           </span>
         )}
       </div>
@@ -88,11 +88,11 @@ export const ResourceTile: React.FC<ResourceTileProps> = ({
       {/* Details */}
       <div className="text-[11px] space-y-1 text-ink-muted mb-3 bg-slate-50 p-2 rounded-xl">
         <div className="flex items-center justify-between">
-          <span>ความจุ / ข้อกำหนด:</span>
+          <span>Capacity / Requirements:</span>
           <span className="font-medium text-ink">{resource.capacityText}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>อัตราค่าบริการ:</span>
+          <span>Service rate:</span>
           <span className="font-semibold text-resource-dark">{resource.priceText}</span>
         </div>
         <div className="flex items-center gap-1 text-[10px] text-ink-muted">
@@ -106,9 +106,9 @@ export const ResourceTile: React.FC<ResourceTileProps> = ({
         <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-xl text-[11px] text-danger flex items-start gap-1.5 animate-pulse">
           <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <div>
-            <div className="font-bold">ถอดออกจากแผนจำลองแล้ว (ยังไม่เปลี่ยนสถานะจริง)</div>
+            <div className="font-bold">Removed from the simulation plan (live status unchanged)</div>
             <div className="text-[10px] text-red-700 leading-tight">
-              บันทึกของเจ้าของทรัพยากร: {resource.impactIfDetached.bottleneckMessage}
+              Resource owner note: {resource.impactIfDetached.bottleneckMessage}
             </div>
           </div>
         </div>
@@ -131,12 +131,12 @@ export const ResourceTile: React.FC<ResourceTileProps> = ({
             {isDetached ? (
               <>
                 <RotateCcw className="w-3 h-3" />
-                <span>คืนชิ้นส่วน</span>
+                <span>Restore resource</span>
               </>
             ) : (
               <>
                 <Trash2 className="w-3 h-3" />
-                <span>ถอดชิ้นส่วน</span>
+                <span>Remove resource</span>
               </>
             )}
           </button>

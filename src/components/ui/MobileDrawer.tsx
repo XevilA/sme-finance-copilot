@@ -31,101 +31,101 @@ type NavItem = {
   icon: React.ReactNode;
   badge?: string;
   badgeColor?: string;
-  group: "วิเคราะห์ธุรกิจ" | "ประกอบโอกาส & ทีม" | "แซนด์บ็อกซ์ & รายงาน";
+  group: "Business Analysis" | "Build Opportunities & Teams" | "Sandbox & Reports";
 };
 
 const navItems: NavItem[] = [
   // Group 1: Business Diagnostics
   {
     id: "overview",
-    label: "1. ภาพรวมธุรกิจ",
+    label: "1. Business Overview",
     icon: <LayoutDashboard className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "import",
-    label: "2. ข้อมูลธุรกิจ & นำเข้าไฟล์",
+    label: "2. Business Data & Import",
     icon: <UploadCloud className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "cashflow",
-    label: "3. เงินสดและกระแสเงินสด",
+    label: "3. Cash & Cash Flow",
     icon: <TrendingUp className="w-4 h-4" />,
     badge: "Time Travel",
     badgeColor: "bg-brand/10 text-brand",
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "health",
-    label: "4. สุขภาพการเงิน",
+    label: "4. Financial Health",
     icon: <HeartPulse className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "cost",
-    label: "5. ต้นทุนและความคุ้มค่า",
+    label: "5. Costs & Profitability",
     icon: <PieChart className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "sales",
-    label: "6. ยอดขายและสินค้า",
+    label: "6. Sales & Products",
     icon: <ShoppingBag className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
 
   // Group 2: Opportunity & Swarm Assembly
   {
     id: "funding",
-    label: "7. จับคู่แหล่งเงินทุน",
+    label: "7. Funding Match",
     icon: <Coins className="w-4 h-4" />,
     badgeColor: "bg-red-50 text-danger border border-red-200",
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "swarm",
-    label: "8. SME SWARM รวมทีม",
+    label: "8. SME SWARM Team Assembly",
     icon: <Network className="w-4 h-4" />,
-    badge: "★ เด่นสุด",
+    badge: "★ Featured",
     badgeColor: "bg-brand text-white",
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "shop-finance",
-    label: "9. แผนเงินรายร้านในทีม",
+    label: "9. Per-SME Cash Plan",
     icon: <Users className="w-4 h-4" />,
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "unlock",
-    label: "10. SME UNLOCK ทรัพยากร",
+    label: "10. SME UNLOCK Resources",
     icon: <Wrench className="w-4 h-4" />,
-    badge: "ถอดชิ้นส่วน",
+    badge: "Disassemble",
     badgeColor: "bg-resource-light text-resource-dark",
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "funder",
-    label: "11. ฝั่งผู้ให้ทุน (Funder)",
+    label: "11. Funder Portal",
     icon: <Building className="w-4 h-4" />,
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
 
   // Group 3: Sandbox & Reports
   {
     id: "simulator",
-    label: "12. ห้องจำลอง & ซ้อมแผนพัง",
+    label: "12. Simulation & Chaos Rehearsal",
     icon: <Sliders className="w-4 h-4" />,
     badge: "Chaos",
     badgeColor: "bg-amber-100 text-amber-800",
-    group: "แซนด์บ็อกซ์ & รายงาน",
+    group: "Sandbox & Reports",
   },
   {
     id: "projects",
-    label: "13. โครงการ & รายงาน",
+    label: "13. Projects & Reports",
     icon: <FileCheck2 className="w-4 h-4" />,
-    group: "แซนด์บ็อกซ์ & รายงาน",
+    group: "Sandbox & Reports",
   },
 ];
 
@@ -147,15 +147,15 @@ export const MobileDrawer: React.FC = () => {
   const proposalState = useEnvelope<SwarmProposal>(useCallback(() => apiClient.getSwarmProposal(), []));
   const proposal = proposalState.envelope?.data || null;
   const fundingBadge = proposal && proposal.totalFundingGap > 0
-    ? `ขาด ฿${proposal.totalFundingGap.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`
+    ? `Shortfall ฿${proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
     : null;
 
   if (!isMobileMenuOpen) return null;
 
   const groups: Array<NavItem["group"]> = [
-    "วิเคราะห์ธุรกิจ",
-    "ประกอบโอกาส & ทีม",
-    "แซนด์บ็อกซ์ & รายงาน",
+    "Business Analysis",
+    "Build Opportunities & Teams",
+    "Sandbox & Reports",
   ];
 
   return (
@@ -176,14 +176,13 @@ export const MobileDrawer: React.FC = () => {
             </div>
             <div>
               <div className="text-xs font-bold text-ink leading-tight">SME Finance Copilot</div>
-              <div className="text-[10px] text-ink-muted leading-none">ห้องประกอบโอกาสธุรกิจ</div>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setMobileMenuOpen(false)}
             className="p-1.5 text-slate-400 hover:text-ink hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
-            aria-label="ปิดเมนู"
+            aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
@@ -193,7 +192,7 @@ export const MobileDrawer: React.FC = () => {
         <div className="p-3 bg-slate-100/70 border-b border-borderLine">
           <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
             <Shield className="w-3 h-3 text-brand" />
-            <span>สวมบทบาท (Role View)</span>
+            <span>View as (Role)</span>
           </div>
           <div className="grid grid-cols-3 gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
             {(["owner", "buyer", "funder"] as UserRole[]).map((r) => (
@@ -207,7 +206,7 @@ export const MobileDrawer: React.FC = () => {
                     : "text-ink-muted hover:text-ink"
                 }`}
               >
-                {r === "owner" ? "เจ้าของ" : r === "buyer" ? "ผู้ซื้อ" : "ผู้ให้ทุน"}
+                {r === "owner" ? "Owner" : r === "buyer" ? "Buyer" : "Funder"}
               </button>
             ))}
           </div>
@@ -273,11 +272,11 @@ export const MobileDrawer: React.FC = () => {
             className="w-full py-2 bg-gradient-to-r from-navy-deep to-brand text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm"
           >
             <PlayCircle className="w-4 h-4 text-brand-glow" />
-            <span>โหมดเล่าโครงการ (Story Mode)</span>
+            <span>Story Mode</span>
           </button>
 
           <div className="flex items-center justify-between pt-1 text-[11px] text-ink-muted">
-            <span>ลดภาพเคลื่อนไหว</span>
+            <span>Reduce motion</span>
             <button
               type="button"
               onClick={toggleReducedMotion}

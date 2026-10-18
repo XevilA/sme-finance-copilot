@@ -41,11 +41,11 @@ export const AIPanel: React.FC = () => {
   const shown: AIResponse | null = isAIPanelOpen && !loading
     ? aiData || {
         pageId: currentPage,
-        summary: error ? "เรียกคำอธิบายจาก backend ไม่สำเร็จ" : "ยังไม่มีคำอธิบายสำหรับหน้านี้",
-        reasoning: error || "backend ไม่ได้คืนคำอธิบายของหน้านี้ · ลองนำเข้าข้อมูลหรือเปิดหน้าอื่น",
+        summary: error ? "Could not load the explanation from the backend" : "No explanation is available for this page yet",
+        reasoning: error || "The backend did not return an explanation for this page · Try importing data or opening another page",
         dataUsed: [],
         suggestions: [],
-        unknowns: [error ? `ข้อผิดพลาด: ${error}` : "backend ไม่ได้คืนคำอธิบายของหน้านี้"],
+        unknowns: [error ? `Error: ${error}` : "The backend did not return an explanation for this page"],
       }
     : null;
   const aiWarning = aiData?.warning || accepted?.result.data.aiWarning || null;
@@ -76,17 +76,17 @@ export const AIPanel: React.FC = () => {
   };
 
   const quickQuestions: Record<string, string[]> = {
-    overview: ["เงินสดลดลงเพราะอะไร?", "รับงานนี้เงินหมุนทันไหม?", "ค่าใช้จ่ายตัวไหนกระทบมากที่สุด?"],
-    swarm: ["ทำไมถึงเสนอ 6 ร้านนี้?", "ทุนที่ขาด 29,500 บาทแก้ยังไง?", "สลับร้านสำรองได้ไหม?"],
-    cashflow: ["เงินจะติดลบวันไหนบ้าง?", "ถ้าขอเครดิตเทอมสั้นลงเงินจะดีขึ้นไหม?", "ทำไมเงินเข้าช้า?"],
-    health: ["Current Ratio 1.15 บ่งบอกอะไร?", "ทำไมถึงคำนวณ DIO ไม่ได้?", "ควรลดต้นทุนจุดไหน?"],
-    funding: ["ทำไมแนะนำ Invoice Factoring?", "ดอกเบี้ยรวมเท่าไร?", "ต้องใช้เอกสารอะไรบ้าง?"],
+    overview: ["Why is cash decreasing?", "Can we fulfill this order with our available working capital?", "Which expense has the biggest impact?"],
+    swarm: ["Why were these six shops selected?", "How can we cover the ฿29,500 funding gap?", "Can we replace a shop with a backup?"],
+    cashflow: ["On which dates could cash go negative?", "Would shorter payment terms improve cash flow?", "Why are payments arriving late?"],
+    health: ["What does a 1.15 current ratio indicate?", "Why can't DIO be calculated?", "Where should we reduce costs?"],
+    funding: ["Why is invoice factoring recommended?", "What is the total interest?", "Which documents are required?"],
   };
 
   const currentQuestions = quickQuestions[currentPage] || [
-    "เงินหายไปตรงไหน?",
-    "งานนี้คุ้มไหม?",
-    "ใช้ทุนน้อยลงได้ไหม?",
+    "Where is the cash going?",
+    "Is this order profitable?",
+    "Can we reduce the funding needed?",
   ];
 
   return (
@@ -101,13 +101,13 @@ export const AIPanel: React.FC = () => {
             <h3 className="font-display font-bold text-ink text-sm flex items-center gap-1.5">
               <span>SME Copilot Intelligence</span>
               <span className="text-[10px] bg-brand/10 text-brand px-1.5 py-0.2 rounded font-normal">
-                {aiMode === "rules" ? "กฎเกณฑ์ (deterministic)" : aiMode ? `โหมด ${aiMode}` : "ยังไม่ทราบโหมด"}
+                {aiMode === "rules" ? "Rules-based (deterministic)" : aiMode ? `Mode: ${aiMode}` : "Mode unavailable"}
               </span>
             </h3>
             <p className="text-[11px] text-ink-muted">
-              อธิบายบริบทหน้า: {currentPage}
-              {aiData?.policyVersion ? ` · เกณฑ์ ${aiData.policyVersion}` : ""}
-              {aiWarning ? ` · ใช้ผลจากกฎเกณฑ์แทนโมเดล: ${aiWarning}` : ""}
+              Explaining page: {currentPage}
+              {aiData?.policyVersion ? ` · Policy ${aiData.policyVersion}` : ""}
+              {aiWarning ? ` · Using rules-based results instead of a model: ${aiWarning}` : ""}
             </p>
           </div>
         </div>
@@ -116,7 +116,7 @@ export const AIPanel: React.FC = () => {
           type="button"
           onClick={() => setAIPanelOpen(false)}
           className="p-1.5 text-ink-muted hover:text-ink hover:bg-slate-100 rounded-lg transition-colors"
-          title="ปิดแผง (Esc)"
+          title="Close panel (Esc)"
         >
           <X className="w-4 h-4" />
         </button>
@@ -127,8 +127,8 @@ export const AIPanel: React.FC = () => {
         <div className="p-2.5 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
           <span>
             {stale
-              ? "ข้อมูลตั้งต้นถูกแก้หลังการวิเคราะห์ ผลนี้จึงเป็นของข้อมูลชุดก่อน"
-              : "มีรายการจำลองที่ยังไม่บันทึก ผลนี้อิงจากข้อมูลเดิม"}
+              ? "Source data changed after analysis; these results are based on the previous version."
+              : "There are unsaved simulation changes; these results use the original data."}
           </span>
           <button
             type="button"
@@ -136,7 +136,7 @@ export const AIPanel: React.FC = () => {
             className="px-2 py-0.5 bg-brand text-white text-[10px] font-medium rounded hover:bg-brand-dark flex items-center gap-1"
           >
             <RefreshCw className="w-2.5 h-2.5" />
-            <span>วิเคราะห์ใหม่</span>
+            <span>Reanalyze</span>
           </button>
         </div>
       )}
@@ -155,7 +155,7 @@ export const AIPanel: React.FC = () => {
             <div className="bg-slate-50 p-3.5 rounded-card border border-slate-100">
               <span className="text-[10px] font-bold text-brand uppercase tracking-wider block mb-1.5 flex items-center gap-1">
                 <FileText className="w-3.5 h-3.5" />
-                สรุปเหตุและผลทางการเงิน
+                Financial Cause-and-Effect Summary
               </span>
               <p className="text-ink font-medium leading-relaxed mb-2">{shown.summary}</p>
               <p className="text-ink-muted leading-relaxed text-[11px] border-t border-slate-200/80 pt-2">
@@ -168,12 +168,12 @@ export const AIPanel: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold text-ink uppercase tracking-wider flex items-center gap-1">
                   <Target className="w-3.5 h-3.5 text-brand" />
-                  ข้อมูลที่ใช้คำนวณ (Evidence Refs)
+                  Evidence Used in This Calculation
                 </span>
                 <span className="text-[10px] text-brand font-medium">
                   {!shown.dataUsed.length
-                    ? "ยังไม่มีตัวเลขที่ใช้อ้างอิง"
-                    : selectedRefId ? "กำลังส่องแสงอ้างอิง" : "คลิกเพื่อส่องแสงดูจุดจริง"}
+                    ? "No supporting figures are available"
+                    : selectedRefId ? "Highlighting evidence" : "Click to highlight the source"}
                 </span>
               </div>
 
@@ -210,7 +210,7 @@ export const AIPanel: React.FC = () => {
             <div>
               <span className="text-[11px] font-bold text-ink uppercase tracking-wider block mb-2 flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-resource-dark" />
-                ข้อเสนอแนะเชิงกลยุทธ์
+                Strategic Recommendations
               </span>
               <div className="space-y-2">
                 {shown.suggestions.map((sug, idx) => {
@@ -227,10 +227,10 @@ export const AIPanel: React.FC = () => {
                         type="button"
                         onClick={() => { if (target) setCurrentPage(target as never); }}
                         disabled={!target}
-                        title={target ? undefined : "ข้อเสนอนี้ไม่ได้ระบุหน้าเป้าหมายจาก backend"}
+                        title={target ? undefined : "The backend did not provide a destination page for this recommendation"}
                         className="text-[11px] font-bold text-resource-dark hover:underline flex items-center gap-1"
                       >
-                        <span>{target ? label || `ไปที่หน้า ${target}` : "ไม่ได้ระบุหน้าเป้าหมาย"}</span>
+                        <span>{target ? label || `Go to ${target}` : "No destination page specified"}</span>
                         <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
@@ -243,10 +243,10 @@ export const AIPanel: React.FC = () => {
             <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-200 text-amber-900">
               <span className="text-[10px] font-bold uppercase tracking-wider block mb-1 flex items-center gap-1">
                 <HelpCircle className="w-3.5 h-3.5 text-attention" />
-                สิ่งที่ระบบยังไม่ทราบ (ความไม่แน่นอน)
+                What the System Does Not Know (Uncertainties)
               </span>
               <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
-                {(shown.unknowns.length ? shown.unknowns : ["backend ไม่ได้ระบุรายการที่ยังไม่ทราบสำหรับข้อมูลชุดนี้"]).map((unk, idx) => (
+                {(shown.unknowns.length ? shown.unknowns : ["The backend did not list unknowns for this data set."]).map((unk, idx) => (
                   <li key={idx}>{unk}</li>
                 ))}
               </ul>
@@ -258,7 +258,7 @@ export const AIPanel: React.FC = () => {
       {/* Quick Prompt Questions */}
       <div className="p-3 bg-slate-50 border-t border-borderLine space-y-1.5">
         <span className="text-[10px] font-bold text-ink-muted uppercase block">
-          คำถามลัด (ยังไม่รองรับการถาม-ตอบ แสดงเป็นตัวอย่างคำถาม):
+          Suggested questions (Q&A is not supported yet; these are example questions):
         </span>
         <div className="flex flex-wrap gap-1.5">
           {currentQuestions.map((q, idx) => (
@@ -266,7 +266,7 @@ export const AIPanel: React.FC = () => {
               key={idx}
               type="button"
               disabled
-              title="ยังไม่มี endpoint ถาม-ตอบ · GET /ai/explain คืนคำอธิบายจากกฎเกณฑ์ของหน้านี้เท่านั้น"
+              title="Q&A is not available yet · GET /ai/explain returns only a rules-based explanation for this page"
               className="text-[10px] bg-white border border-slate-200 hover:border-brand hover:text-brand px-2.5 py-1 rounded-chip text-ink transition-colors text-left"
             >
               {q}

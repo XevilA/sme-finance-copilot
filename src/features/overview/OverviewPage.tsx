@@ -28,13 +28,13 @@ export const OverviewPage: React.FC = () => {
   const mode = envelopeMode(state, (value) =>
     value.revenue == null && value.expense == null && value.netProfit == null
     && value.cashBalance == null && value.actionableItems.length === 0);
-  const amount = (value: number | null | undefined) => value == null ? "ยังไม่มีข้อมูล" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 });
-  const change = (value: number | null | undefined) => value == null ? "ยังไม่มีข้อมูลเทียบงวดก่อน" : `${value > 0 ? "+" : ""}฿${amount(value)} เทียบงวดก่อน`;
+  const amount = (value: number | null | undefined) => value == null ? "No data" : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const change = (value: number | null | undefined) => value == null ? "No prior-period comparison" : `${value > 0 ? "+" : ""}฿${amount(value)} vs. previous period`;
   const [selectedMetric, setSelectedMetric] = useState<"cash" | "profit" | "revenue" | "expense">("cash");
 
   if (!loading && (error || mode === "error")) {
     return (
-      <StateRenderer currentMode="error" errorMessage={error || "อ่านภาพรวมธุรกิจจาก backend ไม่สำเร็จ"} onRetry={loadData}>
+      <StateRenderer currentMode="error" errorMessage={error || "Could not load the business overview from the backend"} onRetry={loadData}>
         {null}
       </StateRenderer>
     );
@@ -44,7 +44,7 @@ export const OverviewPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        unavailableReason="ยังไม่มีงบการเงินที่วิเคราะห์แล้วสำหรับกิจการนี้"
+        unavailableReason="No analyzed financial statements are available for this business."
         missingItems={dataEnvelope.missing}
         onRetry={loadData}
         onAddData={() => setCurrentPage("import")}
@@ -88,16 +88,16 @@ export const OverviewPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-display font-bold text-ink">
-                ภาพรวมสุขภาพการเงินและโอกาสทางธุรกิจ
+                Financial Health & Business Opportunities
               </h2>
               <DataKindBadge kind={kind} size="md" />
             </div>
             <p className="text-xs text-ink-muted flex items-center gap-2 mt-1">
               <Calendar className="w-3.5 h-3.5" />
               <span>
-                ข้อมูลงวด: <strong>{data.period}</strong> · ที่มา: {dataEnvelope.source}
-                {asOf ? ` · ปรับปรุงล่าสุด: ${new Date(asOf).toLocaleDateString("th-TH")}` : " · ยังไม่ระบุวันที่ข้อมูล"}
-                {dataEnvelope.missing.length ? ` · ข้อมูลที่ยังขาด ${dataEnvelope.missing.length} รายการ` : ""}
+                Period: <strong>{data.period}</strong> · Source: {dataEnvelope.source}
+                {asOf ? ` · Last updated: ${new Date(asOf).toLocaleDateString("en-US")}` : " · Data date not specified"}
+                {dataEnvelope.missing.length ? ` · ${dataEnvelope.missing.length} missing data items` : ""}
               </span>
             </p>
           </div>
@@ -109,7 +109,7 @@ export const OverviewPage: React.FC = () => {
               className="px-3 py-1.5 bg-white border border-borderLine hover:border-brand/40 text-xs font-medium rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <RefreshCw className="w-3 h-3 text-ink-muted" />
-              <span>แก้ข้อมูลและวิเคราะห์ใหม่</span>
+              <span>Edit data and reanalyze</span>
             </button>
 
             <button
@@ -118,7 +118,7 @@ export const OverviewPage: React.FC = () => {
               className="px-3.5 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-bold rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>ให้ AI อธิบายภาพรวม</span>
+              <span>Ask AI to explain the overview</span>
             </button>
           </div>
         </div>
@@ -135,7 +135,7 @@ export const OverviewPage: React.FC = () => {
             }`}
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-              <span>รายได้รวม</span>
+              <span>Total revenue</span>
               <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-ink tabular-nums">
@@ -157,7 +157,7 @@ export const OverviewPage: React.FC = () => {
             }`}
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-              <span>ค่าใช้จ่ายรวม</span>
+              <span>Total expenses</span>
               <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-ink tabular-nums">
@@ -182,14 +182,14 @@ export const OverviewPage: React.FC = () => {
             }`}
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-              <span className="font-semibold text-brand">กำไรสุทธิทางบัญชี</span>
+              <span className="font-semibold text-brand">Accounting net profit</span>
               <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-brand tabular-nums">
               ฿{amount(data.netProfit)}
             </div>
             <div className="text-[10px] text-slate-500 mt-1">
-              อัตรากำไรสุทธิ {margin == null ? "ยังไม่มีข้อมูล" : `${amount(margin)}%`}
+              Net margin {margin == null ? "No data" : `${amount(margin)}%`}
             </div>
           </div>
 
@@ -206,7 +206,7 @@ export const OverviewPage: React.FC = () => {
             }`}
           >
             <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-              <span className="font-semibold text-ink">{kind === "actual" ? "เงินสดคงเหลือจริง" : "เงินสดตามข้อมูลที่ระบุ"}</span>
+              <span className="font-semibold text-ink">{kind === "actual" ? "Actual cash balance" : "Cash balance as reported"}</span>
               <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-attention-dark tabular-nums">
@@ -224,14 +224,14 @@ export const OverviewPage: React.FC = () => {
             className="p-4 rounded-card border border-danger/30 bg-red-50/40 relative"
           >
             <div className="flex items-center justify-between text-xs text-danger mb-1">
-              <span className="font-bold">เงินที่ใช้ได้หลังกันสำรอง</span>
+              <span className="font-bold">Cash available after reserve</span>
               <DataKindBadge kind={kind} size="sm" />
             </div>
             <div className="text-xl font-bold font-display text-danger tabular-nums">
               ฿{amount(data.usableCashAfterReserve)}
             </div>
             <div className="text-[10px] text-danger font-medium mt-1">
-              เงินสำรองที่ระบุ ฿{amount(data.reserveThreshold)}
+              Reported reserve: ฿{amount(data.reserveThreshold)}
             </div>
           </div>
         </div>
@@ -244,7 +244,7 @@ export const OverviewPage: React.FC = () => {
             </div>
             <div>
               <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
-                กำไรทางบัญชี ฿{amount(data.netProfit)} · เงินสดคงเหลือ ฿{amount(data.cashBalance)}
+                Accounting profit ฿{amount(data.netProfit)} · Cash balance ฿{amount(data.cashBalance)}
               </h4>
               <p className="text-xs text-ink-muted leading-relaxed mt-0.5">
                 {data.cashVsProfitInsight}
@@ -257,7 +257,7 @@ export const OverviewPage: React.FC = () => {
             onClick={() => setCurrentPage("cashflow")}
             className="px-4 py-2 bg-brand text-white text-xs font-semibold rounded-btn hover:bg-brand-dark flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
           >
-            <span>ดู Time Travel กราฟเงินสด 90 วัน</span>
+            <span>View the 90-day Time Travel cash chart</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -266,9 +266,9 @@ export const OverviewPage: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-display font-bold text-ink flex items-center gap-1.5">
-              <span>เรื่องที่ควรทำต่อเพื่อรักษาสภาพคล่อง</span>
+              <span>Recommended actions to maintain liquidity</span>
               <span className="text-[10px] bg-slate-100 text-ink-muted px-2 py-0.5 rounded-chip font-normal">
-                {data.actionableItems.length} รายการแนะนำ
+                {data.actionableItems.length} recommendations
               </span>
             </h3>
           </div>
@@ -290,11 +290,11 @@ export const OverviewPage: React.FC = () => {
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {item.priority === "high" ? "ด่วนมาก" : item.priority === "medium" ? "สำคัญ" : "ข้อเสนอแนะ"}
+                      {item.priority === "high" ? "Urgent" : item.priority === "medium" ? "Important" : "Recommendation"}
                     </span>
                     {item.dueDate && (
                       <span className="text-[11px] text-ink-muted font-mono">
-                        ครบกำหนด: {item.dueDate}
+                        Due: {item.dueDate}
                       </span>
                     )}
                   </div>
@@ -309,7 +309,7 @@ export const OverviewPage: React.FC = () => {
                 <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
                   {item.amount ? (
                     <span className="text-xs font-bold font-mono text-ink">
-                      มูลค่า: ฿{item.amount.toLocaleString()}
+                      Amount: ฿{item.amount.toLocaleString("en-US")}
                     </span>
                   ) : <span />}
 
@@ -337,10 +337,10 @@ export const OverviewPage: React.FC = () => {
               <FileText className="w-4 h-4" />
             </div>
             <h4 className="font-display font-bold text-xs text-ink mb-1">
-              ดูว่าเงินร้านเป็นอย่างไร
+              Understand your business finances
             </h4>
             <p className="text-[11px] text-ink-muted">
-              นำเข้าไฟล์ Excel (.xlsx) หรือกรอกแบบฟอร์ม 8 หมวดเพื่อตรวจสุขภาพร้าน
+              Upload an Excel file (.xlsx) or complete the 8-category form to assess your business.
             </p>
           </div>
 
@@ -352,10 +352,10 @@ export const OverviewPage: React.FC = () => {
               <Sparkles className="w-4 h-4" />
             </div>
             <h4 className="font-display font-bold text-xs text-ink mb-1">
-              รวมทีมรับงานใหญ่ (SME SWARM)
+              Assemble a team for a large order (SME SWARM)
             </h4>
             <p className="text-[11px] text-ink-muted">
-              เปิดคำสั่งซื้อและคำนวณการแบ่งงานตามข้อมูลร้านที่มี
+              Open an order and calculate work allocation using available shop data.
             </p>
           </div>
 
@@ -367,10 +367,10 @@ export const OverviewPage: React.FC = () => {
               <Coins className="w-4 h-4" />
             </div>
             <h4 className="font-display font-bold text-xs text-ink mb-1">
-              ปลดล็อกของที่มีอยู่ (SME UNLOCK)
+              Unlock existing resources (SME UNLOCK)
             </h4>
             <p className="text-[11px] text-ink-muted">
-              แชร์ครัวกลาง รถขนส่ง หรือเครื่องจักรเพื่อลดต้นทุนก้อนแรก
+              Share kitchens, delivery vehicles, or machinery to reduce upfront costs.
             </p>
           </div>
         </div>

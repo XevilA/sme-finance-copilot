@@ -77,7 +77,7 @@ export function useEnvelope<T>(load: () => Promise<Envelope<T>>, deps: unknown[]
       .catch((failure: unknown) => {
         if (sequence.current !== id || contextEpoch() !== startedAt) return;
         setEnvelope(null);
-        setError(failure instanceof Error ? failure.message : "เรียกข้อมูลไม่สำเร็จ");
+        setError(failure instanceof Error ? failure.message : "Could not load data.");
         setLoading(false);
       });
     return () => {

@@ -137,7 +137,7 @@ export class ApiError extends Error {
 
 function requireBackend() {
   if (USE_MOCK) {
-    throw new Error("โหมดตัวอย่างยังไม่คำนวณข้อมูลจริง กรุณาตั้ง VITE_USE_MOCK=false และ VITE_API_BASE_URL ก่อนใช้งาน");
+    throw new Error("Demo mode does not calculate real data. Set VITE_USE_MOCK=false and configure VITE_API_BASE_URL.");
   }
 }
 
@@ -154,16 +154,16 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
       const message = Array.isArray(detail)
         ? detail.map((item: { loc?: string[]; msg?: string }) => `${item.loc?.join(".") || "input"}: ${item.msg || "Invalid input"}`).join("; ")
         : typeof detail === "string" ? detail : (detail as { message?: string } | undefined)?.message || `HTTP ${response.status}`;
-      if (response.status === 401) throw new ApiError("ต้องเข้าสู่ระบบก่อนเรียกข้อมูลนี้ (HTTP 401)", 401);
-      if (response.status === 403) throw new ApiError("บัญชีนี้ไม่มีสิทธิ์เรียกข้อมูลนี้ (HTTP 403)", 403);
+      if (response.status === 401) throw new ApiError("Sign in is required to access this data (HTTP 401).", 401);
+      if (response.status === 403) throw new ApiError("This account is not allowed to access this data (HTTP 403).", 403);
       throw new ApiError(message, response.status);
     }
-    if (!body || typeof body !== "object") throw new ApiError("Backend ไม่ได้ส่ง JSON ที่ถูกต้อง", response.status);
+    if (!body || typeof body !== "object") throw new ApiError("The backend did not return valid JSON.", response.status);
     return body as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    if (error instanceof DOMException && error.name === "AbortError") throw new ApiError("หมดเวลารอ backend กรุณาลองใหม่", 0);
-    if (error instanceof TypeError) throw new ApiError("เชื่อมต่อ backend ไม่ได้ กรุณาตรวจ API URL และ CORS", 0);
+    if (error instanceof DOMException && error.name === "AbortError") throw new ApiError("The backend request timed out. Please try again.", 0);
+    if (error instanceof TypeError) throw new ApiError("Could not connect to the backend. Check the API URL and CORS settings.", 0);
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -302,7 +302,7 @@ export const apiClient = {
     if (scope.projectId) query.set("project_id", scope.projectId);
     if (scope.smeId) query.set("sme_id", scope.smeId);
     if (scope.orderRef) query.set("order_ref", scope.orderRef);
-    if (!query.toString()) throw new ApiError("ต้องระบุ project, SME หรือเลขออเดอร์ก่อนอ่านแผนที่บันทึกไว้", 422);
+    if (!query.toString()) throw new ApiError("Specify a project, SME, or order reference before reading saved plans.", 422);
     query.set("limit", String(limit));
     return requestJson<Sourced<SavedSimulationSummary[]>>(`/simulations?${query.toString()}`);
   },
@@ -313,7 +313,7 @@ export const apiClient = {
     if (scope.projectId) query.set("project_id", scope.projectId);
     if (scope.smeId) query.set("sme_id", scope.smeId);
     if (scope.orderRef) query.set("order_ref", scope.orderRef);
-    if (!query.toString()) throw new ApiError("ต้องระบุ project, SME หรือเลขออเดอร์ก่อนอ่านแผนที่บันทึกไว้", 422);
+    if (!query.toString()) throw new ApiError("Specify a project, SME, or order reference before reading saved plans.", 422);
     return requestJson<Sourced<SavedSimulation>>(`/simulations/${simulationId}?${query.toString()}`);
   },
 
@@ -324,7 +324,7 @@ export const apiClient = {
     if (scope.projectId) query.set("project_id", scope.projectId);
     if (scope.smeId) query.set("sme_id", scope.smeId);
     if (scope.orderRef) query.set("order_ref", scope.orderRef);
-    if (!query.toString()) throw new ApiError("ต้องระบุ project, SME หรือเลขออเดอร์ก่อน replay แผนที่บันทึกไว้", 422);
+    if (!query.toString()) throw new ApiError("Specify a project, SME, or order reference before replaying a saved plan.", 422);
     if (scope.inputRevision) query.set("input_revision", scope.inputRevision);
     return requestJson<Sourced<SimulationReplay>>(`/simulations/${simulationId}/replay?${query.toString()}`, { method: "POST" });
   },
@@ -348,8 +348,8 @@ export const apiClient = {
 
   async uploadStatement(file: File): Promise<{ input: FinancialInput; source: string; persisted: boolean }> {
     requireBackend();
-    if (!/\.xlsx$/i.test(file.name)) throw new Error("Backend รองรับเฉพาะ .xlsx ตาม Template กรุณาแปลง .xls/.csv ก่อน");
-    if (!file.size || file.size > 5 * 1024 * 1024) throw new Error("ไฟล์ต้องไม่ว่างและมีขนาดไม่เกิน 5 MiB ตามข้อจำกัด backend");
+    if (!/\.xlsx$/i.test(file.name)) throw new Error("The backend supports .xlsx files only. Convert .xls or .csv files first.");
+    if (!file.size || file.size > 5 * 1024 * 1024) throw new Error("Choose a non-empty file no larger than 5 MiB.");
     const body = new FormData();
     body.append("file", file);
     return requestJson("/upload?persist=false", { method: "POST", body });
@@ -357,9 +357,9 @@ export const apiClient = {
 
   async previewStatement(file: File): Promise<UploadPreview> {
     requireBackend();
-    if (!/\.xlsx$/i.test(file.name)) throw new Error("กรุณาเลือกไฟล์ .xlsx");
+    if (!/\.xlsx$/i.test(file.name)) throw new Error("Select an .xlsx file.");
     // Leaves room for multipart overhead under Vercel's 4.5 MB request limit.
-    if (!file.size || file.size > 4 * 1024 * 1024) throw new Error("ไฟล์ต้องไม่ว่างและมีขนาดไม่เกิน 4 MiB สำหรับเว็บนี้");
+    if (!file.size || file.size > 4 * 1024 * 1024) throw new Error("Choose a non-empty file no larger than 4 MiB for this website.");
     const body = new FormData();
     body.append("file", file);
     return requestJson("/upload/preview", { method: "POST", body });
@@ -376,7 +376,7 @@ export const apiClient = {
       { input, shop_name: shopName || null, use_llm: false },
       { ...context, input_revision: revision },
     ));
-    if (!result.views || !result.data?.metrics || !result.source) throw new Error("Backend ยังไม่รองรับผลวิเคราะห์สำหรับ dashboard กรุณาอัปเดต server");
+    if (!result.views || !result.data?.metrics || !result.source) throw new Error("The backend returned an unsupported dashboard analysis. Please update the server.");
     acceptAnalysis({
       result,
       // Identity comes from the response, never from the free-text shop name.
@@ -415,7 +415,7 @@ export const apiClient = {
     const headers = new Headers();
     if (authToken) headers.set("Authorization", `Bearer ${authToken}`);
     const response = await fetch(`${BASE_URL.replace(/\/$/, "")}/analysis/template.xlsx`, { headers });
-    if (!response.ok) throw new Error(`ดาวน์โหลด Template ไม่สำเร็จ: HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Could not download the template: HTTP ${response.status}`);
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement("a");
     link.href = url;
@@ -435,8 +435,8 @@ export const apiClient = {
         "ok",
         undefined,
         [
-          { id: "ev-ov1", label: "สมุดบัญชีเงินฝากกระแสรายวัน กสิกรไทย", targetId: "stat-cash-balance" },
-          { id: "ev-ov2", label: "รายงานภาษี ภ.พ.30 เดือน ก.ย.–ต.ค.", targetId: "stat-net-profit" },
+          { id: "ev-ov1", label: "Kasikornbank current account statement", targetId: "stat-cash-balance" },
+          { id: "ev-ov2", label: "VAT return · Sep–Oct", targetId: "stat-net-profit" },
         ]
       );
     }
@@ -457,7 +457,7 @@ export const apiClient = {
         "ok",
         undefined,
         [
-          { id: "ev-cf1", label: "กำหนดการชำระเงินตามสัญญา PO #STP-2026-091", targetId: "time-travel-scrubber" },
+          { id: "ev-cf1", label: "Payment schedule for PO #STP-2026-091", targetId: "time-travel-scrubber" },
         ]
       );
     }
@@ -530,7 +530,7 @@ export const apiClient = {
         mockHealthIndicators,
         "actual",
         "ok",
-        ["มูลค่าสินค้าคงเหลือของสด (ส่งผลต่อ DIO)"]
+        ["fresh_inventory_value_for_DIO"]
       );
     }
     return requestJson(`/health/indicators`);

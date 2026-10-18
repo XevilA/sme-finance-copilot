@@ -30,9 +30,9 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
   scenarios,
   selectedScenarioId,
   onSelectScenario,
-  source = "ยังไม่ทราบที่มา",
+  source = "Source unknown",
   effectsAvailable = false,
-  effectsReason = "backend ไม่ได้ประกาศว่ารองรับผลกระทบแบบบรรยาย",
+  effectsReason = "The backend has not declared support for narrative effects.",
 }) => {
   const { setCurrentPage, addToast } = useAppStore();
   const currentScenario =
@@ -70,8 +70,8 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
   const handleApplyContingency = (option: ContingencyOption) => {
     addToast({
       type: "info",
-      title: "เปิดหน้าสำหรับดำเนินการต่อ",
-      message: `${option.title} · ยังไม่มีการเปิดใช้งาน จอง หรือบันทึกแผนสำรองใด ๆ ในระบบ (${effectsReason})`,
+      title: "Open a page to continue",
+      message: `${option.title} · No contingency plan was activated, reserved, or saved (${effectsReason})`,
       duration: 9000,
     });
     setCurrentPage(option.targetPage as any);
@@ -90,14 +90,14 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
               <AlertTriangle className="w-4 h-4" />
             </span>
             <h3 className="font-display font-bold text-white text-base">
-              ซ้อมวันที่ทุกอย่างพัง (Chaos Rehearsal Playback)
+              Chaos Rehearsal Playback
             </h3>
             <DataKindBadge kind="simulated" size="sm" />
           </div>
           <p className="text-xs text-slate-300 mt-0.5">
             {effectsAvailable
-              ? "ทดสอบสมมติฐานความเสี่ยง 4 ช่วงเหตุการณ์: เกิดปัญหา → คลื่นลาม → เงินสดดิ่ง → ทางเลือกสำรอง"
-              : `อ่านสถานการณ์ที่บันทึกไว้ (${source}) ตัวเลขมาจากแคตตาล็อก ไม่ใช่การคำนวณใหม่จาก engine · ปรับราคา/ต้นทุน/มัดจำ/เครดิตด้านล่างเพื่อให้ engine คำนวณจริง`}
+              ? "Test a four-phase risk scenario: disruption → propagation → cash impact → contingency"
+              : `Review a saved scenario (${source}). Figures come from a catalogue and are not recalculated by the engine · Change price, costs, deposits, or payment terms below to run a new calculation.`}
           </p>
         </div>
 
@@ -109,7 +109,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
             className="px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-btn text-xs font-bold flex items-center gap-1.5 shadow-glow-primary transition-all cursor-pointer"
           >
             <Play className="w-3.5 h-3.5" />
-            <span>{isPlaying ? "กำลังจำลอง..." : "เล่นเหตุการณ์ให้ดู (Play)"}</span>
+            <span>{isPlaying ? "Simulating..." : "Play scenario"}</span>
           </button>
 
           <button
@@ -119,7 +119,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
               setCurrentPhase(1);
             }}
             className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-navy-surface transition-colors"
-            title="เริ่มใหม่"
+            title="Restart"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -151,10 +151,10 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
       {/* 4-Phase Step Progress Indicator (Part E4 S6) */}
       <div className="grid grid-cols-4 gap-2 text-center text-xs">
         {[
-          { num: 1, label: "1. เกิดปัญหา", desc: "จุดเกิดเหตุ Shockwave" },
-          { num: 2, label: "2. จุดที่ได้รับผล", desc: "คลื่นลามตามเส้นเชื่อม" },
-          { num: 3, label: "3. ช่วงเงินขาด", desc: "กราฟเงินสดดิ่งเหว" },
-          { num: 4, label: "4. ทางเลือกสำรอง", desc: "ข้อเสนอที่บันทึกไว้" },
+          { num: 1, label: "1. Disruption", desc: "Shockwave trigger point" },
+          { num: 2, label: "2. Affected areas", desc: "Propagation across connections" },
+          { num: 3, label: "3. Cash impact", desc: "Projected cash decline" },
+          { num: 4, label: "4. Contingency", desc: "Saved proposals" },
         ].map((ph) => (
           <button
             key={ph.num}
@@ -190,7 +190,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
             </div>
             <div>
               <span className="text-[10px] font-bold text-danger uppercase tracking-widest block mb-1">
-                ช่วงที่ 1: เกิดเหตุฉุกเฉิน
+                Phase 1: Disruption
               </span>
               <h4 className="text-base font-display font-bold text-white">
                 {currentScenario.title}
@@ -206,7 +206,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
         {currentPhase === 2 && (
           <div className="space-y-4 animate-fade-in my-auto">
             <span className="text-[10px] font-bold text-attention uppercase tracking-widest block text-center">
-              ช่วงที่ 2: ผลกระทบลามไปตามห่วงโซ่ (Propagation Path)
+              Phase 2: Impact propagates through the network
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2 max-w-lg mx-auto">
               {currentScenario.propagationPath.map((node, idx) => (
@@ -222,7 +222,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
               ))}
             </div>
             <p className="text-xs text-slate-300 text-center max-w-md mx-auto">
-              เส้นทางผลกระทบที่บันทึกไว้ในสถานการณ์นี้ · ยังไม่ได้คำนวณผลต่อการจัดสรรจริงจาก engine
+              Impact path recorded in this scenario · The engine has not recalculated actual allocation effects.
             </p>
           </div>
         )}
@@ -231,29 +231,29 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
         {currentPhase === 3 && (
           <div className="space-y-4 animate-fade-in my-auto text-center">
             <span className="text-[10px] font-bold text-danger uppercase tracking-widest block">
-              ช่วงที่ 3: เส้นเงินสดดิ่งลงฉับพลัน
+              Phase 3: Cash drops sharply
             </span>
             <div className="flex justify-center items-center gap-6">
               <div className="p-3 bg-red-950/40 rounded-xl border border-danger/40">
                 <span className="text-[10px] text-slate-400 block">
-                  {effectsAvailable ? "เงินทุนหมุนเวียนที่ขาดเพิ่ม" : "ค่าที่บันทึกไว้ในสถานการณ์ (ไม่ได้คำนวณใหม่)"}
+                  {effectsAvailable ? "Additional working-capital gap" : "Value recorded in scenario (not recalculated)"}
                 </span>
                 <span className="text-2xl font-extrabold font-mono text-danger tabular-nums">
-                  +฿{currentScenario.cashImpactAmount.toLocaleString()}
+                  +฿{currentScenario.cashImpactAmount.toLocaleString("en-US")}
                 </span>
               </div>
               <div className="p-3 bg-red-950/40 rounded-xl border border-danger/40">
                 <span className="text-[10px] text-slate-400 block">
-                  {currentScenario.deficitDays.length ? "วันที่เงินสดติดลบตามที่บันทึกไว้" : "วันที่เงินสดติดลบ"}
+                  {currentScenario.deficitDays.length ? "Recorded days with negative cash" : "Days with negative cash"}
                 </span>
                 <span className="text-xl font-bold font-mono text-white">
-                  {currentScenario.deficitDays.length ? `Day ${currentScenario.deficitDays.join(", ")}` : "ไม่ได้บันทึกไว้"}
+                  {currentScenario.deficitDays.length ? `Day ${currentScenario.deficitDays.join(", ")}` : "Not recorded"}
                 </span>
               </div>
             </div>
             <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-              {currentScenario.description} · ค่าปรับ ความล่าช้า และผลต่อร้านอื่นยังไม่มีสัญญาหรือข้อมูลรองรับ
-              ระบบจึงไม่คำนวณเพิ่มให้
+              {currentScenario.description} · No contract or evidence supports penalties, delays, or effects on other shops.
+              The system does not estimate them.
             </p>
           </div>
         )}
@@ -262,7 +262,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
         {currentPhase === 4 && (
           <div className="space-y-3 animate-fade-in">
             <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">
-              ช่วงที่ 4: ทางเลือกสำรองที่บันทึกไว้ (เป็นข้อเสนอให้พิจารณา ไม่ใช่การเปิดใช้งาน)
+              Phase 4: Saved contingency options (proposals for review, not active arrangements)
             </span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {currentScenario.contingencyOptions.map((opt) => (
@@ -294,7 +294,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
 
         {/* Bottom Phase Controller */}
         <div className="flex items-center justify-between border-t border-navy-border pt-3 mt-4 text-[11px] text-slate-400">
-          <span>ความรุนแรง: <strong>{currentScenario.severity.toUpperCase()}</strong></span>
+          <span>Severity: <strong>{currentScenario.severity.toUpperCase()}</strong></span>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -302,7 +302,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
               disabled={currentPhase === 1}
               className="hover:text-white disabled:opacity-30"
             >
-              ย้อนกลับ
+              Back
             </button>
             <span className="font-mono text-white">{currentPhase} / 4</span>
             <button
@@ -311,7 +311,7 @@ export const ChaosPlayback: React.FC<ChaosPlaybackProps> = ({
               disabled={currentPhase === 4}
               className="hover:text-white disabled:opacity-30"
             >
-              ถัดไป
+              Next
             </button>
           </div>
         </div>

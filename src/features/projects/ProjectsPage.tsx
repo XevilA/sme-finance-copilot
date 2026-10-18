@@ -27,20 +27,20 @@ export const ProjectsPage: React.FC = () => {
   const mode = envelopeMode(state, (rows) => rows.length === 0);
   const capabilityState = useEnvelope<Capabilities>(useCallback(
     () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
       : apiClient.getCapabilities()),
     []));
   const canExport = capabilityState.envelope?.data.reportExport.available === true;
   const exportBlockedReason = capabilityState.envelope?.data.reportExport.reason
-    || "backend ยังไม่มี operation สำหรับสร้างไฟล์รายงาน";
+    || "The backend does not support report file generation yet.";
 
   const handleExportPoster = () => {
     // /capabilities declares reportExport unavailable: no file is generated and
     // nothing is queued for download.
     addToast({
       type: "warning",
-      title: "ยังไม่รองรับการส่งออกรายงาน",
-      message: `ยังไม่มีไฟล์ใดถูกสร้างหรือดาวน์โหลด · ${exportBlockedReason} · ใช้โหมดเล่าเรื่องเพื่อนำเสนอบนหน้าจอได้`,
+      title: "Report export is not available yet",
+      message: `No file was created or downloaded · ${exportBlockedReason} · Use Story Mode to present on screen.`,
       duration: 9000,
     });
   };
@@ -60,8 +60,8 @@ export const ProjectsPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "อ่านรายการโครงการจาก backend ไม่สำเร็จ"}
-        unavailableReason="ยังไม่มีโครงการที่บันทึกไว้ในฐานข้อมูล"
+        errorMessage={error || "Could not load projects from the backend"}
+        unavailableReason="No projects have been saved in the database."
         missingItems={projectsEnvelope?.missing || []}
         onRetry={loadData}
       >
@@ -83,12 +83,12 @@ export const ProjectsPage: React.FC = () => {
                 <FileCheck2 className="w-4 h-4" />
               </div>
               <h1 className="text-xl font-display font-bold text-ink">
-                โครงการของฉัน & รายงานผลงานจริง (Projects & Post-Mortem)
+                Projects & Actual Performance Reports (Post-Mortem)
               </h1>
               <DataKindBadge kind="actual" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ติดตามตารางส่งมอบงาน บันทึกธุรกรรมจริง และเปรียบเทียบผลลัพธ์หลังจบโครงการ
+              Track delivery schedules, record actual transactions, and compare results after each project.
             </p>
           </div>
 
@@ -99,7 +99,7 @@ export const ProjectsPage: React.FC = () => {
               className="px-4 py-2 bg-gradient-to-r from-navy-deep to-brand hover:opacity-95 text-white rounded-btn text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
             >
               <PlayCircle className="w-4 h-4 text-brand-glow animate-pulse" />
-              <span>เปิดโหมดเล่าโครงการ (Story Mode)</span>
+              <span>Open Story Mode</span>
             </button>
 
             <button
@@ -110,7 +110,7 @@ export const ProjectsPage: React.FC = () => {
               className="px-3.5 py-2 bg-white border border-borderLine hover:border-brand text-xs font-semibold rounded-btn flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{canExport ? "ดาวน์โหลดสรุปโครงการ (Poster)" : "ยังไม่รองรับการส่งออกไฟล์"}</span>
+              <span>{canExport ? "Download project summary (Poster)" : "File export is not available yet"}</span>
             </button>
           </div>
         </div>
@@ -145,14 +145,14 @@ export const ProjectsPage: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
               <span className="text-[10px] font-bold text-brand uppercase tracking-wider block">
-                ตารางส่งมอบ 10 วันทำการ (Delivery Schedule)
+                10-Day Delivery Schedule
               </span>
               <h3 className="font-display font-bold text-sm text-ink leading-snug">
                 {activeProj.title} ({activeProj.clientName})
               </h3>
             </div>
             <div className="text-right text-xs">
-              <span className="text-ink-muted block text-[10px]">ความคืบหน้า</span>
+              <span className="text-ink-muted block text-[10px]">Progress</span>
               <span className="font-bold font-mono text-brand text-sm">{activeProj.progressPercent}%</span>
             </div>
           </div>
@@ -176,7 +176,7 @@ export const ProjectsPage: React.FC = () => {
                   {ds.deliveredUnits}/{ds.targetUnits}
                 </span>
                 <span className="text-[9px] block mt-0.5 font-semibold">
-                  {ds.status === "done" ? "✓ ส่งครบ" : ds.status === "delayed" ? "⚠ ล่าช้า" : "รอดำเนินการ"}
+                  {ds.status === "done" ? "✓ Delivered" : ds.status === "delayed" ? "⚠ Delayed" : "Pending"}
                 </span>
               </div>
             ))}
@@ -190,10 +190,10 @@ export const ProjectsPage: React.FC = () => {
               <div>
                 <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>สรุปผลจริงเทียบแผนงาน (Post-Mortem Reality Check)</span>
+                  <span>Actual Results vs. Plan (Post-Mortem Review)</span>
                 </h3>
                 <p className="text-[11px] text-ink-muted">
-                  ส่งครบไหม ต้นทุนต่างจากที่คาดการณ์เท่าไร และเงินเหลือจริงสู่กระเป๋าร้านค้า
+                  Were all items delivered? How did costs compare with the forecast? How much cash did each shop retain?
                 </p>
               </div>
               <DataKindBadge kind="actual" size="sm" />
@@ -201,41 +201,41 @@ export const ProjectsPage: React.FC = () => {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="p-3 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">อัตราส่งมอบสำเร็จ</span>
+                <span className="text-[10px] text-ink-muted block">On-time delivery rate</span>
                 <span className="text-xl font-bold font-mono text-emerald-700">
                   {activeProj.postMortem.unitsFulfillmentPercent}%
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">1,500 / 1,500 กล่อง</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">1,500 / 1,500 boxes</span>
               </div>
 
               <div className="p-3 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">ความคลาดเคลื่อนต้นทุน</span>
+                <span className="text-[10px] text-ink-muted block">Cost variance</span>
                 <span className="text-xl font-bold font-mono text-emerald-700">
                   {activeProj.postMortem.costVariancePercent}%
                 </span>
-                <span className="text-[10px] text-emerald-600 block mt-0.5">ประหยัดกว่าแผน ฿2,500</span>
+                <span className="text-[10px] text-emerald-600 block mt-0.5">฿2,500 under plan</span>
               </div>
 
               <div className="p-3 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">ความล่าช้ารับเงิน</span>
+                <span className="text-[10px] text-ink-muted block">Payment delay</span>
                 <span className="text-xl font-bold font-mono text-ink">
-                  +{activeProj.postMortem.paymentDelayDays} วัน
+                  +{activeProj.postMortem.paymentDelayDays} days
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">รับเงิน 21 ต.ค.</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Payment received Oct 21</span>
               </div>
 
               <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl">
-                <span className="text-[10px] font-bold text-brand block">กำไรสุทธิรวมที่กระจาย</span>
+                <span className="text-[10px] font-bold text-brand block">Total net profit distributed</span>
                 <span className="text-xl font-extrabold font-mono text-brand">
                   ฿{activeProj.postMortem.shopNetProfits.reduce((s, p) => s + p.profit, 0).toLocaleString()}
                 </span>
-                <span className="text-[10px] text-brand/80 block mt-0.5">กระจายสู่ 4 ร้านค้า</span>
+                <span className="text-[10px] text-brand/80 block mt-0.5">Distributed to 4 shops</span>
               </div>
             </div>
 
             {/* Per-Shop Net Profits Table */}
             <div className="pt-2">
-              <span className="text-xs font-bold text-ink block mb-2">กำไรสุทธิรายร้านที่ได้รับจริง:</span>
+              <span className="text-xs font-bold text-ink block mb-2">Actual net profit received by each shop:</span>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 {activeProj.postMortem.shopNetProfits.map((sp, idx) => (
                   <div key={idx} className="p-2.5 bg-emerald-50/50 border border-emerald-200 rounded-xl">

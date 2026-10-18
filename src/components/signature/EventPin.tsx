@@ -28,7 +28,7 @@ export const EventPin: React.FC<EventPinProps> = ({
       case "buy_materials":
         return {
           icon: <ShoppingCart className="w-3.5 h-3.5" />,
-          label: "ซื้อวัตถุดิบ",
+          label: "Buy ingredients",
           bg: "bg-amber-500 text-white",
           ring: "ring-amber-300",
           border: "border-amber-600",
@@ -36,7 +36,7 @@ export const EventPin: React.FC<EventPinProps> = ({
       case "produce":
         return {
           icon: <ChefHat className="w-3.5 h-3.5" />,
-          label: "ผลิต",
+          label: "Production",
           bg: "bg-brand text-white",
           ring: "ring-brand-glow",
           border: "border-brand-dark",
@@ -44,7 +44,7 @@ export const EventPin: React.FC<EventPinProps> = ({
       case "deliver":
         return {
           icon: <Truck className="w-3.5 h-3.5" />,
-          label: "ส่งมอบงาน",
+          label: "Delivery",
           bg: "bg-blue-500 text-white",
           ring: "ring-blue-300",
           border: "border-blue-600",
@@ -52,7 +52,7 @@ export const EventPin: React.FC<EventPinProps> = ({
       case "receive_payment":
         return {
           icon: <Coins className="w-3.5 h-3.5" />,
-          label: "รับเงิน",
+          label: "Payment received",
           bg: "bg-emerald-500 text-white",
           ring: "ring-emerald-300",
           border: "border-emerald-600",
@@ -60,7 +60,7 @@ export const EventPin: React.FC<EventPinProps> = ({
       case "pay_obligations":
         return {
           icon: <Receipt className="w-3.5 h-3.5" />,
-          label: "จ่ายภาระ",
+          label: "Obligation payment",
           bg: "bg-rose-500 text-white",
           ring: "ring-rose-300",
           border: "border-rose-600",
@@ -81,7 +81,7 @@ export const EventPin: React.FC<EventPinProps> = ({
           onClick?.();
         }
       }}
-      title={`${event.date}: ${event.title} (${event.isInflow ? "+" : "-"}฿${event.amount.toLocaleString()})`}
+      title={`${event.date}: ${event.title} (${event.isInflow ? "+" : "-"}฿${event.amount.toLocaleString("en-US")})`}
       className={`group relative flex flex-col items-center cursor-pointer outline-none transition-transform select-none ${
         isActive ? "scale-125 z-30" : "hover:scale-110 z-10"
       } ${isBouncing ? "animate-bounce" : ""} ${className}`}
@@ -116,7 +116,7 @@ export const EventPin: React.FC<EventPinProps> = ({
               event.isInflow ? "text-emerald-300" : "text-amber-300"
             }`}
           >
-            {event.isInflow ? "+" : "-"}฿{event.amount.toLocaleString()}
+            {event.isInflow ? "+" : "-"}฿{event.amount.toLocaleString("en-US")}
           </div>
         </div>
         <div className="w-2 h-2 bg-ink rotate-45 -mt-1" />

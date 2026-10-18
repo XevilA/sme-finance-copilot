@@ -44,12 +44,12 @@ export const UnlockPage: React.FC = () => {
   const mode = envelopeMode(state, (rows) => rows.length === 0);
   const capabilityState = useEnvelope<Capabilities>(useCallback(
     () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
       : apiClient.getCapabilities()),
     []));
   const canReserve = capabilityState.envelope?.data.resourceReservation.available === true;
   const reserveBlockedReason = capabilityState.envelope?.data.resourceReservation.reason
-    || "backend ยังไม่มี operation สำหรับจองทรัพยากร";
+    || "The backend does not support resource reservations yet.";
 
   // Taking a resource out of the plan is recomputed by the engine through
   // POST /simulate/order with unavailable_resource_ids. The browser does not
@@ -60,7 +60,7 @@ export const UnlockPage: React.FC = () => {
   const outageSequence = React.useRef(0);
 
   const recomputeOutage = async (resourceIds: string[]) => {
-    if (apiClient.isDemoMode()) { setOutage({ comparison: null, error: "โหมดตัวอย่างไม่คำนวณผลจาก engine", pending: false }); return; }
+    if (apiClient.isDemoMode()) { setOutage({ comparison: null, error: "The demo mode does not calculate results with the engine.", pending: false }); return; }
     if (resourceIds.length === 0) { setOutage({ comparison: null, error: "", pending: false }); return; }
     const id = ++outageSequence.current;
     setOutage((previous) => ({ ...previous, pending: true, error: "" }));
@@ -73,7 +73,7 @@ export const UnlockPage: React.FC = () => {
       const applicable = resourceIds.filter((value) => known.has(value));
       if (applicable.length === 0) {
         if (outageSequence.current === id) setOutage({ comparison: null, pending: false,
-          error: "ทรัพยากรที่เลือกไม่ได้ผูกกับออเดอร์ที่กำลังจัดทีม จึงคำนวณผลกระทบต่อออเดอร์นี้ไม่ได้" });
+          error: "The selected resource is not linked to the order being assembled, so its impact cannot be calculated." });
         return;
       }
       const result = await apiClient.simulateOrder(context, {
@@ -99,9 +99,9 @@ export const UnlockPage: React.FC = () => {
     void recomputeOutage(next);
     addToast({
       type: "info",
-      title: isNowDetached ? "ถอดออกจากแผนเพื่อคำนวณใหม่" : "ใส่กลับในแผนเพื่อคำนวณใหม่",
-      message: `'${res.title}' · กำลังให้ engine จัดสรรออเดอร์ใหม่แบบ preview (persist=false)`
-        + ` · ไม่เปลี่ยนสถานะทรัพยากรจริงและไม่จอง (${reserveBlockedReason})`,
+      title: isNowDetached ? "Remove from plan and recalculate" : "Restore to plan and recalculate",
+      message: `'${res.title}' · The engine will preview a new order allocation (persist=false)`
+        + ` · Live resource status remains unchanged and nothing is reserved (${reserveBlockedReason})`,
       duration: 9000,
     });
   };
@@ -128,8 +128,8 @@ export const UnlockPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "อ่านรายการทรัพยากรที่แชร์ได้จาก backend ไม่สำเร็จ"}
-        unavailableReason="ยังไม่มีทรัพยากรที่เปิดให้ใช้ร่วมในฐานข้อมูล"
+        errorMessage={error || "Could not load shareable resources from the backend"}
+        unavailableReason="No resources are available for sharing in the database."
         missingItems={resourcesEnvelope?.missing || []}
         onRetry={loadData}
       >
@@ -143,17 +143,17 @@ export const UnlockPage: React.FC = () => {
   const planA = outage.comparison?.data.planA;
   const planB = outage.comparison?.data.planB;
   const amount = (value: number | string | null | undefined) =>
-    value == null ? "ยังไม่มีข้อมูล" : `฿${Number(value).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+    value == null ? "No data" : `฿${Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   const outageSummary = outage.pending
-    ? "กำลังให้ engine จัดสรรออเดอร์ใหม่…"
+    ? "The engine is reallocating the order…"
     : outage.error
     ? outage.error
     : planA && planB
-    ? `กำลังผลิตที่จัดสรรได้ ${planB.totalCapacityAssigned} (เดิม ${planA.totalCapacityAssigned})`
-      + ` · ขาดกำลังผลิต ${planB.deficitBoxesPerDay} ต่อวัน (เดิม ${planA.deficitBoxesPerDay})`
-      + ` · กำไรของออเดอร์ ${amount(planB.totalProfit)} (เดิม ${amount(planA.totalProfit)})`
-      + ` · ทุนที่ขาด ${amount(planB.totalFundingGap)} (เดิม ${amount(planA.totalFundingGap)})`
-    : "ยังไม่มีผลคำนวณจาก engine";
+    ? `Allocated capacity: ${planB.totalCapacityAssigned} (was ${planA.totalCapacityAssigned})`
+      + ` · Capacity shortfall: ${planB.deficitBoxesPerDay} per day (was ${planA.deficitBoxesPerDay})`
+      + ` · Order profit: ${amount(planB.totalProfit)} (was ${amount(planA.totalProfit)})`
+      + ` · Funding gap: ${amount(planB.totalFundingGap)} (was ${amount(planA.totalFundingGap)})`
+    : "No engine results yet.";
 
   return (
     <StateRenderer onRetry={loadData}>
@@ -166,13 +166,13 @@ export const UnlockPage: React.FC = () => {
                 <Wrench className="w-4 h-4" />
               </div>
               <h1 className="text-xl font-display font-bold text-ink">
-                SME UNLOCK ปลดล็อกและแชร์ทรัพยากร
+                SME UNLOCK: Unlock & Share Resources
               </h1>
               <DataKindBadge kind={resourcesEnvelope.kind} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ดูทรัพยากรที่เจ้าของเสนอให้ใช้ร่วม · ถอดออกจากแผนเพื่อให้ engine จัดสรรออเดอร์ใหม่แบบ preview
-              (ไม่จองและไม่เปลี่ยนสถานะจริง)
+              Review resources offered by their owners · Remove a resource from the plan to preview a new engine allocation
+              (nothing is reserved or changed in the live system)
             </p>
           </div>
 
@@ -184,7 +184,7 @@ export const UnlockPage: React.FC = () => {
                 className="px-3 py-1.5 bg-white border border-borderLine hover:border-brand/40 text-xs font-semibold rounded-btn flex items-center gap-1.5 transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-ink-muted" />
-                <span>คืนทรัพยากรทั้งหมด ({detachedResourceIds.length})</span>
+                <span>Restore all resources ({detachedResourceIds.length})</span>
               </button>
             )}
 
@@ -193,7 +193,7 @@ export const UnlockPage: React.FC = () => {
               onClick={() => setCurrentPage("swarm")}
               className="px-4 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-bold rounded-btn flex items-center gap-1.5 shadow-sm transition-all"
             >
-              <span>กลับสู่ห้องประกอบทีม SWARM</span>
+              <span>Return to SWARM team assembly</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -208,11 +208,11 @@ export const UnlockPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-bold text-xs uppercase tracking-wider">
-                  จำลองการถอดทรัพยากร ({detachedResourceIds.length} รายการ) · คำนวณใหม่เฉพาะออเดอร์นี้
+                  Simulate removing resources ({detachedResourceIds.length}) · Recalculate this order only
                 </h3>
                 <p className="text-xs text-red-900 mt-0.5">
                   <strong>{outageSummary}</strong>
-                  {planB ? " · เป็น preview ไม่เปลี่ยนการจัดสรรหรือสถานะทรัพยากรจริง" : ""}
+                  {planB ? " · Preview only; live allocations and resource status are unchanged." : ""}
                 </p>
               </div>
             </div>
@@ -222,7 +222,7 @@ export const UnlockPage: React.FC = () => {
               onClick={() => { resetSimulation(); void recomputeOutage([]); }}
               className="px-4 py-1.5 bg-danger text-white text-xs font-bold rounded-btn hover:bg-danger-dark transition-all shrink-0"
             >
-              คืนทรัพยากรทั้งหมดในแผนจำลอง
+              Restore all resources in the simulation plan
             </button>
           </div>
         )}
@@ -233,11 +233,11 @@ export const UnlockPage: React.FC = () => {
             <div>
               <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-resource-dark" />
-                <span>มูลค่าที่ปลดล็อกได้ (Value Unlocked Comparison)</span>
+                <span>Value Unlocked Comparison</span>
               </h3>
               <p className="text-[11px] text-ink-muted">
-                ต้องมีใบเสนอราคาซื้อและชั่วโมงการใช้งานจริงก่อนเทียบ ซื้อเอง vs แชร์ร่วม ·
-                backend ยังไม่เก็บข้อมูลสองชุดนี้
+                Purchase quotes and actual usage hours are required to compare buying vs. sharing ·
+                The backend does not store these values yet.
               </p>
             </div>
             <DataKindBadge kind="simulated" size="sm" />
@@ -248,30 +248,30 @@ export const UnlockPage: React.FC = () => {
             {/* Column A: Buy Individually */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider block">
-                แนวทางเดิม: ต่างคนต่างซื้อเอง
+                Previous approach: Each shop buys its own equipment
               </span>
-              <div className="text-2xl font-extrabold font-mono text-ink">ยังไม่มีข้อมูล</div>
+              <div className="text-2xl font-extrabold font-mono text-ink">No data</div>
               <p className="text-[11px] text-ink-muted leading-relaxed">
-                ต้องมีใบเสนอราคาซื้ออุปกรณ์ของร้านนี้ (investment_cash_schedule) ก่อนจะบอกเงินลงทุนรวมได้
+                A purchase quote for this shop (investment_cash_schedule) is required to calculate total investment.
               </p>
               <div className="text-[10px] text-danger font-medium mt-2">
-                ✕ ยังไม่มีหลักฐานราคาซื้อในระบบ
+                ✕ No purchase price evidence in the system
               </div>
             </div>
 
             {/* Column B: Shared Opportunity via SME UNLOCK */}
             <div className="p-4 rounded-xl bg-resource-light/60 border border-resource/40 space-y-2">
               <span className="text-[10px] font-bold text-resource-dark uppercase tracking-wider block">
-                แนวทางใหม่: แชร์ใช้ร่วมผ่าน SME UNLOCK
+                New approach: Share resources through SME UNLOCK
               </span>
-              <div className="text-2xl font-extrabold font-mono text-resource-dark">ยังไม่มีข้อมูล</div>
+              <div className="text-2xl font-extrabold font-mono text-resource-dark">No data</div>
               <p className="text-[11px] text-ink-muted leading-relaxed">
-                รายการที่เปิดให้ใช้ร่วมมี {allResources.length} รายการ · อัตราค่าบริการของแต่ละรายการแสดงอยู่ในการ์ดด้านล่าง
-                แต่ยังไม่มีชั่วโมงการใช้งานที่ยืนยันเพื่อรวมเป็นยอดเดียว
+                {allResources.length} resources are available for sharing · Each service rate is shown on its card below,
+                but verified usage hours are not available for a combined total.
               </p>
               <div className="text-[11px] text-resource-dark font-bold mt-2 flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>ส่วนต่างที่ประหยัดได้: ยังคำนวณไม่ได้</span>
+                <span>Savings: Cannot calculate yet</span>
               </div>
             </div>
           </div>
@@ -280,11 +280,11 @@ export const UnlockPage: React.FC = () => {
         {/* Category Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
           {[
-            { id: "all", label: `ทั้งหมด (${allResources.length} รายการ)` },
-            { id: "kitchen", label: "🍳 ครัวกลาง" },
-            { id: "truck", label: "🚚 รถขนส่งเย็น" },
-            { id: "machine", label: "⚙️ เครื่องจักรแพ็กเกจ" },
-            { id: "team", label: "👥 ทีมงานเสริม" },
+            { id: "all", label: `All (${allResources.length})` },
+            { id: "kitchen", label: "🍳 Shared kitchens" },
+            { id: "truck", label: "🚚 Refrigerated vehicles" },
+            { id: "machine", label: "⚙️ Packaging equipment" },
+            { id: "team", label: "👥 Temporary staff" },
           ].map((cat) => (
             <button
               key={cat.id}

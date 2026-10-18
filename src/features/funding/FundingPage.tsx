@@ -45,15 +45,15 @@ export const FundingPage: React.FC = () => {
 
   const capabilityState = useEnvelope<Capabilities>(useCallback(
     () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
       : apiClient.getCapabilities()),
     []));
   const canApply = capabilityState.envelope?.data.fundingApplication.available === true;
   const applyBlockedReason = capabilityState.envelope?.data.fundingApplication.reason
-    || "backend ยังไม่มี operation สำหรับยื่นคำขอสินเชื่อ";
+    || "The backend does not support loan applications yet.";
 
   const amount = (value: string | number | null | undefined) =>
-    value == null || value === "" ? "ยังไม่มีข้อมูล" : `฿${Number(value).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+    value == null || value === "" ? "No data" : `฿${Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   // Values supplied in the statement being graded, shown as supplied figures.
   const supplied = (field: string) => {
     const value = accepted?.input?.[field];
@@ -68,8 +68,8 @@ export const FundingPage: React.FC = () => {
     // no persistence and no status transition behind this button.
     addToast({
       type: "warning",
-      title: "ยังไม่รองรับการยื่นคำขอจริง",
-      message: `${applyBlockedReason} · ผลที่แสดงคือการจัดอันดับตามเกณฑ์ตัวเลขที่ส่งไป ไม่ใช่การอนุมัติสินเชื่อ`,
+      title: "Loan applications are not available yet",
+      message: `${applyBlockedReason} · Results are ranked using the submitted numeric criteria; they are not loan approvals.`,
       duration: 9000,
     });
   };
@@ -91,7 +91,7 @@ export const FundingPage: React.FC = () => {
 
   if (!fundingEnvelope || error) {
     return (
-      <StateRenderer currentMode="error" errorMessage={error || "อ่านทางเลือกแหล่งทุนจาก backend ไม่สำเร็จ"} onRetry={loadData}>
+      <StateRenderer currentMode="error" errorMessage={error || "Could not load funding options from the backend"} onRetry={loadData}>
         {null}
       </StateRenderer>
     );
@@ -104,8 +104,8 @@ export const FundingPage: React.FC = () => {
       <StateRenderer
         currentMode="unavailable"
         unavailableReason={evaluation?.notRequired
-          ? "งบชุดนี้ไม่มีส่วนที่ขาด (funding gap = 0) จึงไม่มีการจัดอันดับแหล่งทุน"
-          : "ยังไม่มีทางเลือกแหล่งทุนที่ตรงเกณฑ์ของงบชุดนี้ · ต้องมีมูลค่าส่วนที่ขาดที่คำนวณได้ก่อน"}
+          ? "This statement has no funding gap (funding gap = 0), so no funders are ranked."
+          : "No funding options match this statement · A calculated funding gap is required first."}
         missingItems={fundingEnvelope.missing}
         onRetry={loadData}
         onAddData={() => setCurrentPage("import")}
@@ -123,12 +123,12 @@ export const FundingPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-display font-bold text-ink">
-                จับคู่แหล่งเงินทุนเฉพาะโครงการ (Smart Funding Matcher)
+                Project-Specific Smart Funding Matcher
               </h1>
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              เติมทุนเฉพาะส่วนที่ขาดเพื่อเริ่มงานได้ทันที คัดกรองดอกเบี้ยและความรวดเร็วในการเบิกเงิน
+              Cover only the shortfall needed to start work. Compare interest rates and disbursement speed.
             </p>
           </div>
 
@@ -139,7 +139,7 @@ export const FundingPage: React.FC = () => {
               className="px-3 py-1.5 bg-resource-light hover:bg-resource/20 border border-resource/30 text-resource-dark text-xs font-semibold rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <Coins className="w-3.5 h-3.5" />
-              <span>ลองลดทุนที่ต้องใช้ (SME UNLOCK)</span>
+              <span>Reduce funding needs with SME UNLOCK</span>
             </button>
           </div>
         </div>
@@ -148,57 +148,57 @@ export const FundingPage: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-4 rounded-card border border-borderLine shadow-soft-sm">
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">
-              ทุนหมุนเวียนต้องใช้รวม
+              Total working capital required
             </span>
             <span className="text-lg font-bold font-mono text-ink">{amount(supplied("working_capital_needed"))}</span>
             <span className="text-[10px] text-slate-400 block mt-0.5">
-              {supplied("working_capital_needed") == null ? "ขาด working_capital_needed ในงบ" : "ตามค่าที่ระบุในงบชุดนี้"}
+              {supplied("working_capital_needed") == null ? "Missing working_capital_needed in statement" : "As reported in this statement"}
             </span>
           </div>
 
           <div>
             <span className="text-[10px] text-ink-muted block uppercase tracking-wider">
-              เงินสดในมือปัจจุบัน
+              Current cash on hand
             </span>
             <span className="text-lg font-bold font-mono text-ink">{amount(overview?.cashBalance)}</span>
             <span className="text-[10px] text-slate-400 block mt-0.5">
-              {overview?.cashBalance == null ? "ขาด cash_balance ในงบ" : `หลังกันสำรอง ${amount(overview?.usableCashAfterReserve)}`}
+              {overview?.cashBalance == null ? "Missing cash_balance in statement" : `After reserve: ${amount(overview?.usableCashAfterReserve)}`}
             </span>
           </div>
 
           <div className="border-x border-slate-100 px-3">
             <span className="text-[10px] font-bold text-danger block uppercase tracking-wider">
-              ทุนที่ยังขาด (Funding Gap)
+              Funding gap
             </span>
             <span className="text-lg font-extrabold font-mono text-danger tabular-nums">
-              {evaluation ? amount(evaluation.requestedAmount) : "ยังไม่มีข้อมูล"}
+              {evaluation ? amount(evaluation.requestedAmount) : "No data"}
             </span>
             <span className="text-[10px] text-danger font-medium block mt-0.5">
               {!evaluation
-                ? "นำเข้างบก่อนเพื่อคำนวณส่วนที่ขาด"
+                ? "Import a statement to calculate the funding gap"
                 : evaluation.notRequired
-                ? "งบชุดนี้ไม่มีส่วนที่ขาด (ศูนย์ที่ทราบค่า)"
+                ? "This statement has no funding gap (known value of zero)"
                 : evaluation.requestedAmount == null
-                ? "ยังคำนวณไม่ได้ ไม่ใช่ศูนย์"
-                : `เกรด ${evaluation.grade || "ยังไม่ทราบ"} คะแนน ${evaluation.gradeScore || "ยังไม่ทราบ"}`}
+                ? "Cannot calculate; this is not zero"
+                : `Grade ${evaluation.grade || "Unknown"} · Score ${evaluation.gradeScore || "Unknown"}`}
             </span>
           </div>
 
           <div>
             <span className="text-[10px] text-brand block uppercase tracking-wider font-semibold">
-              วันที่ต้องมีเงินสดพร้อม
+              Cash needed by
             </span>
             <span className="text-lg font-bold font-mono text-brand">
               {accepted?.result.views.forecast?.data?.first_shortfall_date
                 || accepted?.result.views.forecast?.data?.conditional_first_shortfall_date
-                || "ยังไม่มีข้อมูล"}
+                || "No data"}
             </span>
             <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
               {accepted?.result.views.forecast?.data?.first_shortfall_date
-                ? "วันที่เงินสดต่ำกว่าศูนย์จากตารางที่มีวันกำหนด"
+                ? "Date cash falls below zero in the dated schedule"
                 : accepted?.result.views.forecast?.data?.conditional_first_shortfall_date
-                ? "เป็นค่าตามเงื่อนไข ยังไม่ยืนยันวันรับเงินจริง"
-                : "ต้องมีตารางรับ-จ่ายตามวันที่ของกิจการนี้ก่อน"}
+                ? "Based on stated terms; actual receipt date is not confirmed"
+                : "A dated cash inflow/outflow schedule is required for this business."}
             </span>
           </div>
         </div>
@@ -209,21 +209,21 @@ export const FundingPage: React.FC = () => {
             type="button"
             className="px-3 py-1 bg-white shadow-2xs font-semibold rounded-lg text-brand flex items-center gap-1"
           >
-            <span>1. ค้นหาทางเลือกทุน</span>
+            <span>1. Find funding options</span>
           </button>
           <button
             type="button"
             onClick={() => setIsComparing(!isComparing)}
             className="px-3 py-1 text-ink-muted hover:text-ink font-medium rounded-lg"
           >
-            <span>2. เปรียบเทียบ {isComparing ? "(ซ่อน)" : "(แสดง)"}</span>
+            <span>2. Compare {isComparing ? "(Hide)" : "(Show)"}</span>
           </button>
           <button
             type="button"
             onClick={() => setCurrentPage("unlock")}
             className="px-3 py-1 text-ink-muted hover:text-resource-dark font-medium rounded-lg"
           >
-            <span>3. ลดทุนโดยใช้ของร่วม</span>
+            <span>3. Reduce costs by sharing resources</span>
           </button>
           <button
             type="button"
@@ -231,7 +231,7 @@ export const FundingPage: React.FC = () => {
             title={canApply ? undefined : applyBlockedReason}
             className="px-3 py-1 bg-brand text-white font-semibold rounded-lg ml-auto flex items-center gap-1"
           >
-            <span>{canApply ? "4. เตรียมยื่นคำขอ" : "4. ดูเอกสารที่ต้องเตรียม"}</span>
+            <span>{canApply ? "4. Prepare application" : "4. Review required documents"}</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
@@ -240,18 +240,18 @@ export const FundingPage: React.FC = () => {
         {isComparing && (
           <div className="p-4 bg-white rounded-card border border-borderLine shadow-soft-sm space-y-3">
             <h3 className="text-xs font-display font-bold text-ink uppercase tracking-wider">
-              ตารางเปรียบเทียบแหล่งเงินทุน (Comparison Matrix)
+              Funding Comparison Matrix
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="border-b border-slate-200 text-ink-muted">
-                    <th className="py-2">แหล่งเงินทุน</th>
-                    <th className="py-2">ประเภท</th>
-                    <th className="py-2">ดอกเบี้ยต่อปี</th>
-                    <th className="py-2">วันรับเงิน</th>
-                    <th className="py-2">ภาระผ่อน/คืน</th>
-                    <th className="py-2">ความเหมาะสม</th>
+                    <th className="py-2">Funder</th>
+                    <th className="py-2">Type</th>
+                    <th className="py-2">Annual interest</th>
+                    <th className="py-2">Disbursement</th>
+                    <th className="py-2">Total repayment</th>
+                    <th className="py-2">Match</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -260,15 +260,15 @@ export const FundingPage: React.FC = () => {
                       <td className="py-2.5 font-bold text-ink">{opt.name}</td>
                       <td className="py-2.5 text-ink-muted">{opt.typeLabel}</td>
                       <td className="py-2.5 font-bold font-mono text-brand">
-                        {(opt.interestRateAnnual * 100).toLocaleString("th-TH", { maximumFractionDigits: 2 })}%
+                        {(opt.interestRateAnnual * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%
                       </td>
                       <td className="py-2.5 font-bold font-mono text-emerald-700">
-                        {opt.disbursementDays} วัน
+                        {opt.disbursementDays} days
                       </td>
                       <td className="py-2.5 font-mono">฿{opt.totalRepayment.toLocaleString()}</td>
                       <td className="py-2.5">
                         <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px]">
-                          {opt.matchScore}% ตรงเกณฑ์
+                          {opt.matchScore}% match
                         </span>
                       </td>
                     </tr>
@@ -292,9 +292,9 @@ export const FundingPage: React.FC = () => {
                 setSelectedFundingId(funding.id);
                 addToast({
                   type: "info",
-                  title: `ค่างวดจาก backend · ${funding.name}`,
-                  message: `ผ่อน ${amount(funding.monthlyPayment)}/เดือน ${funding.termMonths} เดือน · คืนรวม ${amount(funding.totalRepayment)}`
-                    + (funding.postFundingDscr ? ` · DSCR หลังรับทุน ${funding.postFundingDscr}` : " · ยังไม่ทราบ DSCR หลังรับทุน"),
+                  title: `Repayment estimate from backend · ${funding.name}`,
+                  message: `${amount(funding.monthlyPayment)}/month for ${funding.termMonths} months · Total repayment: ${amount(funding.totalRepayment)}`
+                    + (funding.postFundingDscr ? ` · DSCR after funding: ${funding.postFundingDscr}` : " · DSCR after funding is unknown"),
                   duration: 9000,
                 });
               }}
@@ -311,7 +311,7 @@ export const FundingPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[10px] font-bold text-brand uppercase tracking-wider">
-                รายละเอียดการอนุมัติและเอกสารที่ต้องใช้
+                Approval Details & Required Documents
               </span>
               <h3 className="text-sm font-display font-bold text-ink">
                 {activeFunding.name}
@@ -322,7 +322,7 @@ export const FundingPage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="space-y-2">
-              <span className="font-bold text-ink block">เอกสารที่ต้องเตรียม:</span>
+              <span className="font-bold text-ink block">Required documents:</span>
               <ul className="space-y-1 list-disc pl-4 text-ink-muted">
                 {activeFunding.requiredDocs.map((doc, idx) => (
                   <li key={idx}>{doc}</li>
@@ -331,7 +331,7 @@ export const FundingPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <span className="font-bold text-ink block">เงื่อนไขคุณสมบัติ:</span>
+              <span className="font-bold text-ink block">Eligibility requirements:</span>
               <ul className="space-y-1 list-disc pl-4 text-ink-muted">
                 {activeFunding.eligibilityConditions.map((cond, idx) => (
                   <li key={idx}>{cond}</li>
@@ -343,9 +343,9 @@ export const FundingPage: React.FC = () => {
           <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-brand-dark flex items-start gap-2">
             <Sparkles className="w-4 h-4 text-brand shrink-0 mt-0.5" />
             <div>
-              <strong>เกณฑ์ที่ใช้จัดอันดับ ({activeFunding.policyVersion || "ยังไม่ทราบเวอร์ชันเกณฑ์"}):</strong>{" "}
+              <strong>Ranking policy ({activeFunding.policyVersion || "Version unknown"}):</strong>{" "}
               {activeFunding.matchReason}
-              {activeFunding.notice ? ` · ${activeFunding.notice}` : " · การจัดอันดับนี้ไม่ใช่การอนุมัติสินเชื่อ"}
+              {activeFunding.notice ? ` · ${activeFunding.notice}` : " · This ranking is not a loan approval."}
             </div>
           </div>
         </div>
@@ -362,7 +362,7 @@ export const FundingPage: React.FC = () => {
             >
               <div className="flex items-center justify-between border-b border-borderLine pb-3">
                 <h3 className="font-display font-bold text-ink text-sm">
-                  {canApply ? "ตรวจยืนยันคำขอเงินทุนหมุนเวียน (Verification Step)" : "สรุปทางเลือกที่เลือกไว้ (ยังไม่ยื่นคำขอ)"}
+                  {canApply ? "Review working-capital application (Verification Step)" : "Review selected option (application not submitted)"}
                 </h3>
                 <button
                   type="button"
@@ -376,33 +376,33 @@ export const FundingPage: React.FC = () => {
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-xl space-y-1">
                   <div className="font-bold text-ink">
-                    งบที่ใช้จัดอันดับ: {overview?.shopName || "ยังไม่ได้นำเข้างบ"}
-                    {accepted?.context.smeId ? "" : " · ยังไม่ผูกกับกิจการในฐานข้อมูล"}
+                    Statement used for ranking: {overview?.shopName || "No statement imported"}
+                    {accepted?.context.smeId ? "" : " · Not linked to a business in the database"}
                   </div>
                   <div className="text-ink-muted">
-                    ทางเลือกที่เลือก: {activeFunding.name} ({activeFunding.provider}) · {activeFunding.typeLabel}
-                    {" · "}สถานะตามเกณฑ์: {activeFunding.status === "eligible" ? "ผ่านเกณฑ์ตัวเลข" : activeFunding.status === "requires_info" ? "ต้องข้อมูลเพิ่ม" : "ไม่ผ่านเกณฑ์"}
+                    Selected option: {activeFunding.name} ({activeFunding.provider}) · {activeFunding.typeLabel}
+                    {" · "}Eligibility: {activeFunding.status === "eligible" ? "Meets numeric criteria" : activeFunding.status === "requires_info" ? "More information required" : "Does not meet criteria"}
                   </div>
                   <div className="font-mono font-bold text-brand">
-                    ส่วนที่ขาดตามงบชุดนี้: {evaluation ? amount(evaluation.requestedAmount) : "ยังไม่มีข้อมูล"}
-                    {" · "}วงเงิน {amount(activeFunding.minAmount)}–{amount(activeFunding.maxAmount)}
+                    Funding gap in this statement: {evaluation ? amount(evaluation.requestedAmount) : "No data"}
+                    {" · "}Funding range: {amount(activeFunding.minAmount)}–{amount(activeFunding.maxAmount)}
                   </div>
                 </div>
 
                 <div className="p-3 border border-slate-200 rounded-xl space-y-1 text-ink-muted">
                   <span className="font-bold text-ink block">
-                    {canApply ? "ข้อมูลที่จะเปิดเผยแก่ผู้ให้ทุน:" : "สถานะการยื่นคำขอในระบบนี้:"}
+                    {canApply ? "Information to be shared with the funder:" : "Application status in this system:"}
                   </span>
                   <p>
                     {canApply
-                      ? "ระบบจะส่งงบชุดที่วิเคราะห์และผลการจัดอันดับให้ผู้ให้ทุนตรวจ"
-                      : `ยังไม่มีการยื่นคำขอ ลงนาม หรือส่งเอกสารใด ๆ · เหตุผลจาก /capabilities: ${applyBlockedReason}`}
+                      ? "The analyzed statement and ranking will be sent to the funder for review."
+                      : `No application, signature, or documents have been submitted · /capabilities reason: ${applyBlockedReason}`}
                   </p>
-                  <p>เอกสารที่ผู้ให้ทุนระบุ: {activeFunding.requiredDocs.length} รายการ (ดูรายการด้านหลังหน้านี้)</p>
+                  <p>Documents requested by funder: {activeFunding.requiredDocs.length} (see details below)</p>
                   <p>
                     {activeFunding.missing?.length
-                      ? `ข้อมูลที่ยังขาดสำหรับเกณฑ์นี้: ${activeFunding.missing.join(", ")}`
-                      : "ไม่มีรายการข้อมูลที่ขาดสำหรับเกณฑ์ตัวเลขของทางเลือกนี้"}
+                      ? `Missing information for this criterion: ${activeFunding.missing.join(", ")}`
+                      : "No information is missing for this option's numeric criteria."}
                   </p>
                 </div>
               </div>
@@ -413,7 +413,7 @@ export const FundingPage: React.FC = () => {
                   onClick={() => setIsApplying(false)}
                   className="px-4 py-2 border border-slate-200 rounded-btn text-xs text-ink-muted hover:bg-slate-50"
                 >
-                  {canApply ? "ยกเลิก" : "ปิด"}
+                  {canApply ? "Cancel" : "Close"}
                 </button>
                 <button
                   type="button"
@@ -422,7 +422,7 @@ export const FundingPage: React.FC = () => {
                   title={canApply ? undefined : applyBlockedReason}
                   className="px-5 py-2 bg-brand text-white rounded-btn text-xs font-bold hover:bg-brand-dark transition-all shadow-sm"
                 >
-                  {canApply ? "ยืนยันและส่งคำขอ" : "ยังไม่รองรับการส่งคำขอ"}
+                  {canApply ? "Confirm and submit application" : "Applications are not available yet"}
                 </button>
               </div>
             </div>

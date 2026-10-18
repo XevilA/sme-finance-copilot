@@ -50,10 +50,10 @@ export const SalesPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={error ? "error" : unavailable ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "อ่านยอดขายรายสินค้าและรายช่องทางจาก backend ไม่สำเร็จ"}
+        errorMessage={error || "Could not load product and channel sales from the backend"}
         unavailableReason={accepted
-          ? "งบที่นำเข้าเป็นยอดรวมของงวด จึงไม่มีสัดส่วนรายสินค้าหรือรายช่องทาง · ระบบจะไม่แบ่งสัดส่วนขึ้นเองและไม่ใช้ข้อมูลตัวอย่างแทน"
-          : "ยังไม่มีรายการสินค้าหรือช่องทางขายที่บันทึกไว้"}
+          ? "The imported statement contains period totals only, with no product or channel breakdown · The system will not estimate a mix or substitute sample data."
+          : "No products or sales channels have been recorded."}
         missingItems={[...(productsEnvelope?.missing || []), ...(channelsEnvelope?.missing || [])]}
         onRetry={loadData}
         onAddData={() => setCurrentPage("import")}
@@ -74,12 +74,12 @@ export const SalesPage: React.FC = () => {
                 <ShoppingBag className="w-4 h-4" />
               </div>
               <h1 className="text-xl font-display font-bold text-ink">
-                ยอดขายและสินค้า (Sales & Channel Profitability)
+                Sales & Products (Sales & Channel Profitability)
               </h1>
               <DataKindBadge kind="actual" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              แยกยอดขายกับกำไรจริง วิเคราะห์ความคุ้มค่าของช่องทางเดลิเวอรี่ vs งานจัดเลี้ยงองค์กร
+              Separate actual sales and profit; compare delivery channels with corporate catering.
             </p>
           </div>
         </div>
@@ -89,10 +89,10 @@ export const SalesPage: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div>
               <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-                กำไรสุทธิตามช่องทางจัดจำหน่าย (หลังหักค่า GP, ค่าส่ง และค่าโฆษณา)
+                Net profit by sales channel (after platform commissions, delivery, and advertising)
               </h3>
               <p className="text-[11px] text-ink-muted">
-                เปรียบเทียบกำไรสุทธิแท้จริงระหว่างการรับจัดเลี้ยงองค์กร vs ขายผ่านแอปเดลิเวอรี่
+                Compare actual net profit from corporate catering with sales through delivery apps.
               </p>
             </div>
             <DataKindBadge kind="actual" size="sm" />
@@ -106,29 +106,29 @@ export const SalesPage: React.FC = () => {
               >
                 <div className="font-bold text-ink leading-tight">{ch.channel}</div>
                 <div className="flex items-baseline justify-between border-b border-slate-200 pb-2">
-                  <span className="text-ink-muted">ยอดขายรวม:</span>
+                  <span className="text-ink-muted">Gross sales:</span>
                   <span className="font-bold font-mono text-ink">฿{ch.grossSales.toLocaleString()}</span>
                 </div>
 
                 <div className="space-y-1 text-[11px] text-ink-muted">
                   <div className="flex justify-between">
-                    <span>ค่าคอมมิชชัน/GP แพลตฟอร์ม:</span>
+                    <span>Platform commission:</span>
                     <span className="text-danger font-mono">-฿{ch.commissionFee.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>ค่าขนส่ง/โฆษณา:</span>
+                    <span>Delivery / advertising:</span>
                     <span className="font-mono">-฿{(ch.adCost + ch.deliveryCost).toLocaleString()}</span>
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                  <span className="font-bold text-brand">กำไรสุทธิคงเหลือ:</span>
+                  <span className="font-bold text-brand">Net profit:</span>
                   <div className="text-right">
                     <span className="font-extrabold font-mono text-brand block">
                       ฿{ch.netProfit.toLocaleString()}
                     </span>
                     <span className={`text-[10px] font-bold ${ch.netMarginPercent > 20 ? "text-emerald-700" : "text-amber-800"}`}>
-                      มาร์จิน {ch.netMarginPercent}%
+                      Margin {ch.netMarginPercent}%
                     </span>
                   </div>
                 </div>
@@ -137,26 +137,26 @@ export const SalesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section: Product Sales Table (แยกยอดขายกับกำไรชัดเจน per Part G7) */}
+        {/* Product sales table separates revenue from profit. */}
         <div className="bg-white rounded-card p-5 border border-borderLine shadow-soft-sm space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-              ประสิทธิภาพรายเมนู (Best Sellers & Margin Champions)
+              Product Performance (Best Sellers & Margin Leaders)
             </h3>
-            <span className="text-xs text-ink-muted">4 รายการหลัก</span>
+            <span className="text-xs text-ink-muted">4 key items</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-slate-200 text-ink-muted">
-                  <th className="py-2">ชื่อเมนู</th>
-                  <th className="py-2">หมวด</th>
-                  <th className="py-2 text-right">จำนวนขาย (กล่อง)</th>
-                  <th className="py-2 text-right">ยอดขาย (Revenue)</th>
-                  <th className="py-2 text-right">กำไรสุทธิ (Profit)</th>
-                  <th className="py-2 text-right">อัตรากำไร (%)</th>
-                  <th className="py-2 text-center">ความเร็วรอบขาย</th>
+                  <th className="py-2">Product</th>
+                  <th className="py-2">Category</th>
+                  <th className="py-2 text-right">Units sold</th>
+                  <th className="py-2 text-right">Revenue</th>
+                  <th className="py-2 text-right">Net profit</th>
+                  <th className="py-2 text-right">Margin (%)</th>
+                  <th className="py-2 text-center">Sales velocity</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
@@ -178,7 +178,7 @@ export const SalesPage: React.FC = () => {
                             : "bg-amber-50 text-amber-800"
                         }`}
                       >
-                        {p.velocity === "fast" ? "🔥 ขายดี" : p.velocity === "normal" ? "ปกติ" : "🐢 หมุนช้า"}
+                        {p.velocity === "fast" ? "🔥 Best seller" : p.velocity === "normal" ? "Normal" : "🐢 Slow-moving"}
                       </span>
                     </td>
                   </tr>

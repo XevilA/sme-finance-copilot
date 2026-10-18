@@ -6,6 +6,8 @@
 > **ระบบ Frontend เว็บไซต์ระดับสตูดิโอสำหรับการประกอบแผนธุรกิจ การเงินกระแสเงินสด และการรวมทีมรับงานขนาดใหญ่**
 > *พัฒนาขึ้นตามข้อกำหนด UX/UI + Frontend + Motion System (Part A – M)*
 
+> **For frontend contributors:** start with the [Frontend Integration Guide](docs/FRONTEND_INTEGRATION_GUIDE.md) for local setup, API configuration, contracts, and safe UI integration patterns.
+
 ---
 
 ## สถานะโครงการและข้อตกลงทีม — 2026-10-16

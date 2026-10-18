@@ -116,7 +116,7 @@ def analysis_views(analysis: dict, shop_name: str | None = None) -> dict:
     payload = analysis["data"]["input"]
     metrics = analysis["data"]["metrics"]
     overview, overview_missing = business_overview(
-        payload, metrics, metrics, shop_name or "ข้อมูลที่ส่งมาวิเคราะห์", None,
+        payload, metrics, metrics, shop_name or "Submitted business", None,
         analysis["data"]["findings"],
     )
     costs, cost_missing = cost_breakdown(payload, metrics)
@@ -184,20 +184,20 @@ def business_overview(
     # Stated as a comparison of two computed figures, with no causal claim -
     # the backend cannot see why cash and profit diverged.
     if net_profit is None or net_cash_flow is None:
-        insight = "ข้อมูลไม่พอสำหรับเทียบกำไรกับกระแสเงินสดในงวดนี้"
+        insight = "Not enough data to compare profit and cash flow for this period."
     else:
         gap = net_profit - net_cash_flow
         reserve_note = (
-            f"ต่ำกว่าเงินสำรอง {thb(reserve)} บาท"
+            f"below the reserve of {thb(reserve)} THB"
             if cash is not None and reserve is not None and cash < reserve
-            else f"สูงกว่าเงินสำรอง {thb(reserve)} บาท"
+            else f"above the reserve of {thb(reserve)} THB"
         )
         if cash is None or reserve is None:
-            reserve_note = "ยังไม่มีข้อมูลเงินสดหรือเงินสำรองครบ"
+            reserve_note = "cash balance or reserve data is incomplete"
         insight = (
-            f"กำไรสุทธิตามบัญชี {thb(net_profit)} บาท แต่กระแสเงินสดสุทธิ {thb(net_cash_flow)} บาท "
-            f"ต่างกัน {thb(abs(gap))} บาท เงินสดคงเหลือ {thb(cash)} บาท ({reserve_note}) "
-            "ตัวเลขนี้เทียบจากงบที่ส่งเข้ามา ไม่ได้ระบุสาเหตุของส่วนต่าง"
+            f"Accounting net profit is {thb(net_profit)} THB, while net cash flow is {thb(net_cash_flow)} THB, "
+            f"a difference of {thb(abs(gap))} THB. Cash balance is {thb(cash)} THB ({reserve_note}). "
+            "This compares figures from the submitted statements and does not identify the cause of the difference."
         )
 
     # No dated weekly movements exist in the input contract, so this stays empty
@@ -205,7 +205,7 @@ def business_overview(
     missing.append("weekly_cash_movements")
 
     overview = {
-        "shopName": shop_name or "ชุดข้อมูลตัวอย่าง (ยังไม่ผูกกับร้านจริง)",
+        "shopName": shop_name or "Sample dataset (not linked to a real shop)",
         "revenue": revenue,
         "expense": expense,
         "netProfit": net_profit,
@@ -233,7 +233,7 @@ def actionable_items(findings: list[dict] | None = None) -> list[dict]:
             "title": finding.get("text", ""),
             "description": action.get("text", ""),
             "priority": SEVERITY_TO_PRIORITY.get(finding.get("severity"), "medium"),
-            "actionText": action.get("text", "ดูรายละเอียด"),
+            "actionText": action.get("text", "View details"),
             "targetPage": action.get("targetPage", "overview"),
         })
     return items
@@ -360,9 +360,9 @@ def swarm_proposal(stored: dict) -> tuple[dict, list[str]]:
         {
             "type": "funding",
             "shopId": shop["shopId"],
-            "title": "ร้านนี้ยังขาดเงินทุนสำหรับส่วนที่รับไป",
-            "message": f"ขาด {thb(shop['fundingGap'])} บาท จากเงินทุนหมุนเวียนที่ต้องใช้ {thb(shop['workingCapitalNeeded'])} บาท",
-            "actionLabel": "จับคู่แหล่งทุน",
+            "title": "This shop is short of working capital for its allocation.",
+            "message": f"Funding gap: {thb(shop['fundingGap'])} THB of {thb(shop['workingCapitalNeeded'])} THB required.",
+            "actionLabel": "Find funding",
             "actionTarget": "funding",
         }
         for shop in shops if shop["status"] == "blocked"
@@ -371,9 +371,9 @@ def swarm_proposal(stored: dict) -> tuple[dict, list[str]]:
     if deficit > 0:
         stuck.append({
             "type": "capacity",
-            "title": "กำลังผลิตรวมยังไม่ถึงเป้าของออเดอร์",
-            "message": f"ยังขาด {thb(deficit)} {project['unit']}/วัน จากเป้า {thb(target)}",
-            "actionLabel": "ชวนร้านเพิ่ม",
+            "title": "Total production capacity is below the order target.",
+            "message": f"Short by {thb(deficit)} {project['unit']}/day against a target of {thb(target)}.",
+            "actionLabel": "Invite another shop",
             "actionTarget": "swarm",
         })
 

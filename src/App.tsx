@@ -87,7 +87,7 @@ export const App: React.FC = () => {
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-8">
           <React.Suspense fallback={(
             <div role="status" className="m-6 rounded-card border border-borderLine bg-white p-6 text-sm text-ink-muted">
-              กำลังโหลดหน้า…
+              Loading page…
             </div>
           )}>
             {renderCurrentPage()}
@@ -105,7 +105,7 @@ export const App: React.FC = () => {
           }`}
         >
           <LayoutDashboard className="w-5 h-5 mb-0.5" />
-          <span>ภาพรวม</span>
+          <span>Overview</span>
         </button>
 
         <button
@@ -116,7 +116,7 @@ export const App: React.FC = () => {
           }`}
         >
           <TrendingUp className="w-5 h-5 mb-0.5" />
-          <span>เงินสด</span>
+          <span>Cash</span>
         </button>
 
         <button
@@ -138,7 +138,7 @@ export const App: React.FC = () => {
           }`}
         >
           <Wrench className="w-5 h-5 mb-0.5" />
-          <span>ทรัพยากร</span>
+          <span>Resources</span>
         </button>
 
         <button
@@ -149,7 +149,7 @@ export const App: React.FC = () => {
           }`}
         >
           <FileCheck2 className="w-5 h-5 mb-0.5" />
-          <span>โครงการ</span>
+          <span>Projects</span>
         </button>
       </div>
 

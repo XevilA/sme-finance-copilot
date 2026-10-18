@@ -37,46 +37,46 @@ export const ImportPage: React.FC = () => {
   });
 
   const fields: { key: string; label: string; section: number; type?: string; required?: boolean; signed?: boolean }[] = [
-    { key: "currency", label: "สกุลเงิน (THB)", section: 1, type: "text", required: true },
-    { key: "kind", label: "ประเภทข้อมูล (actual / forecast / simulated)", section: 1, type: "text", required: true },
-    { key: "period_start", label: "วันเริ่มงวด", section: 1, type: "date", required: true },
-    { key: "period_end", label: "วันสิ้นงวด", section: 1, type: "date", required: true },
-    { key: "total_expenses", label: "ค่าใช้จ่ายรวมในงวด (฿)", section: 2 },
-    { key: "cost_of_goods_sold", label: "ต้นทุนขายในงวด (฿)", section: 2 },
-    { key: "operating_expenses", label: "ค่าใช้จ่ายดำเนินงานในงวด (฿)", section: 2 },
-    { key: "interest_expense", label: "ดอกเบี้ยจ่ายในงวด (฿)", section: 2 },
-    { key: "tax_expense", label: "ภาษีในงวด (฿)", section: 2 },
-    { key: "net_income", label: "กำไรสุทธิในงวด (฿)", section: 2, signed: true },
-    { key: "operating_cash_flow", label: "กระแสเงินสดจากการดำเนินงาน (฿)", section: 3, signed: true },
-    { key: "investing_cash_flow", label: "กระแสเงินสดจากการลงทุน (฿)", section: 3, signed: true },
-    { key: "financing_cash_flow", label: "กระแสเงินสดจากการจัดหาเงิน (฿)", section: 3, signed: true },
-    { key: "capital_expenditure", label: "รายจ่ายลงทุน (฿)", section: 3 },
-    { key: "operating_cash_outflow", label: "เงินสดจ่ายจากการดำเนินงาน (฿)", section: 3 },
-    { key: "assets", label: "สินทรัพย์รวม (฿)", section: 4, required: true },
-    { key: "liabilities", label: "หนี้สินรวม (฿)", section: 4, required: true },
-    { key: "equity", label: "ส่วนของเจ้าของ (฿)", section: 4, required: true, signed: true },
-    { key: "opening_assets", label: "สินทรัพย์ต้นงวด (฿)", section: 4 },
-    { key: "opening_equity", label: "ส่วนของเจ้าของต้นงวด (฿)", section: 4, signed: true },
-    { key: "current_assets", label: "สินทรัพย์หมุนเวียน (฿)", section: 5 },
-    { key: "current_liabilities", label: "หนี้สินหมุนเวียน (฿)", section: 5 },
-    { key: "working_capital_needed", label: "เงินทุนหมุนเวียนที่ต้องใช้ (฿)", section: 5 },
-    { key: "buyer_deposit", label: "มัดจำผู้ซื้อที่พร้อมใช้ (฿)", section: 5 },
-    { key: "committed_funding", label: "เงินทุนที่ยืนยันแล้ว (฿)", section: 5 },
-    { key: "inventory", label: "มูลค่าสินค้าคงเหลือ / สต็อกปลายงวด (฿)", section: 6 },
-    { key: "cash_available_for_debt_service", label: "เงินสดที่ใช้ชำระหนี้ได้ (฿)", section: 7, signed: true },
-    { key: "debt_principal_due", label: "เงินต้นที่ถึงกำหนดในงวด (฿)", section: 7 },
-    { key: "debt_interest_due", label: "ดอกเบี้ยที่ถึงกำหนดในงวด (฿)", section: 7 },
-    { key: "loan.principal", label: "เงินต้นสินเชื่อที่พิจารณา (฿)", section: 7 },
-    { key: "loan.annual_interest_rate", label: "ดอกเบี้ยต่อปีแบบทศนิยม (เช่น 0.12)", section: 7 },
-    { key: "loan.periods", label: "จำนวนงวดสินเชื่อ", section: 7, type: "integer" },
-    { key: "loan.payments_per_year", label: "จำนวนงวดชำระต่อปี", section: 7, type: "integer" },
-    { key: "loan.timing", label: "เวลาชำระ (end / beginning)", section: 7, type: "text" },
-    { key: "units_sold", label: "จำนวนหน่วยที่ขายในงวด", section: 8, type: "integer" },
-    { key: "unit_price", label: "ราคาขายต่อหน่วย (฿)", section: 8 },
-    { key: "variable_cost_per_unit", label: "ต้นทุนผันแปรต่อหน่วย (฿)", section: 8 },
-    { key: "fixed_costs", label: "ต้นทุนคงที่ในงวด (฿)", section: 8 },
-    { key: "initial_investment", label: "เงินลงทุนเริ่มต้น (฿)", section: 8 },
-    { key: "investment_net_gain", label: "กำไรสุทธิจากการลงทุน (฿)", section: 8, signed: true },
+    { key: "currency", label: "Currency (THB)", section: 1, type: "text", required: true },
+    { key: "kind", label: "Data type (actual / forecast / simulated)", section: 1, type: "text", required: true },
+    { key: "period_start", label: "Period start date", section: 1, type: "date", required: true },
+    { key: "period_end", label: "Period end date", section: 1, type: "date", required: true },
+    { key: "total_expenses", label: "Total expenses for period (฿)", section: 2 },
+    { key: "cost_of_goods_sold", label: "Cost of goods sold for period (฿)", section: 2 },
+    { key: "operating_expenses", label: "Operating expenses for period (฿)", section: 2 },
+    { key: "interest_expense", label: "Interest expense for period (฿)", section: 2 },
+    { key: "tax_expense", label: "Tax expense for period (฿)", section: 2 },
+    { key: "net_income", label: "Net income for period (฿)", section: 2, signed: true },
+    { key: "operating_cash_flow", label: "Operating cash flow (฿)", section: 3, signed: true },
+    { key: "investing_cash_flow", label: "Investing cash flow (฿)", section: 3, signed: true },
+    { key: "financing_cash_flow", label: "Financing cash flow (฿)", section: 3, signed: true },
+    { key: "capital_expenditure", label: "Capital expenditure (฿)", section: 3 },
+    { key: "operating_cash_outflow", label: "Operating cash outflow (฿)", section: 3 },
+    { key: "assets", label: "Total assets (฿)", section: 4, required: true },
+    { key: "liabilities", label: "Total liabilities (฿)", section: 4, required: true },
+    { key: "equity", label: "Owner's equity (฿)", section: 4, required: true, signed: true },
+    { key: "opening_assets", label: "Opening assets (฿)", section: 4 },
+    { key: "opening_equity", label: "Opening owner's equity (฿)", section: 4, signed: true },
+    { key: "current_assets", label: "Current assets (฿)", section: 5 },
+    { key: "current_liabilities", label: "Current liabilities (฿)", section: 5 },
+    { key: "working_capital_needed", label: "Working capital required (฿)", section: 5 },
+    { key: "buyer_deposit", label: "Available buyer deposit (฿)", section: 5 },
+    { key: "committed_funding", label: "Committed funding (฿)", section: 5 },
+    { key: "inventory", label: "Ending inventory value (฿)", section: 6 },
+    { key: "cash_available_for_debt_service", label: "Cash available for debt service (฿)", section: 7, signed: true },
+    { key: "debt_principal_due", label: "Principal due this period (฿)", section: 7 },
+    { key: "debt_interest_due", label: "Interest due this period (฿)", section: 7 },
+    { key: "loan.principal", label: "Loan principal under consideration (฿)", section: 7 },
+    { key: "loan.annual_interest_rate", label: "Annual interest rate as a decimal (e.g. 0.12)", section: 7 },
+    { key: "loan.periods", label: "Number of loan periods", section: 7, type: "integer" },
+    { key: "loan.payments_per_year", label: "Payments per year", section: 7, type: "integer" },
+    { key: "loan.timing", label: "Payment timing (end / beginning)", section: 7, type: "text" },
+    { key: "units_sold", label: "Units sold this period", section: 8, type: "integer" },
+    { key: "unit_price", label: "Selling price per unit (฿)", section: 8 },
+    { key: "variable_cost_per_unit", label: "Variable cost per unit (฿)", section: 8 },
+    { key: "fixed_costs", label: "Fixed costs for period (฿)", section: 8 },
+    { key: "initial_investment", label: "Initial investment (฿)", section: 8 },
+    { key: "investment_net_gain", label: "Net gain from investment (฿)", section: 8, signed: true },
   ];
 
   const updateDraft = (key: string, value: string) => {
@@ -98,14 +98,14 @@ export const ImportPage: React.FC = () => {
   const [analysisStep, setAnalysisStep] = useState<"idle" | "reading" | "validating" | "analyzing">("idle");
 
   const sections = [
-    { id: 1, title: "1. ข้อมูลทั่วไปและประเภทธุรกิจ", status: "incomplete" },
-    { id: 2, title: "2. รายได้และค่าใช้จ่าย", status: "incomplete" },
-    { id: 3, title: "3. เงินสดคงเหลือและบัญชีธนาคาร", status: "incomplete" },
-    { id: 4, title: "4. สินทรัพย์ หนี้สิน และส่วนทุน", status: "incomplete" },
-    { id: 5, title: "5. ลูกหนี้การค้าและเจ้าหนี้การค้า", status: "incomplete" },
-    { id: 6, title: "6. สินค้าคงคลังของสด (สต็อก)", status: "incomplete" }, // Shows Rule #3 demonstration!
-    { id: 7, title: "7. ภาระผ่อนและวันครบกำหนด", status: "incomplete" },
-    { id: 8, title: "8. สินค้าหลักและสัดส่วนยอดขาย", status: "incomplete" },
+    { id: 1, title: "1. Business Details & Industry", status: "incomplete" },
+    { id: 2, title: "2. Revenue & Expenses", status: "incomplete" },
+    { id: 3, title: "3. Cash Balance & Bank Accounts", status: "incomplete" },
+    { id: 4, title: "4. Assets, Liabilities & Equity", status: "incomplete" },
+    { id: 5, title: "5. Accounts Receivable & Payable", status: "incomplete" },
+    { id: 6, title: "6. Fresh Inventory", status: "incomplete" }, // Shows Rule #3 demonstration!
+    { id: 7, title: "7. Loan Payments & Due Dates", status: "incomplete" },
+    { id: 8, title: "8. Products & Sales Mix", status: "incomplete" },
   ].map((section) => ({ ...section, status: fields.some((field) => field.section === section.id)
     && fields.filter((field) => field.section === section.id && !field.key.startsWith("loan.")).every((field) => draft[field.key]?.trim())
     ? "complete" : "incomplete" }));
@@ -142,7 +142,7 @@ export const ImportPage: React.FC = () => {
           const value = draft[field.key]?.trim();
           if (!value) continue; // Unknown is absent, never silently zero.
           const integer = field.key === "units_sold" || field.key === "loan.periods" || field.key === "loan.payments_per_year";
-          if (integer && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) throw new Error(`${field.key}: กรุณาระบุจำนวนเต็ม`);
+          if (integer && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) throw new Error(`${field.key}: Enter a whole number.`);
           const parsed = integer ? Number(value) : value;
           if (field.key.startsWith("loan.")) loan[field.key.slice(5)] = parsed;
           else values[field.key] = parsed;
@@ -161,15 +161,15 @@ export const ImportPage: React.FC = () => {
       const gap = (result.missing || []).length;
       addToast({
         type: gap ? "warning" : "success",
-        title: gap ? "วิเคราะห์แล้ว แต่ข้อมูลยังไม่ครบ" : "วิเคราะห์ข้อมูลสำเร็จ",
+        title: gap ? "Analysis complete, but data is incomplete" : "Analysis complete",
         message: gap
-          ? `เกรด ${result.data.grading?.grade || "ยังไม่ทราบ"} · ข้อมูลที่ยังขาด ${gap} รายการ ระบบจะไม่เดาค่าเป็น 0`
-          : `เกรด ${result.data.grading?.grade || "ยังไม่ทราบ"} · ใช้ข้อมูลชุดที่ส่งวิเคราะห์นี้ทุกหน้า`,
+          ? `Grade ${result.data.grading?.grade || "Unknown"} · ${gap} missing data items; missing values are never assumed to be zero.`
+          : `Grade ${result.data.grading?.grade || "Unknown"} · This analyzed data set is now used across all pages.`,
         duration: gap ? 9000 : undefined,
       });
       setCurrentPage("overview");
     } catch (error) {
-      addToast({ type: "error", title: "การแจ้งเตือนความสมบูรณ์", message: error instanceof Error ? error.message : "ไม่สามารถคำนวณข้อมูลได้", duration: 10000 });
+      addToast({ type: "error", title: "Validation notice", message: error instanceof Error ? error.message : "Could not calculate the data.", duration: 10000 });
     } finally {
       busy.current = false;
       setIsAnalyzing(false);
@@ -186,12 +186,12 @@ export const ImportPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-display font-bold text-ink">
-              ข้อมูลธุรกิจ & นำเข้าไฟล์ (Business Data Input)
+              Business Data & Import
             </h1>
             <DataKindBadge kind="actual" size="md" />
           </div>
           <p className="text-xs text-ink-muted mt-0.5">
-            อัปโหลดไฟล์สเปรดชีต Excel (.xlsx) หรือกรอกแบบฟอร์ม 8 หมวดเพื่อสร้างฐานข้อมูลจริง
+            Upload an Excel spreadsheet (.xlsx) or complete the 8-category form to create your business data.
           </p>
         </div>
 
@@ -204,7 +204,7 @@ export const ImportPage: React.FC = () => {
               activeTab === "upload" ? "bg-white text-brand shadow-2xs" : "text-ink-muted"
             }`}
           >
-            อัปโหลดไฟล์ Excel
+            Upload Excel file
           </button>
           <button
             type="button"
@@ -213,7 +213,7 @@ export const ImportPage: React.FC = () => {
               activeTab === "manual" ? "bg-white text-brand shadow-2xs" : "text-ink-muted"
             }`}
           >
-            กรอกเอง 8 หมวด
+            Enter data manually (8 categories)
           </button>
         </div>
       </div>
@@ -222,11 +222,11 @@ export const ImportPage: React.FC = () => {
       {activeTab === "upload" ? (
         <div className="space-y-6">
           <div className="p-8 border-2 border-dashed border-borderLine hover:border-brand rounded-card bg-white text-center space-y-3 transition-colors cursor-pointer"
-            role="button" tabIndex={0} aria-label="ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์"
+            role="button" tabIndex={0} aria-label="Drop a file here or click to choose a file"
             onClick={() => !busy.current && fileInput.current?.click()}
             onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); fileInput.current?.click(); } }}
             onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
-            onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length !== 1) { addToast({ type: "error", title: "การแจ้งเตือนความสมบูรณ์", message: "กรุณาเลือกไฟล์ครั้งละหนึ่งไฟล์" }); return; } void runAnalysis(event.dataTransfer.files[0]); }}>
+            onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length !== 1) { addToast({ type: "error", title: "Validation notice", message: "Please select one file at a time." }); return; } void runAnalysis(event.dataTransfer.files[0]); }}>
             <input ref={fileInput} type="file" accept=".xlsx" hidden disabled={isAnalyzing}
               onClick={(event) => event.stopPropagation()}
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void runAnalysis(file); }} />
@@ -235,10 +235,10 @@ export const ImportPage: React.FC = () => {
             </div>
             <div>
               <h3 className="font-display font-bold text-sm text-ink">
-                ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์
+                Drop a file here or click to choose a file
               </h3>
               <p className="text-xs text-ink-muted mt-0.5">
-                รองรับไฟล์ .XLSX แบบ Financials และงบไทย/อังกฤษหลายงบ ขนาดไม่เกิน 4 MiB
+                Supports .XLSX financial templates and Thai/English multi-statement workbooks up to 4 MiB
               </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
@@ -248,15 +248,15 @@ export const ImportPage: React.FC = () => {
                 disabled={isAnalyzing}
                 onClick={(event) => { event.stopPropagation(); fileInput.current?.click(); }}
               >
-                เลือกไฟล์จากเครื่อง
+                Choose a file
               </button>
               <button
                 type="button"
                 className="px-3.5 py-2 border border-slate-200 text-ink text-xs font-medium rounded-btn hover:bg-slate-50 flex items-center gap-1.5"
-                onClick={(event) => { event.stopPropagation(); void apiClient.downloadTemplate().catch((error) => addToast({ type: "error", title: "การแจ้งเตือนความสมบูรณ์", message: error.message })); }}
+                onClick={(event) => { event.stopPropagation(); void apiClient.downloadTemplate().catch((error) => addToast({ type: "error", title: "Template download failed", message: error.message })); }}
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>ดาวน์โหลดแบบฟอร์มตัวอย่าง (Template)</span>
+                <span>Download sample template</span>
               </button>
             </div>
           </div>
@@ -267,31 +267,31 @@ export const ImportPage: React.FC = () => {
             setStatementRecords(null);
             setActiveSection(1);
             setActiveTab("manual");
-            addToast({ type: "warning", title: "นำเข้างบที่เลือกแล้ว", message: "กรุณาตรวจตัวเลขและกรอกวันที่เริ่ม/สิ้นงวดที่ยังขาด ก่อนยืนยันการวิเคราะห์", duration: 10000 });
+            addToast({ type: "warning", title: "Statement selected", message: "Review the figures and enter any missing period start/end dates before confirming the analysis.", duration: 10000 });
           }} />}
 
           {/* Template layout the parser actually reads (no automatic mapping) */}
           <div className="bg-white p-5 rounded-card border border-borderLine space-y-3">
             <h4 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-              แบบ Financials วิเคราะห์ได้ทันที ส่วนไฟล์หลายงบต้องเลือกชุดข้อมูลและตรวจในแบบฟอร์มก่อน · ต้องมี 7 ฟิลด์บังคับ
+              Financial templates can be analyzed immediately. For multi-statement files, select a data set and review it in the form first · 7 fields are required
               (currency, kind, period_start, period_end, assets, liabilities, equity) และ assets = liabilities + equity
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">ชีตที่อ่าน</span>
+                <span className="text-[10px] text-ink-muted block">Sheets read</span>
                 <span className="font-bold text-ink">Financials</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">คอลัมน์ A / B</span>
+                <span className="text-[10px] text-ink-muted block">Columns A / B</span>
                 <span className="font-bold text-ink">field ↔ value</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">แถวข้อมูลใน Template</span>
-                <span className="font-bold text-ink">41 ชื่อฟิลด์</span>
+                <span className="text-[10px] text-ink-muted block">Template data rows</span>
+                <span className="font-bold text-ink">41 field names</span>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-ink-muted block">เว้นว่างไว้ = ไม่ทราบ</span>
-                <span className="font-bold text-ink">ไม่ถูกแปลงเป็น 0</span>
+                <span className="text-[10px] text-ink-muted block">Blank = unknown</span>
+                <span className="font-bold text-ink">Never converted to 0</span>
               </div>
             </div>
           </div>
@@ -302,7 +302,7 @@ export const ImportPage: React.FC = () => {
           {/* Sticky Left Section Nav */}
           <div className="lg:col-span-4 bg-white p-4 rounded-card border border-borderLine shadow-soft-sm sticky top-24 space-y-2">
             <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider block px-1">
-              หมวดหมู่งบการเงิน 8 หมวด
+              8 Financial Data Categories
             </span>
             <div className="space-y-1">
               {sections.map((sec) => (
@@ -334,7 +334,7 @@ export const ImportPage: React.FC = () => {
                 disabled={isAnalyzing}
                 className="w-full py-2.5 bg-brand hover:bg-brand-dark text-white rounded-btn text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
               >
-                <span>{isAnalyzing ? "กำลังประมวลผล..." : "ยืนยันข้อมูลและเริ่มวิเคราะห์"}</span>
+                <span>{isAnalyzing ? "Processing..." : "Confirm data and analyze"}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -344,50 +344,50 @@ export const ImportPage: React.FC = () => {
           <div className="lg:col-span-8 bg-white p-6 rounded-card border border-borderLine shadow-soft-sm space-y-6">
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <h3 className="font-display font-bold text-sm text-ink">
-                หมวดที่ {activeSection}: {sections.find((s) => s.id === activeSection)?.title}
+                Section {activeSection}: {sections.find((s) => s.id === activeSection)?.title}
               </h3>
-              <span className="text-xs text-ink-muted font-medium">บันทึกร่างอัตโนมัติ</span>
+              <span className="text-xs text-ink-muted font-medium">Draft saved automatically</span>
             </div>
 
-            {draft.statement_year && <p className="text-xs text-brand">งบที่นำเข้าเป็นปี ค.ศ. {draft.statement_year} · โปรดระบุวันสิ้นงวดให้ตรงกับปีของงบ</p>}
+            {draft.statement_year && <p className="text-xs text-brand">Imported statement year: {draft.statement_year} · Set the period end date to match this year.</p>}
 
             {/* Fields Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="font-bold text-ink block mb-1">ชื่อสถานประกอบการ / ร้านค้า</label>
+                <label className="font-bold text-ink block mb-1">Business / shop name</label>
                 <input
                   type="text"
-                  name="shop_name" aria-label="ชื่อสถานประกอบการ / ร้านค้า" value={draft.shop_name || ""}
+                  name="shop_name" aria-label="Business / shop name" value={draft.shop_name || ""}
                   onChange={(event) => updateDraft("shop_name", event.target.value)} maxLength={200} disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">รายได้รวมในงวด (฿)</label>
+                <label className="font-bold text-ink block mb-1">Total revenue for period (฿)</label>
                 <input
                   type="number"
-                  name="revenue" aria-label="รายได้รวมในงวด (฿)" value={draft.revenue || ""}
+                  name="revenue" aria-label="Total revenue for period (฿)" value={draft.revenue || ""}
                   onChange={(event) => updateDraft("revenue", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">เงินสดคงเหลือปลายงวด (฿)</label>
+                <label className="font-bold text-ink block mb-1">Ending cash balance (฿)</label>
                 <input
                   type="number"
-                  name="cash_balance" aria-label="เงินสดคงเหลือปลายงวด (฿)" value={draft.cash_balance || ""}
+                  name="cash_balance" aria-label="Ending cash balance (฿)" value={draft.cash_balance || ""}
                   onChange={(event) => updateDraft("cash_balance", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-ink block mb-1">เงินสำรองขั้นต่ำที่ต้องการ (฿)</label>
+                <label className="font-bold text-ink block mb-1">Minimum cash reserve (฿)</label>
                 <input
                   type="number"
-                  name="minimum_cash_reserve" aria-label="เงินสำรองขั้นต่ำที่ต้องการ (฿)" value={draft.minimum_cash_reserve || ""}
+                  name="minimum_cash_reserve" aria-label="Minimum cash reserve (฿)" value={draft.minimum_cash_reserve || ""}
                   onChange={(event) => updateDraft("minimum_cash_reserve", event.target.value)} step="0.01" min="0" disabled={isAnalyzing}
                   className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono font-bold"
                 />
@@ -412,10 +412,10 @@ export const ImportPage: React.FC = () => {
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-attention mt-0.5 shrink-0" />
               <div>
-                <strong>การแจ้งเตือนความสมบูรณ์:</strong>{" "}
+                <strong>Validation notice:</strong>{" "}
                 {emptyInSection.length
-                  ? `หมวดนี้ยังไม่ได้กรอก ${emptyInSection.length} ช่อง (${emptyInSection.join(", ")}) ระบบจะส่งเป็น "ไม่ทราบ" ไม่เดาค่าเป็น 0`
-                  : "หมวดนี้กรอกครบแล้ว ช่องที่เว้นว่างในหมวดอื่นจะถูกส่งเป็น \"ไม่ทราบ\" ไม่ใช่ 0"}
+                  ? `${emptyInSection.length} fields are blank in this section (${emptyInSection.join(", ")}). They will be sent as "Unknown"; values are never assumed to be 0.`
+                  : "This section is complete. Blank fields in other sections will be sent as \"Unknown\", not 0."}
               </div>
             </div>
           </div>
@@ -431,12 +431,12 @@ export const ImportPage: React.FC = () => {
             </div>
             <div>
               <h3 className="font-display font-bold text-ink text-sm">
-                กำลังวิเคราะห์ข้อมูลธุรกิจ
+                Analyzing business data
               </h3>
               <p className="text-xs text-ink-muted mt-1">
-                {analysisStep === "reading" && "1/3: กำลังอ่านโครงสร้างข้อมูลและแถวรายการ..."}
-                {analysisStep === "validating" && "2/3: กำลังตรวจสอบดุลบัญชีและความสัมพันธ์..."}
-                {analysisStep === "analyzing" && "3/3: ประมวลผลดัชนีสุขภาพการเงินและกระแสเงินสด..."}
+                {analysisStep === "reading" && "1/3: Reading the data structure and rows..."}
+                {analysisStep === "validating" && "2/3: Validating balances and relationships..."}
+                {analysisStep === "analyzing" && "3/3: Calculating financial health and cash flow..."}
               </p>
             </div>
           </div>

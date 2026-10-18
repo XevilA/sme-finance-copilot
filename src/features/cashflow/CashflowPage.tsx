@@ -36,7 +36,7 @@ export const CashflowPage: React.FC = () => {
   const { envelope: timelineEnvelope, loading, error, reload: loadData } = state;
   const mode = envelopeMode(state, (rows) => rows.length === 0);
   const money = (value: number | null | undefined) =>
-    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+    value == null ? "No data" : `฿${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   // Cash-flow statement lines come from the statement that was analysed. The
   // dated timeline contract does not return them, so they are not invented.
   const statementLine = (field: string) => {
@@ -60,10 +60,10 @@ export const CashflowPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "อ่านตารางกระแสเงินสดจาก backend ไม่สำเร็จ"}
+        errorMessage={error || "Could not load the cash flow schedule from the backend"}
         unavailableReason={accepted
-          ? "งบที่นำเข้าเป็นยอดรวมของงวด ไม่มีรายการรับ-จ่ายตามวันที่ · ระบบจะไม่ใช้ตารางของกิจการตัวอย่างมาแสดงแทน และจะไม่กระจายยอดรวมเป็นรายวัน"
-          : "ยังไม่มีรายการรับ-จ่ายตามวันที่สำหรับกิจการนี้"}
+          ? "The imported statement contains period totals but no dated cash transactions · The system will not substitute a sample business schedule or spread totals across days."
+          : "No dated cash transactions are available for this business."}
         missingItems={missing}
         onRetry={loadData}
         onAddData={() => setCurrentPage("import")}
@@ -88,12 +88,12 @@ export const CashflowPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-display font-bold text-ink">
-                เงินสดและกระแสเงินสด (Cashflow Forecast)
+                Cash & Cash Flow (Cash Flow Forecast)
               </h1>
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ตรวจจังหวะเงินเข้า-ออก รายการครบกำหนด และเลื่อนดูเงินคงเหลือในอนาคตด้วย Time Travel
+              Review cash inflows and outflows, upcoming obligations, and future balances with Time Travel.
             </p>
           </div>
 
@@ -104,7 +104,7 @@ export const CashflowPage: React.FC = () => {
               className="px-3.5 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-bold rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>AI วิเคราะห์จุดเงินขาด</span>
+              <span>Ask AI to identify cash shortfalls</span>
             </button>
 
             <button
@@ -113,7 +113,7 @@ export const CashflowPage: React.FC = () => {
               className="px-4 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-semibold rounded-btn flex items-center gap-1.5 shadow-sm transition-all"
             >
               <Coins className="w-3.5 h-3.5" />
-              <span>จัดอันดับแหล่งทุนตามส่วนที่ขาด</span>
+              <span>Rank funders against the shortfall</span>
             </button>
           </div>
         </div>
@@ -128,19 +128,19 @@ export const CashflowPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-bold text-danger uppercase tracking-wider">
                   {breachDays.length
-                    ? `ช่วงเงินสดต่ำกว่าเงินสำรอง ${breachDays.length} วัน (${breachDays[0].date} – ${breachDays[breachDays.length - 1].date})`
-                    : "ไม่พบวันที่เงินสดต่ำกว่าเงินสำรองในตารางนี้"}
+                    ? `Cash is below the reserve for ${breachDays.length} days (${breachDays[0].date} – ${breachDays[breachDays.length - 1].date})`
+                    : "Cash stays above the reserve throughout this schedule"}
                 </h3>
                 <span className="text-[10px] bg-white text-danger px-2 py-0.2 rounded border border-danger/30 font-bold">
-                  {minCashDay.projectedCash < 0 ? "ติดลบ" : breachDays.length ? "ต่ำกว่าสำรอง" : "ไม่ติดลบ"}
+                  {minCashDay.projectedCash < 0 ? "Negative" : breachDays.length ? "Below reserve" : "Not negative"}
                 </span>
               </div>
               <p className="text-xs text-red-900 mt-1 leading-relaxed">
-                เงินสดต่ำสุดในตาราง <strong>{money(minCashDay.projectedCash)}</strong> วันที่{" "}
-                <strong>{minCashDay.date}</strong> เทียบเงินสำรอง {money(minCashDay.reserveLine)} ·{" "}
-                {timelineEnvelope.kind === "forecast" ? "เป็นประมาณการจากรายการที่มีวันกำหนด" : "จากรายการที่บันทึกไว้"}
-                {defaultSme ? " · ยังไม่ได้ระบุกิจการ ระบบเลือกกิจการเริ่มต้นให้" : ""}
-                {missing.length ? ` · ข้อมูลที่ยังขาด: ${missing.join(", ")}` : ""}
+                Lowest scheduled cash balance: <strong>{money(minCashDay.projectedCash)}</strong> on{" "}
+                <strong>{minCashDay.date}</strong> · Reserve: {money(minCashDay.reserveLine)} ·{" "}
+                {timelineEnvelope.kind === "forecast" ? "Forecast based on dated transactions" : "Based on saved transactions"}
+                {defaultSme ? " · No business selected; the default business is shown" : ""}
+                {missing.length ? ` · Missing data: ${missing.join(", ")}` : ""}
               </p>
             </div>
           </div>
@@ -151,14 +151,14 @@ export const CashflowPage: React.FC = () => {
               onClick={() => setSelectedDayIndex(minCashDay.dayIndex)}
               className="px-3 py-1.5 bg-white border border-danger/40 text-danger text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors"
             >
-              ดูวันที่เงินต่ำสุด ({minCashDay.date})
+              View lowest-cash date ({minCashDay.date})
             </button>
             <button
               type="button"
               onClick={() => setCurrentPage("funding")}
               className="px-4 py-1.5 bg-danger text-white text-xs font-bold rounded-lg hover:bg-danger-dark transition-all flex items-center gap-1 shadow-sm"
             >
-              <span>เปิดแผนแก้ปัญหา</span>
+              <span>Open mitigation plan</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -179,43 +179,43 @@ export const CashflowPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-card bg-white border border-borderLine">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              1. กระแสเงินสดจากการดำเนินงาน (Operating)
+              1. Operating cash flow
             </span>
             <div className="text-lg font-bold font-mono text-emerald-700 tabular-nums">
               {money(statementLine("operating_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
               {statementLine("operating_cash_flow") == null
-                ? "ต้องระบุ operating_cash_flow ในงบที่นำเข้า · ตารางรายวันไม่ได้คืนค่านี้"
-                : "ตามค่าที่ระบุในงบของงวดที่วิเคราะห์"}
+                ? "Add operating_cash_flow to the imported statement · The daily schedule does not calculate this figure."
+                : "Based on the value reported for this period."}
             </p>
           </div>
 
           <div className="p-4 rounded-card bg-white border border-borderLine">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              2. กระแสเงินสดจากการลงทุน (Investing)
+              2. Investing cash flow
             </span>
             <div className="text-lg font-bold font-mono text-ink tabular-nums">
               {money(statementLine("investing_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
               {statementLine("investing_cash_flow") == null
-                ? "ต้องระบุ investing_cash_flow ในงบที่นำเข้า · ค่าว่างไม่ถูกตีความเป็นศูนย์"
-                : "ตามค่าที่ระบุในงบของงวดที่วิเคราะห์"}
+                ? "Add investing_cash_flow to the imported statement · A blank value is not treated as zero."
+                : "Based on the value reported for this period."}
             </p>
           </div>
 
           <div className="p-4 rounded-card bg-white border border-borderLine">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              3. กระแสเงินสดจากการจัดหาเงิน (Financing)
+              3. Financing cash flow
             </span>
             <div className="text-lg font-bold font-mono text-brand tabular-nums">
               {money(statementLine("financing_cash_flow"))}
             </div>
             <p className="text-[11px] text-ink-muted mt-1 leading-tight">
               {statementLine("financing_cash_flow") == null
-                ? "ต้องระบุ financing_cash_flow ในงบที่นำเข้า · ยังไม่มีวงเงินใดถูกจัดหรืออนุมัติ"
-                : "ตามค่าที่ระบุในงบ · ไม่ใช่วงเงินที่ได้รับอนุมัติแล้ว"}
+                ? "Add financing_cash_flow to the imported statement · No facility has been allocated or approved."
+                : "Based on the reported value · This is not an approved credit facility."}
             </p>
           </div>
         </div>
@@ -225,16 +225,16 @@ export const CashflowPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-display font-bold text-ink flex items-center gap-2">
               <Calendar className="w-4 h-4 text-brand" />
-              <span>รายการเงินรับ-เงินจ่ายในวันที่ {currentDay.date}</span>
+              <span>Cash transactions on {currentDay.date}</span>
             </h3>
             <span className="text-xs text-ink-muted">
-              {currentDay.events.length} รายการในวันนี้
+              {currentDay.events.length} transactions today
             </span>
           </div>
 
           {currentDay.events.length === 0 ? (
             <div className="p-8 text-center text-xs text-ink-muted bg-slate-50 rounded-xl">
-              ไม่มีรายการธุรกรรมเงินสดเข้าออกในวันที่ {currentDay.date}
+              No cash transactions on {currentDay.date}
             </div>
           ) : (
             <div className="space-y-2">
@@ -247,7 +247,7 @@ export const CashflowPage: React.FC = () => {
                     <div className="font-semibold text-ink flex items-center gap-2">
                       <span>{ev.title}</span>
                       <span className="text-[10px] bg-slate-200 px-1.5 py-0.2 rounded font-normal text-slate-600">
-                        {ev.partner || "ภายในร้าน"}
+                        {ev.partner || "Internal"}
                       </span>
                     </div>
                     <div className="text-[11px] text-ink-muted">{ev.impactReason}</div>

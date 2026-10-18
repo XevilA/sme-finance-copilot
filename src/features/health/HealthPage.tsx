@@ -50,8 +50,8 @@ export const HealthPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "อ่านตัวชี้วัดสุขภาพการเงินจาก backend ไม่สำเร็จ"}
-        unavailableReason="ยังไม่มีตัวชี้วัดสำหรับข้อมูลชุดนี้"
+        errorMessage={error || "Could not load financial health metrics from the backend"}
+        unavailableReason="No metrics are available for this data set."
         missingItems={indicatorsEnvelope?.missing || []}
         onRetry={loadData}
         onAddData={() => setCurrentPage("import")}
@@ -72,12 +72,12 @@ export const HealthPage: React.FC = () => {
                 <HeartPulse className="w-4 h-4" />
               </div>
               <h1 className="text-xl font-display font-bold text-ink">
-                สุขภาพการเงิน 5 มิติ (Financial Health Diagnostics)
+                Five Dimensions of Financial Health
               </h1>
               <DataKindBadge kind={indicatorsEnvelope.kind} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ตรวจสภาพคล่อง ความสามารถทำกำไร ภาระหนี้ ประสิทธิภาพหมุนเวียน และการเติบโต
+              Assess liquidity, profitability, debt burden, operating efficiency, and growth.
             </p>
           </div>
 
@@ -88,7 +88,7 @@ export const HealthPage: React.FC = () => {
               className="px-3.5 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-bold rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>ให้ AI อธิบายตัวชี้วัด</span>
+              <span>Ask AI to explain these metrics</span>
             </button>
           </div>
         </div>
@@ -96,11 +96,11 @@ export const HealthPage: React.FC = () => {
         {/* Category Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
           {[
-            { id: "all", label: "ตัวชี้วัดทั้งหมด" },
-            { id: "liquidity", label: "💧 สภาพคล่อง (Liquidity)" },
-            { id: "profitability", label: "📈 การทำกำไร (Profitability)" },
-            { id: "debt", label: "⚖️ ภาระหนี้ (Debt)" },
-            { id: "efficiency", label: "⚙️ ประสิทธิภาพ (Efficiency)" },
+            { id: "all", label: "All metrics" },
+            { id: "liquidity", label: "💧 Liquidity" },
+            { id: "profitability", label: "📈 Profitability" },
+            { id: "debt", label: "⚖️ Debt" },
+            { id: "efficiency", label: "⚙️ Efficiency" },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -155,12 +155,12 @@ export const HealthPage: React.FC = () => {
                       }`}
                     >
                       {item.status === "good"
-                        ? "เกณฑ์ดี"
+                        ? "Healthy"
                         : item.status === "warning"
-                        ? "เฝ้าระวัง"
+                        ? "Monitor"
                         : item.status === "danger"
-                        ? "ตึงตัว"
-                        : "ข้อมูลไม่พอ"}
+                        ? "Under pressure"
+                        : "Insufficient data"}
                     </span>
                   </div>
 
@@ -169,10 +169,10 @@ export const HealthPage: React.FC = () => {
                     <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1.5 my-2">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
                         <FileQuestion className="w-4 h-4 text-attention shrink-0" />
-                        <span>{item.missingFields?.length ? "คำนวณไม่ได้ ขาด:" : "คำนวณไม่ได้"}</span>
+                        <span>{item.missingFields?.length ? "Cannot calculate. Missing:" : "Cannot calculate"}</span>
                       </div>
                       <ul className="text-[11px] text-amber-800 list-disc pl-4 space-y-0.5">
-                        {(item.missingFields?.length ? item.missingFields : [item.interpretation || "backend ไม่ได้ระบุรายการที่ขาด"]).map((mf, idx) => (
+                        {(item.missingFields?.length ? item.missingFields : [item.interpretation || "The backend did not specify the missing items."]).map((mf, idx) => (
                           <li key={idx}>{mf}</li>
                         ))}
                       </ul>
@@ -181,19 +181,19 @@ export const HealthPage: React.FC = () => {
                         onClick={() => setCurrentPage("import")}
                         className="text-[10px] font-bold text-brand hover:underline block pt-1"
                       >
-                        + ไปเพิ่มข้อมูลที่ขาดในหน้าข้อมูลธุรกิจ
+                        + Add the missing data on the Business Data page
                       </button>
                     </div>
                   ) : (
                     <div className="my-2">
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-2xl font-extrabold font-mono text-ink tabular-nums">
-                          {item.value == null ? "ยังไม่มีข้อมูล" : item.value.toLocaleString("th-TH", { maximumFractionDigits: 4 })}
+                          {item.value == null ? "No data" : item.value.toLocaleString("en-US", { maximumFractionDigits: 4 })}
                         </span>
                         <span className="text-xs font-semibold text-ink-muted">{item.unit}</span>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        เกณฑ์มาตรฐาน: {item.benchmark}
+                        Benchmark: {item.benchmark}
                       </span>
                     </div>
                   )}
@@ -214,7 +214,7 @@ export const HealthPage: React.FC = () => {
                     className="text-brand hover:underline font-medium flex items-center gap-1"
                   >
                     <Info className="w-3 h-3" />
-                    <span>{inspectFormulaId === item.id ? "ซ่อนสูตร" : "ดูสูตรที่ใช้"}</span>
+                    <span>{inspectFormulaId === item.id ? "Hide formula" : "View formula"}</span>
                   </button>
 
                   <DataKindBadge kind={indicatorsEnvelope.kind} size="sm" />
@@ -223,7 +223,7 @@ export const HealthPage: React.FC = () => {
                 {/* Formula Popover Dropdown */}
                 {inspectFormulaId === item.id && (
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[10px] text-ink-muted font-mono animate-fade-in">
-                    <strong>สูตร:</strong> {item.formula}
+                    <strong>Formula:</strong> {item.formula}
                   </div>
                 )}
               </div>

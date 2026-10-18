@@ -32,23 +32,23 @@ export const ShopFinancePage: React.FC = () => {
     if (!selectedShopId && firstShopId) setSelectedShopId(firstShopId);
   }, [selectedShopId, firstShopId, setSelectedShopId]);
   const financeState = useEnvelope<ShopFinance | null>(useCallback(
-    () => (activeShopId ? apiClient.getShopFinance(activeShopId) : Promise.reject(new Error("ยังไม่ได้เลือกร้านค้า"))),
+    () => (activeShopId ? apiClient.getShopFinance(activeShopId) : Promise.reject(new Error("No shop has been selected."))),
     [activeShopId]), [activeShopId]);
   const capabilityState = useEnvelope<Capabilities>(useCallback(
     () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      ? Promise.reject(new Error("Backend capabilities are not declared in demo mode."))
       : apiClient.getCapabilities()),
     []));
   const canSign = capabilityState.envelope?.data.agreementSignature.available === true;
   const signBlockedReason = capabilityState.envelope?.data.agreementSignature.reason
-    || "backend ยังไม่มี operation สำหรับลงนามข้อตกลง";
+    || "The backend does not support agreement signing.";
   const finance = financeState.envelope?.data || null;
   const loading = shopsState.loading || financeState.loading;
   const error = shopsState.error || financeState.error;
   const loadData = () => { shopsState.reload(); financeState.reload(); };
   const mode = envelopeMode(financeState, (data) => data == null);
   const amount = (value: number | null | undefined) =>
-    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+    value == null ? "No data" : `฿${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   // Stored acceptance flags. The page shows what is recorded and never signs.
   const parties = finance?.partyAcceptance;
 
@@ -57,8 +57,8 @@ export const ShopFinancePage: React.FC = () => {
     // no persisted signature and no status transition behind this button.
     addToast({
       type: "warning",
-      title: "ยังไม่รองรับการลงนามจริง",
-      message: `${signBlockedReason} · สถานะที่แสดงคือสิ่งที่บันทึกไว้ในฐานข้อมูล ไม่ใช่การลงนามจากหน้านี้`,
+      title: "Live signing is unavailable",
+      message: `${signBlockedReason} · The status shown is read from the database; this page does not sign agreements.`,
       duration: 9000,
     });
   };
@@ -76,10 +76,10 @@ export const ShopFinancePage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "error" ? "error" : "unavailable"}
-        errorMessage={error || "อ่านแผนการเงินรายร้านจาก backend ไม่สำเร็จ"}
+        errorMessage={error || "Could not load the shop financial plan from the backend."}
         unavailableReason={shops.length
-          ? "ยังไม่มีแผนการเงินที่บันทึกไว้สำหรับร้านที่เลือก"
-          : "ยังไม่มีร้านค้าในฐานข้อมูลให้เลือก"}
+          ? "No financial plan is saved for the selected shop."
+          : "There are no shops in the database to select."}
         missingItems={[...(shopsState.envelope?.missing || []), ...(financeState.envelope?.missing || [])]}
         onRetry={loadData}
         onAddData={() => setCurrentPage("swarm")}
@@ -99,12 +99,12 @@ export const ShopFinancePage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-display font-bold text-ink">
-                แผนการเงินรายร้านในทีม (Per-Shop Financial Model)
+                Team Shop Financial Plan
               </h1>
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ตรวจกระแสเงินสด วันที่เงินติดลบ และลงนามรับทราบข้อตกลง 4 ฝ่าย
+              Review cash flow and shortfall dates, and track four-party agreement acceptance.
             </p>
           </div>
 
@@ -121,7 +121,7 @@ export const ShopFinancePage: React.FC = () => {
                     : "bg-white border border-borderLine text-ink hover:border-brand/40"
                 }`}
               >
-                {s.fundingGap > 0 ? `${s.name} (ขาด ${amount(s.fundingGap)})` : s.name}
+                {s.fundingGap > 0 ? `${s.name} (shortfall ${amount(s.fundingGap)})` : s.name}
               </button>
             ))}
           </div>
@@ -132,70 +132,70 @@ export const ShopFinancePage: React.FC = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-display font-bold text-ink flex items-center gap-2">
               <Coins className="w-4 h-4 text-brand" />
-              <span>รับงานเพิ่มแล้วเหลือเงินเพิ่มจริงไหม? (แยกกำไร vs เงินสด)</span>
+              <span>Will taking this order leave more cash? (Profit vs. cash)</span>
             </h2>
             <DataKindBadge kind="forecast" size="sm" />
           </div>
           <p className="text-xs text-ink-muted leading-relaxed">
-            สำหรับ <strong>{finance.name}</strong> โควตา {finance.boxesPerDay} {finance.totalBoxes ? `ต่อวัน (รวม ${finance.totalBoxes})` : "ต่อวัน"}:
-            ได้รับรายได้รวม <strong>{amount(finance.revenue)}</strong>{" "}
-            หักต้นทุนรวม <strong>{amount(finance.totalCost)}</strong> จะได้กำไรของออเดอร์นี้ก่อนค่าใช้จ่ายอื่น{" "}
-            <strong>{amount(finance.projectedProfit)}</strong> ({finance.profitMarginPercent}% มาร์จิน) ·{" "}
-            <strong>เงินสดต่ำสุดตามตารางของออเดอร์นี้ {amount(finance.minCashBalance)}</strong>
+            For <strong>{finance.name}</strong>, at a capacity of {finance.boxesPerDay} {finance.totalBoxes ? `per day (${finance.totalBoxes} total)` : "per day"}:
+            total revenue is <strong>{amount(finance.revenue)}</strong>, less total costs of{" "}
+            <strong>{amount(finance.totalCost)}</strong>, leaving projected order profit before other expenses of{" "}
+            <strong>{amount(finance.projectedProfit)}</strong> ({finance.profitMarginPercent}% margin) ·{" "}
+            <strong>projected minimum cash balance: {amount(finance.minCashBalance)}</strong>
             {finance.minCashBalance < 0
-              ? " จึงต้องมีเงินทุนหมุนเวียนเสริมก่อนเริ่มงาน"
-              : " ยังไม่ติดลบตามตารางนี้ และไม่รวมภาระอื่นของกิจการ"}
+              ? " Additional working capital is needed before the order starts."
+              : " Cash does not go negative in this schedule; other business obligations are excluded."}
           </p>
         </div>
 
         {/* Financial Metrics Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="p-3 bg-white rounded-card border border-borderLine">
-            <span className="text-[10px] text-ink-muted block">โควตารับงาน</span>
+            <span className="text-[10px] text-ink-muted block">Order capacity</span>
             <span className="text-sm font-bold font-mono text-ink">
-              {finance.boxesPerDay} กล่อง/วัน
+              {finance.boxesPerDay} boxes/day
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">รวม {finance.totalBoxes} กล่อง</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{finance.totalBoxes} boxes total</span>
           </div>
 
           <div className="p-3 bg-white rounded-card border border-borderLine">
-            <span className="text-[10px] text-ink-muted block">รายรับรวม</span>
+            <span className="text-[10px] text-ink-muted block">Total revenue</span>
             <span className="text-sm font-bold font-mono text-ink">
               ฿{finance.revenue.toLocaleString()}
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">@ ฿{finance.sellingPricePerBox}/กล่อง</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">@ ฿{finance.sellingPricePerBox}/box</span>
           </div>
 
           <div className="p-3 bg-white rounded-card border border-borderLine">
-            <span className="text-[10px] text-ink-muted block">ต้นทุนรวม</span>
+            <span className="text-[10px] text-ink-muted block">Total cost</span>
             <span className="text-sm font-bold font-mono text-ink">
               ฿{finance.totalCost.toLocaleString()}
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">วัตถุดิบ+ค่าแรง+ส่ง</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">Materials + labor + delivery</span>
           </div>
 
           <div className="p-3 bg-white rounded-card border border-brand/30 bg-brand/5">
-            <span className="text-[10px] font-bold text-brand block">กำไรสุทธิคาดการณ์</span>
+            <span className="text-[10px] font-bold text-brand block">Projected net profit</span>
             <span className="text-sm font-extrabold font-mono text-brand">
               ฿{finance.projectedProfit.toLocaleString()}
             </span>
-            <span className="text-[10px] text-brand/80 block mt-0.5">มาร์จิน {finance.profitMarginPercent}%</span>
+            <span className="text-[10px] text-brand/80 block mt-0.5">Margin {finance.profitMarginPercent}%</span>
           </div>
 
           <div className="p-3 bg-white rounded-card border border-borderLine">
-            <span className="text-[10px] text-ink-muted block">เงินสดต้องจ่ายก่อน</span>
+            <span className="text-[10px] text-ink-muted block">Upfront cash required</span>
             <span className="text-sm font-bold font-mono text-ink">
               ฿{finance.upfrontCashNeeded.toLocaleString()}
             </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">มัดจำของสด Day 1</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">Fresh ingredient deposit · Day 1</span>
           </div>
 
           <div className={`p-3 rounded-card border ${isShortage ? "bg-red-50 border-danger" : "bg-emerald-50 border-emerald-300"}`}>
             <span className={`text-[10px] font-bold block ${isShortage ? "text-danger" : "text-emerald-800"}`}>
-              {isShortage ? "ทุนที่ยังขาด" : "สภาพคล่อง"}
+              {isShortage ? "Funding shortfall" : "Liquidity"}
             </span>
             <span className={`text-sm font-extrabold font-mono ${isShortage ? "text-danger" : "text-emerald-700"}`}>
-              {isShortage ? `ขาด ฿${finance.fundingGap.toLocaleString()}` : "เพียงพอ"}
+              {isShortage ? `Short ฿${finance.fundingGap.toLocaleString("en-US")}` : "Sufficient"}
             </span>
             {isShortage && (
               <button
@@ -203,7 +203,7 @@ export const ShopFinancePage: React.FC = () => {
                 onClick={() => setCurrentPage("funding", { shopId: finance.shopId })}
                 className="text-[10px] font-bold text-danger underline block mt-0.5"
               >
-                หาเงินสำหรับร้านนี้ →
+                Find funding for this shop →
               </button>
             )}
           </div>
@@ -212,23 +212,23 @@ export const ShopFinancePage: React.FC = () => {
         {/* Cost Itemization Table */}
         <div className="bg-white rounded-card border border-borderLine p-4 space-y-3">
           <h3 className="text-xs font-display font-bold text-ink uppercase tracking-wider">
-            แจกแจงโครงสร้างต้นทุน (Cost Breakdown per Shop)
+            Cost breakdown per shop
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="p-2.5 bg-slate-50 rounded-xl">
-              <span className="text-ink-muted block text-[10px]">ค่าวัตถุดิบของสด</span>
+              <span className="text-ink-muted block text-[10px]">Fresh materials</span>
               <span className="font-bold text-ink font-mono">฿{finance.rawMaterialCost.toLocaleString()}</span>
             </div>
             <div className="p-2.5 bg-slate-50 rounded-xl">
-              <span className="text-ink-muted block text-[10px]">ค่าแรงงานเพิ่มเติม</span>
+              <span className="text-ink-muted block text-[10px]">Additional labor</span>
               <span className="font-bold text-ink font-mono">฿{finance.additionalLaborCost.toLocaleString()}</span>
             </div>
             <div className="p-2.5 bg-slate-50 rounded-xl">
-              <span className="text-ink-muted block text-[10px]">ค่าขนส่งควบคุมอุณหภูมิ</span>
+              <span className="text-ink-muted block text-[10px]">Temperature-controlled delivery</span>
               <span className="font-bold text-ink font-mono">฿{finance.deliveryCost.toLocaleString()}</span>
             </div>
             <div className="p-2.5 bg-slate-50 rounded-xl">
-              <span className="text-ink-muted block text-[10px]">ค่าบริการระบบ SWARM</span>
+              <span className="text-ink-muted block text-[10px]">SWARM service fee</span>
               <span className="font-bold text-ink font-mono">฿{finance.serviceFee.toLocaleString()}</span>
             </div>
           </div>
@@ -237,7 +237,7 @@ export const ShopFinancePage: React.FC = () => {
         {/* Cashflow Timeline Events */}
         <div className="bg-white rounded-card border border-borderLine p-4 space-y-3">
           <h3 className="text-xs font-display font-bold text-ink uppercase tracking-wider flex items-center justify-between">
-            <span>เส้นทางเงินสดของร้าน (Cash Timeline: ซื้อของ → ผลิต → ส่งงาน → รับเงิน)</span>
+            <span>Shop cash timeline (Purchase → Production → Delivery → Payment)</span>
             <DataKindBadge kind="forecast" size="sm" />
           </h3>
 
@@ -263,10 +263,10 @@ export const ShopFinancePage: React.FC = () => {
                       item.amount > 0 ? "text-emerald-700" : item.amount < 0 ? "text-danger" : "text-slate-500"
                     }`}
                   >
-                    {item.amount > 0 ? "+" : ""}{item.amount !== 0 ? `฿${item.amount.toLocaleString()}` : "ส่งมอบ"}
+                    {item.amount > 0 ? "+" : ""}{item.amount !== 0 ? `฿${item.amount.toLocaleString("en-US")}` : "Delivered"}
                   </div>
                   <div className="text-[10px] text-ink-muted font-mono">
-                    เงินสดคงเหลือ: ฿{item.cashBalance.toLocaleString()}
+                    Cash balance: ฿{item.cashBalance.toLocaleString("en-US")}
                   </div>
                 </div>
               </div>
@@ -279,10 +279,10 @@ export const ShopFinancePage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs font-display font-bold text-ink uppercase tracking-wider">
-                การลงนามยอมรับเงื่อนไข 4 ฝ่ายก่อนเริ่มงานจริง
+                Four-party agreement acceptance before work begins
               </h3>
               <p className="text-[11px] text-ink-muted">
-                ข้อตกลงราคา ส่วนแบ่ง มาตรฐาน วันส่ง และรอบจ่ายเงิน
+                Confirm pricing, allocation, standards, delivery dates, and payment terms.
               </p>
             </div>
             <DataKindBadge kind="actual" size="sm" />
@@ -290,53 +290,53 @@ export const ShopFinancePage: React.FC = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-              <span className="text-[10px] text-slate-400 block">1. ผู้ว่าจ้าง (Buyer)</span>
+              <span className="text-[10px] text-slate-400 block">1. Buyer</span>
               <div className="font-bold text-ink">
-                {parties?.buyerSigned ? "ยังไม่ได้บันทึกชื่อคู่สัญญา" : "ยังไม่บันทึกการยอมรับของผู้ว่าจ้าง"}
+                {parties?.buyerSigned ? "Buyer name not recorded" : "Buyer acceptance not recorded"}
               </div>
               {parties?.buyerSigned && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
+                  <CheckCircle2 className="w-3 h-3" /> Acceptance recorded
                 </span>
               )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-              <span className="text-[10px] text-slate-400 block">2. โลจิสติกส์ (Fleet)</span>
+              <span className="text-[10px] text-slate-400 block">2. Logistics</span>
               <div className="font-bold text-ink">
-                {parties?.logisticsSigned ? "ยังไม่ได้บันทึกผู้ให้บริการขนส่ง" : "ยังไม่บันทึกการยอมรับของผู้ขนส่ง"}
+                {parties?.logisticsSigned ? "Delivery provider not recorded" : "Logistics acceptance not recorded"}
               </div>
               {parties?.logisticsSigned && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
+                  <CheckCircle2 className="w-3 h-3" /> Acceptance recorded
                 </span>
               )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-              <span className="text-[10px] text-slate-400 block">3. ร้านค้า (Shop)</span>
+              <span className="text-[10px] text-slate-400 block">3. Shop</span>
               <div className="font-bold text-ink">{finance.name}</div>
               {parties?.shopSigned ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
+                  <CheckCircle2 className="w-3 h-3" /> Acceptance recorded
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
-                  <AlertTriangle className="w-3 h-3" /> ยังไม่บันทึกการยอมรับ
+                  <AlertTriangle className="w-3 h-3" /> Acceptance not recorded
                 </span>
               )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-              <span className="text-[10px] text-slate-400 block">4. ผู้ให้ทุน (Funder)</span>
-              <div className="font-bold text-ink">ยังไม่ได้บันทึกผู้ให้ทุน</div>
+              <span className="text-[10px] text-slate-400 block">4. Funder</span>
+              <div className="font-bold text-ink">Funder not recorded</div>
               {parties?.funderSigned ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> บันทึกว่ายอมรับแล้ว
+                  <CheckCircle2 className="w-3 h-3" /> Acceptance recorded
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                  ยังไม่บันทึกการยอมรับ
+                  Acceptance not recorded
                 </span>
               )}
             </div>
@@ -345,8 +345,8 @@ export const ShopFinancePage: React.FC = () => {
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[11px] text-ink-muted">
               {canSign
-                ? "การเปลี่ยนแปลงร้านหรือเงื่อนไขสำคัญ จะสร้างสัญญาฉบับใหม่ให้ตรวจยอมรับเสมอ"
-                : `สถานะด้านบนอ่านจากที่บันทึกไว้ · ${signBlockedReason}`}
+                ? "Changes to a shop or key terms always create a new agreement for review and acceptance."
+                : `Status above is read from saved records · ${signBlockedReason}`}
             </span>
             <button
               type="button"
@@ -356,7 +356,7 @@ export const ShopFinancePage: React.FC = () => {
               className="px-5 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-btn text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
             >
               <FileCheck className="w-4 h-4" />
-              <span>{canSign ? "ลงนามยอมรับแผนฉบับนี้" : "ยังไม่รองรับการลงนาม"}</span>
+              <span>{canSign ? "Accept this plan" : "Signing is unavailable"}</span>
             </button>
           </div>
         </div>

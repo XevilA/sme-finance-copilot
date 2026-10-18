@@ -28,7 +28,7 @@ export const SimulatorPage: React.FC = () => {
   // implemented, so the playback is presented as a stored catalogue reading.
   const [chaosEffects, setChaosEffects] = useState<{ available: boolean; reason: string }>({
     available: false,
-    reason: "ยังไม่ทราบความสามารถของ backend",
+    reason: "Backend capabilities are unknown.",
   });
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>("chaos-shop-dropout");
   const [loading, setLoading] = useState(true);
@@ -54,7 +54,7 @@ export const SimulatorPage: React.FC = () => {
     const [whole, fraction = ""] = value.split(".");
     return `${whole.length > 2 ? whole.slice(0, -2) : "0"}.${whole.padStart(2, "0").slice(-2)}${fraction}`;
   };
-  const amount = (value: number | string | null | undefined) => value == null ? "ยังไม่มีข้อมูล" : Number(value).toLocaleString("th-TH", { maximumFractionDigits: 2 });
+  const amount = (value: number | string | null | undefined) => value == null ? "No data" : Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
   const setBaseline = (value: OrderContext) => {
     setSimUnitPrice(value.unit_price);
     // Blank means preserve each shop's actual cost; never impose an average.
@@ -67,7 +67,7 @@ export const SimulatorPage: React.FC = () => {
     if (apiClient.isDemoMode()) {
       apiClient.getChaosScenarios().then((value) => {
         setChaosEnvelope(value);
-        setError("โหมดตัวอย่าง: ตั้ง VITE_USE_MOCK=false และเชื่อมต่อ backend ก่อนคำนวณหรือบันทึกแผน");
+        setError("Demo mode: set VITE_USE_MOCK=false and connect the backend before calculating or saving a plan.");
       }).catch((err) => setError(err.message)).finally(() => setLoading(false));
       return;
     }
@@ -82,7 +82,7 @@ export const SimulatorPage: React.FC = () => {
           .catch(() => null);
         setChaosEffects({
           available: declared?.available === true,
-          reason: declared?.reason || "backend ไม่ได้ประกาศว่ารองรับผลกระทบแบบบรรยาย",
+          reason: declared?.reason || "The backend has not declared support for narrative effects.",
         });
         setLoading(false);
       }).catch((err) => { setError(err.message); setLoading(false); });
@@ -108,15 +108,15 @@ export const SimulatorPage: React.FC = () => {
   }, [context, simUnitPrice, simCostPerUnit, simDepositPercent, simCreditTermDays]);
   // Scoped read of the plans already stored for this project or order.
   const refreshSavedPlans = async (next: { projectId: string | null; orderRef: string | null }) => {
-    if (!next.projectId && !next.orderRef) { setSavedPlans(null); setSavedNote("ยังไม่ทราบ project/ออเดอร์ จึงอ่านแผนที่บันทึกไว้ไม่ได้"); return; }
+    if (!next.projectId && !next.orderRef) { setSavedPlans(null); setSavedNote("Project or order is unknown, so saved plans cannot be loaded."); return; }
     try {
       const list = await apiClient.listSimulations(next, 20);
       setSavedPlans(list.data);
       const replayable = list.data.filter((plan) => plan.replayAvailable).length;
       setSavedNote(list.data.length
-        ? `แผนที่บันทึกไว้ ${list.data.length} แผน · replay ได้ ${replayable} แผน`
-        : "ยังไม่มีแผนที่บันทึกไว้สำหรับโครงการนี้");
-    } catch (err) { setSavedPlans(null); setSavedNote(`อ่านแผนที่บันทึกไว้ไม่สำเร็จ: ${(err as Error).message}`); }
+        ? `${list.data.length} saved plans · ${replayable} replayable`
+        : "No saved plans for this project.");
+    } catch (err) { setSavedPlans(null); setSavedNote(`Could not load saved plans: ${(err as Error).message}`); }
   };
   const handleReset = () => { if (context) setBaseline(context); resetSimulation(); };
   const handleSave = async () => {
@@ -124,12 +124,12 @@ export const SimulatorPage: React.FC = () => {
     busySave.current = true; setSaving(true);
     try {
       const result = await apiClient.simulateOrder(context, scenario, true);
-      if (!result.persisted || !result.simulationId) throw new Error("ยังบันทึกไม่ได้ กรุณาตรวจการเชื่อมต่อฐานข้อมูล");
+      if (!result.persisted || !result.simulationId) throw new Error("Could not save the plan. Check the database connection.");
       const simulationId = result.simulationId;
       // Read the stored row back in the same scope before reporting success.
       const stored = await apiClient.readSimulation(simulationId, scope);
       if (!stored.data?.resultHash || !stored.data.request || !stored.data.results) {
-        throw new Error("บันทึกแล้วแต่อ่านกลับไม่ครบ ยังไม่ยืนยันว่าเก็บสำเร็จ");
+        throw new Error("The plan was saved, but the read-back was incomplete. Save is not confirmed.");
       }
       // Replay the saved snapshot to prove the stored plan reproduces.
       const replay = await apiClient.replaySimulation(simulationId, { ...scope, inputRevision: result.context?.inputRevision ?? null });
@@ -137,14 +137,14 @@ export const SimulatorPage: React.FC = () => {
       await refreshSavedPlans(scope);
       addToast({
         type: replay.data.reproduced && !differences.length ? "success" : "warning",
-        title: replay.data.reproduced ? "บันทึกและตรวจซ้ำแล้ว" : "บันทึกแล้ว แต่ replay ไม่ตรง",
-        message: `Simulation ID: ${simulationId} · engine ${stored.data.engine || "ยังไม่ทราบ"}`
+        title: replay.data.reproduced ? "Saved and verified" : "Saved, but replay differs",
+        message: `Simulation ID: ${simulationId} · Engine ${stored.data.engine || "Unknown"}`
           + ` · resultHash ${stored.data.resultHash.slice(0, 12)}…`
-          + ` · replay ${replay.data.reproduced ? "ได้ผลเท่าเดิม" : "ได้ผลไม่เท่าเดิม"}`
-          + (differences.length ? ` · บริบทที่ต่าง: ${differences.join(", ")}` : ""),
+          + ` · Replay ${replay.data.reproduced ? "matches" : "does not match"}`
+          + (differences.length ? ` · Context differences: ${differences.join(", ")}` : ""),
         duration: 12000,
       });
-    } catch (err) { addToast({ type: "error", title: "บันทึกไม่สำเร็จ", message: (err as Error).message, duration: 10000 }); }
+    } catch (err) { addToast({ type: "error", title: "Save failed", message: (err as Error).message, duration: 10000 }); }
     finally { busySave.current = false; setSaving(false); }
   };
   if (!loading && !context && error && !apiClient.isDemoMode()) return <StateRenderer currentMode="error" errorMessage={error} onRetry={loadData}>{null}</StateRenderer>;
@@ -169,12 +169,12 @@ export const SimulatorPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-display font-bold text-ink">
-                ห้องจำลองธุรกิจ & ซ้อมแผนพัง (Simulation Sandbox)
+                Business Simulation & Chaos Rehearsal
               </h1>
               <DataKindBadge kind="simulated" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ทดลองเปลี่ยนสมมติฐานราคา มัดจำ ต้นทุน และซ้อมรับมือวิกฤติโดยไม่กระทบข้อมูลจริง
+              Change price, deposit, and cost assumptions, and rehearse crisis scenarios without affecting live data.
             </p>
           </div>
 
@@ -185,7 +185,7 @@ export const SimulatorPage: React.FC = () => {
               className="px-3 py-1.5 bg-white border border-borderLine hover:border-brand/40 text-xs font-semibold rounded-btn flex items-center gap-1.5 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5 text-ink-muted" />
-              <span>คืนค่าเดิม</span>
+              <span>Reset</span>
             </button>
 
             <button
@@ -195,7 +195,7 @@ export const SimulatorPage: React.FC = () => {
               className="px-4 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-bold rounded-btn flex items-center gap-1.5 shadow-sm transition-all"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>บันทึกแผนจำลองฉบับใหม่</span>
+              <span>Save new simulation plan</span>
             </button>
           </div>
         </div>
@@ -217,7 +217,7 @@ export const SimulatorPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
                 <Sliders className="w-4 h-4 text-brand" />
-                <span>ตัวปรับสมมติฐาน (คู่สไลเดอร์และช่องกรอก)</span>
+                <span>Assumption controls (slider and input)</span>
               </h3>
               <DataKindBadge kind="simulated" size="sm" />
             </div>
@@ -225,7 +225,7 @@ export const SimulatorPage: React.FC = () => {
             {/* 1. Deposit Percent */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-ink">เงินมัดจำล่วงหน้าจากผู้ว่าจ้าง (%)</span>
+                <span className="font-medium text-ink">Buyer deposit (%)</span>
                 <input
                   type="number"
                   min="0"
@@ -250,7 +250,7 @@ export const SimulatorPage: React.FC = () => {
             {/* 2. Selling Price per Box */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-ink">ราคาขายอาหารต่อกล่อง (฿)</span>
+                <span className="font-medium text-ink">Selling price per meal box (฿)</span>
                 <input
                   type="number"
                   min="0"
@@ -275,13 +275,13 @@ export const SimulatorPage: React.FC = () => {
             {/* 3. Cost per Box */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-ink">ต้นทุนวัตถุดิบและผลิตต่อกล่อง (฿)</span>
+                <span className="font-medium text-ink">Ingredient and production cost per box (฿)</span>
                 <input
                   type="number"
                   min="0"
                   max="1000"
                   step="0.01"
-                  placeholder="ต้นทุนเดิม"
+                  placeholder="Original cost"
                   value={simCostPerUnit}
                   onChange={(e) => setSimCostPerUnit(e.target.value)}
                   className="w-20 px-2 py-0.5 border border-slate-200 rounded text-right font-mono text-xs font-bold"
@@ -292,8 +292,8 @@ export const SimulatorPage: React.FC = () => {
                 min="0"
                 max="1000"
                 step="0.01"
-                placeholder="ต้นทุนเดิม"
-                title="เลื่อนเพื่อกำหนดต้นทุนเดียวกันทุกร้าน"
+                placeholder="Original cost"
+                title="Set the same cost for every shop"
                 value={simCostPerUnit === "" ? context?.shops[0]?.cost_per_unit || "0" : simCostPerUnit}
                 onChange={(e) => setSimCostPerUnit(e.target.value)}
                 className="w-full accent-brand cursor-pointer"
@@ -303,7 +303,7 @@ export const SimulatorPage: React.FC = () => {
             {/* 4. Payment Terms Days */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-ink">เครดิตเทอมชำระเงินงวดสุดท้าย (วัน)</span>
+                <span className="font-medium text-ink">Payment terms for the final installment (days)</span>
                 <input
                   type="number"
                   min="0"
@@ -329,10 +329,10 @@ export const SimulatorPage: React.FC = () => {
           <div className="lg:col-span-6 bg-white p-5 rounded-card border border-borderLine shadow-soft-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink">
-                เปรียบเทียบผลลัพธ์: แผน A (เดิม) vs แผน B (จำลอง)
+                Compare results: Plan A (baseline) vs. Plan B (simulation)
               </h3>
               <span className="text-[11px] text-ink-muted">
-                {context?.order_ref || "โหมดตัวอย่าง"} · เฉพาะออเดอร์
+                {context?.order_ref || "Demo mode"} · This order only
                 {savedNote ? ` · ${savedNote}` : ""}
               </span>
             </div>
@@ -341,16 +341,16 @@ export const SimulatorPage: React.FC = () => {
               {/* Row 1: Net Profit */}
               <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-ink block">กำไรออเดอร์ก่อนค่าใช้จ่ายอื่น</span>
-                  <span className="text-[10px] text-ink-muted">รายรับหักต้นทุนรวม</span>
+                  <span className="font-bold text-ink block">Order profit before other expenses</span>
+                  <span className="text-[10px] text-ink-muted">Revenue minus total costs</span>
                 </div>
                 <div className="flex items-center gap-4 font-mono text-right">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">แผนเดิม A</span>
+                    <span className="text-[10px] text-slate-400 block">Baseline Plan A</span>
                     <span className="font-bold text-ink">฿{amount(comparison?.data.planA.totalProfit)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-brand block">แผนจำลอง B</span>
+                    <span className="text-[10px] text-brand block">Simulated Plan B</span>
                     <span className="font-extrabold text-brand">฿{amount(simProfit)}</span>
                   </div>
                 </div>
@@ -359,16 +359,16 @@ export const SimulatorPage: React.FC = () => {
               {/* Row 2: Minimum Cash Balance */}
               <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-ink block">เงินสดต่ำสุดของร้านที่รับงาน</span>
-                  <span className="text-[10px] text-ink-muted">เฉพาะกระแสเงินสดของออเดอร์นี้</span>
+                  <span className="font-bold text-ink block">Lowest cash balance among participating shops</span>
+                  <span className="text-[10px] text-ink-muted">Cash flow for this order only</span>
                 </div>
                 <div className="flex items-center gap-4 font-mono text-right">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">แผนเดิม A</span>
+                    <span className="text-[10px] text-slate-400 block">Baseline Plan A</span>
                     <span className="font-bold text-danger">฿{amount(comparison?.data.planA.minimumShopCash)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-brand block">แผนจำลอง B</span>
+                    <span className="text-[10px] text-brand block">Simulated Plan B</span>
                     <span className={`font-extrabold ${Number(simMinCash) < 0 ? "text-danger" : "text-emerald-700"}`}>
                       ฿{amount(simMinCash)}
                     </span>
@@ -379,16 +379,16 @@ export const SimulatorPage: React.FC = () => {
               {/* Row 3: Funding Gap */}
               <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-ink block">ทุนหมุนเวียนที่ยังขาด</span>
-                  <span className="text-[10px] text-ink-muted">ต้องกู้หรือเติมเพิ่ม</span>
+                  <span className="font-bold text-ink block">Remaining working-capital gap</span>
+                  <span className="text-[10px] text-ink-muted">Amount to borrow or add</span>
                 </div>
                 <div className="flex items-center gap-4 font-mono text-right">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">แผนเดิม A</span>
+                    <span className="text-[10px] text-slate-400 block">Baseline Plan A</span>
                     <span className="font-bold text-danger">฿{amount(comparison?.data.planA.totalFundingGap)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-brand block">แผนจำลอง B</span>
+                    <span className="text-[10px] text-brand block">Simulated Plan B</span>
                     <span className="font-extrabold text-emerald-700">
                       ฿{amount(simFundingGap)}
                     </span>
@@ -399,7 +399,7 @@ export const SimulatorPage: React.FC = () => {
 
             {/* Insight Callout */}
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 leading-relaxed">
-              <strong>ข้อสรุปจากการจำลอง:</strong> {pending ? "กำลังคำนวณจาก backend…" : error || (comparison ? `ทุนที่ขาด ฿${amount(simFundingGap)} · ยังขาดกำลังผลิต ${amount(comparison.data.planB.deficitBoxesPerDay)} ต่อวัน คำนวณเฉพาะออเดอร์ ไม่รวมกระแสเงินสดกิจการอื่น` : "ยังไม่มีผลคำนวณ")}
+              <strong>Simulation summary:</strong> {pending ? "Calculating with the backend…" : error || (comparison ? `Funding gap: ฿${amount(simFundingGap)} · Remaining capacity shortfall: ${amount(comparison.data.planB.deficitBoxesPerDay)} per day · Order only; excludes other business cash flows.` : "No calculation results yet.")}
             </div>
           </div>
         </div>

@@ -96,43 +96,43 @@ def _build_analysis(data: FinancialInput, *, forecast: dict | None, expense_hist
     values = {name: None if item["value"] is None else Decimal(item["value"]) for name, item in metrics.items()}
     if values["liquidity"] is not None:
         if data.current_assets < data.current_liabilities:
-            add("liquidity_shortfall", "risk", "high", "สินทรัพย์หมุนเวียนต่ำกว่าหนี้สินหมุนเวียน (liquidity < 1)", ["liquidity"],
-                "ตรวจสอบวันรับเงินและวันจ่ายเงินก่อนผูกพันการใช้เงินสดเพิ่ม", "cashflow")
+            add("liquidity_shortfall", "risk", "high", "Current assets are below current liabilities (current ratio < 1).", ["liquidity"],
+                "Review expected receipt and payment dates before committing additional cash.", "cashflow")
         else:
-            add("liquidity_coverage", "strength", "low", "สินทรัพย์หมุนเวียนครอบคลุมหนี้สินหมุนเวียน แต่ยังต้องตรวจสอบว่าเปลี่ยนเป็นเงินสดได้ทันกำหนดจ่ายหรือไม่",
-                ["liquidity"], "จัดทำตารางรับจ่ายเงินสดที่ระบุวันที่เพื่อยืนยันความพร้อมชำระเงิน", "cashflow")
+            add("liquidity_coverage", "strength", "low", "Current assets cover current liabilities; confirm they can be converted to cash before payments are due.",
+                ["liquidity"], "Create a dated cash receipt and payment schedule to confirm payment readiness.", "cashflow")
     if values["dscr"] is not None:
         if data.cash_available_for_debt_service < data.debt_principal_due + data.debt_interest_due:
-            add("debt_service_shortfall", "risk", "high", "เงินสดก่อนชำระหนี้ต่ำกว่าเงินต้นและดอกเบี้ยที่ถึงกำหนด (DSCR < 1)",
-                ["dscr"], "ทบทวนกำหนดชำระหนี้และประเมินความสามารถชำระหนี้เพิ่มก่อนขอสินเชื่อใหม่", "funding")
+            add("debt_service_shortfall", "risk", "high", "Cash available for debt service is below scheduled principal and interest (DSCR < 1).",
+                ["dscr"], "Review debt due dates and repayment capacity before applying for additional credit.", "funding")
         else:
-            add("debt_service_coverage", "strength", "low", "เงินสดก่อนชำระหนี้ครอบคลุมยอดชำระตามกำหนดที่ระบุในข้อมูล",
-                ["dscr"], "คำนวณ DSCR อีกครั้งโดยรวมค่างวดสินเชื่อใหม่ที่กำลังพิจารณา", "funding")
+            add("debt_service_coverage", "strength", "low", "Cash available for debt service covers the scheduled payments provided.",
+                ["dscr"], "Recalculate DSCR including payments for any proposed new loan.", "funding")
     if values["fcf"] is not None and values["fcf"] < 0:
-        add("capex_cash_pressure", "weakness", "medium", "กระแสเงินสดจากการดำเนินงานไม่ครอบคลุมรายจ่ายลงทุนในงวดนี้ (FCF < 0)",
-            ["fcf"], "ทบทวนความจำเป็นและช่วงเวลาของรายจ่ายลงทุน", "cashflow")
+        add("capex_cash_pressure", "weakness", "medium", "Operating cash flow does not cover capital expenditure for this period (FCF < 0).",
+            ["fcf"], "Review the necessity and timing of capital expenditure.", "cashflow")
     if values["net_cash_flow"] is not None and values["net_cash_flow"] < 0:
-        add("cash_decrease", "risk", "high", "กระแสเงินสดรวมจากการดำเนินงาน การลงทุน และการจัดหาเงินทำให้เงินสดลดลงในงวดที่ระบุ (net_cash_flow < 0)",
-            ["net_cash_flow"], "ตรวจสอบกระแสเงินสดแต่ละประเภทพร้อมวันที่รับเงินและจ่ายเงินจริง", "cashflow")
+        add("cash_decrease", "risk", "high", "Combined operating, investing, and financing cash flows reduced cash during this period (net cash flow < 0).",
+            ["net_cash_flow"], "Review each cash flow category against actual receipt and payment dates.", "cashflow")
     if values["funding_gap"] is not None and values["funding_gap"] > 0:
-        add("unfunded_working_capital", "risk", "high", "เงินสดที่ใช้ได้ มัดจำจากผู้ซื้อ และเงินทุนที่ยืนยันแล้วไม่ครอบคลุมเงินทุนหมุนเวียนที่ต้องใช้ (funding_gap > 0)",
-            ["funding_gap"], "ยืนยันวันจ่ายเงินและวันที่เงินทุนพร้อมใช้ก่อนเริ่มผลิตตามออเดอร์", "funding")
+        add("unfunded_working_capital", "risk", "high", "Available cash, buyer deposits, and confirmed funding do not cover required working capital (funding gap > 0).",
+            ["funding_gap"], "Confirm payment dates and funding availability before production begins.", "funding")
     if values["cash_reserve_months"] is not None and Decimal(grading["components"]["cash_reserve"]["rawValue"]) < 1:
-        add("thin_cash_reserve", "weakness", "medium", "เงินสดสำรองครอบคลุมรายจ่ายดำเนินงานได้น้อยกว่า 1 งวดมาตรฐาน 30 วัน (cash_reserve_months < 1)",
-            ["cash_reserve_months"], "ทบทวนเป้าหมายเงินสำรองและจัดลำดับรายจ่ายเงินสดที่จำเป็นก่อน", "cashflow")
+        add("thin_cash_reserve", "weakness", "medium", "Cash reserves cover less than one standard 30-day period of operating expenses (cash reserve months < 1).",
+            ["cash_reserve_months"], "Review the reserve target and prioritize essential cash expenses.", "cashflow")
     if values["debt_ratio"] is not None and data.liabilities > data.assets:
-        add("negative_equity", "risk", "critical", "หนี้สินสูงกว่าสินทรัพย์และส่วนของเจ้าของติดลบ คะแนนรวมยังไม่สามารถหักล้างความเสี่ยงนี้ได้",
-            ["debt_ratio"], "ตรวจสอบความสามารถชำระหนี้จากเอกสารบัญชีก่อนรับภาระผูกพันใหม่", "health")
+        add("negative_equity", "risk", "critical", "Liabilities exceed assets and equity is negative; the overall score does not offset this risk.",
+            ["debt_ratio"], "Verify repayment capacity against accounting records before taking on new commitments.", "health")
     if values["net_profit"] is not None:
         if values["net_profit"] > 0:
-            add("period_profit", "strength", "low", "งบกำไรขาดทุนที่ตรวจสอบยอดแล้วแสดงกำไรสุทธิเป็นบวกในงวดนี้ (net_profit > 0)",
-                ["net_profit"], "ติดตามว่ากำไรที่รับรู้เปลี่ยนเป็นเงินสดรับจริงเมื่อใด", "cashflow")
+            add("period_profit", "strength", "low", "The balanced income statement reports positive net income for this period (net profit > 0).",
+                ["net_profit"], "Track when recognized profit is collected as cash.", "cashflow")
         elif values["net_profit"] < 0:
-            add("period_loss", "weakness", "high", "รายได้ที่ระบุต่ำกว่าผลรวมต้นทุน ค่าใช้จ่ายดำเนินงาน ดอกเบี้ย และภาษี (net_profit < 0)",
-                ["net_profit", "total_cost"], "ตรวจสอบต้นทุนแต่ละประเภทและอัตรากำไรจากการขายโดยใช้รายการธุรกรรมจริง", "health")
+            add("period_loss", "weakness", "high", "Reported revenue is below total costs, operating expenses, interest, and taxes (net profit < 0).",
+                ["net_profit", "total_cost"], "Review each cost category and sales margin against transaction records.", "health")
     if values["contribution_per_unit"] is not None and values["contribution_per_unit"] <= 0:
-        add("nonpositive_unit_margin", "risk", "high", "ราคาขายต่อหน่วยไม่สูงกว่าต้นทุนผันแปรต่อหน่วย การขายเพิ่มจึงยังไม่ช่วยชดเชยต้นทุนคงที่ (contribution_per_unit <= 0)",
-            ["contribution_per_unit"], "ทบทวนราคาขายหรือต้นทุนผันแปรต่อหน่วยก่อนเพิ่มกำลังผลิต", "health")
+        add("nonpositive_unit_margin", "risk", "high", "Selling price does not exceed variable cost per unit, so additional sales do not cover fixed costs (contribution per unit <= 0).",
+            ["contribution_per_unit"], "Review selling price or variable cost per unit before expanding production.", "health")
 
     missing = sorted({field for item in metrics.values() for field in item["missingFields"]} | set(grading["missingFields"]))
     unknowns = [f"Missing input: {field}" for field in missing]
@@ -198,7 +198,7 @@ def _add_forecast(result, forecast, evidence, unknowns):
         "schedule_complete_through": None if complete is None else complete.isoformat(),
         "kind": forecast.get("kind", "forecast"), "policy": "Supplied confirmed-coverage forecast only; conditional outputs excluded",
         "formula": "Taken from supplied forecast_cashflow result; not recomputed",
-        "interpretation": "ค่าคาดการณ์ตามตารางที่ผู้เรียกยืนยันความครบถ้วน ไม่ใช่ยอดเงินสดที่เกิดขึ้นจริง"}
+        "interpretation": "Forecast from a schedule confirmed as complete by the caller; this is not actual cash received or paid."}
     refs, balances = [], []
     for days in (30, 60, 90):
         value = forecast.get("period_end_balances", {}).get(str(days))
@@ -219,8 +219,8 @@ def _add_forecast(result, forecast, evidence, unknowns):
         risk = any(value < reserve for _, value in balances)
         text = "; ".join(f"{days} วัน: {value:,.2f} THB" for days, value in balances)
         _context_finding(result, "forecast_horizon_balances", "risk" if risk else "strength", "medium" if risk else "low",
-                         f"ยอดเงินสดคาดการณ์จากวันที่ {as_of.isoformat()} ตามช่วงที่ยืนยันตารางแล้ว: {text}", refs,
-                         "ตรวจสอบรายการรับจ่ายและปรับตารางคาดการณ์เมื่อกำหนดชำระเปลี่ยน")
+                         f"Projected cash balance from {as_of.isoformat()} for caller-confirmed schedule periods: {text}", refs,
+                         "Review receipts and payments, and update the forecast when due dates change.")
     if forecast.get("status") != "ok":
         unknowns.append("Forecast coverage is incomplete; the 90-day minimum and first shortfall are not confirmed.")
         return
@@ -236,8 +236,8 @@ def _add_forecast(result, forecast, evidence, unknowns):
                   status="danger" if minimum < reserve else "good")
     risk = minimum < reserve
     _context_finding(result, identifier, "risk" if risk else "strength", "medium" if risk else "low",
-                     f"เงินสดคาดการณ์ต่ำสุดในช่วง 90 วันคือ {minimum:,.2f} THB วันที่ {minimum_date.isoformat()}",
-                     [identifier], "เตรียมเงินสดสำรองโดยตรวจรายการรับจ่ายก่อนวันที่ยอดเงินสดต่ำสุด")
+                     f"The lowest projected cash balance over 90 days is {minimum:,.2f} THB on {minimum_date.isoformat()}.",
+                     [identifier], "Prepare a cash reserve after reviewing receipts and payments before the lowest-balance date.")
     first = forecast.get("first_shortfall_date")
     if first is not None:
         first = TypeAdapter(date).validate_python(first)
@@ -251,10 +251,10 @@ def _add_forecast(result, forecast, evidence, unknowns):
         }
         evidence.append({"id": date_id, "refNum": len(evidence) + 1, "label": "First forecast shortfall date",
                          "value": first.isoformat(), "targetElementId": f"health-{identifier}"})
-        threshold = "ยอดเงินสดต่ำกว่า 0" if forecast.get("minimum_cash_reserve") is None else f"เงินสดต่ำกว่าเงินสำรอง {reserve:,.2f} THB"
+        threshold = "cash falls below 0" if forecast.get("minimum_cash_reserve") is None else f"cash falls below the reserve of {reserve:,.2f} THB"
         _context_finding(result, "forecast_cash_shortfall", "risk", "high",
-                         f"คาดว่าจะเริ่มขาดเงินสดวันที่ {first.isoformat()} โดยเกณฑ์คือ{threshold} ตามตารางที่ยืนยันแล้ว",
-                         [date_id, identifier], "เร่งติดตามลูกหนี้หรือจัดเวลาจ่ายเงินก่อนวันเริ่มขาดเงินสด")
+                         f"Cash is projected to fall short on {first.isoformat()}; the confirmed schedule shows {threshold}.",
+                         [date_id, identifier], "Follow up on receivables or reschedule payments before the projected shortfall date.")
 
 
 class ExpenseRecord(BaseModel):
@@ -345,23 +345,24 @@ def _add_expenses(result, history, evidence, unknowns):
             _context_fact(result, evidence, identifier, f"Expense {suffix}: {category}",
                           format(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f"), unit="THB",
                           details={**item, "policy": policy["rule"], "formula": "Observed monthly category totals; baseline = sum / observed month count",
-                                   "interpretation": "คัดกรองจากรายการค่าใช้จ่ายที่มีอยู่ ไม่ยืนยันว่ารายการครบหรือเป็นการทุจริต"})
+                                   "interpretation": "Screened against available expense transactions; completeness and fraud are not established."})
             refs.append(identifier)
         _context_finding(result, f"unusual_expense_{token}", "weakness", "medium",
-                         f"ค่าใช้จ่ายหมวด {category} เดือน {current.strftime('%Y-%m')} ถึงวันที่ {as_of.isoformat()} รวม {monthly[current]:,.2f} THB "
-                         f"สูงกว่าค่าเฉลี่ย {len(observed)} เดือนที่มีข้อมูลในช่วง {months[0].isoformat()} ถึง {(current - timedelta(days=1)).isoformat()} "
-                         f"ซึ่งเท่ากับ {item['baseline_mean']} THB อยู่ {item['increase_percent']}% และเกินเกณฑ์ 50% จากรายการที่บันทึกไว้",
-                         refs, "ตรวจใบแจ้งหนี้ ปริมาณซื้อ และราคาต่อหน่วยก่อนสรุปสาเหตุค่าใช้จ่ายเพิ่ม", "health")
+                         f"Recorded {category} expenses for {current.strftime('%Y-%m')} through {as_of.isoformat()} total {monthly[current]:,.2f} THB, "
+                         f"which is {item['increase_percent']}% above the average of {len(observed)} available months "
+                         f"from {months[0].isoformat()} through {(current - timedelta(days=1)).isoformat()} ({item['baseline_mean']} THB) "
+                         "and exceeds the 50% screening threshold.",
+                         refs, "Review invoices, purchase quantities, and unit prices before drawing conclusions about the increase.", "health")
 
 
 def compose_explanation(result: dict, findings: list[dict], evidence: list[dict], unknowns: list[str]) -> None:
     grading = result["data"]["grading"]
-    grade_text = (f"ธุรกิจได้เกรด {grading['grade']} คะแนน {grading['score']} ตามเกณฑ์ {grading['policyVersion']}"
-                  if grading["grade"] is not None else "ข้อมูลที่มีอยู่ยังไม่เพียงพอสำหรับจัดเกรดธุรกิจ")
+    grade_text = (f"The business received grade {grading['grade']} with a score of {grading['score']} under {grading['policyVersion']}"
+                  if grading["grade"] is not None else "Available data is insufficient to grade the business.")
     risk_count = sum(item["category"] == "risk" for item in findings)
     result["data"]["explanation"] = {
-        "pageId": "health", "summary": f"{grade_text} พบประเด็นความเสี่ยงที่มีหลักฐานรองรับ {risk_count} รายการ",
-        "reasoning": " ".join(item["text"] for item in findings) or "กรุณาเพิ่มข้อมูลทางการเงินก่อนสรุปผลวิเคราะห์",
+        "pageId": "health", "summary": f"{grade_text}. {risk_count} evidence-backed risk item(s) were found.",
+        "reasoning": " ".join(item["text"] for item in findings) or "Add financial data before drawing conclusions.",
         "dataUsed": evidence,
         "suggestions": [item["action"] for item in findings], "unknowns": unknowns,
         "mode": result["data"]["aiMode"], "policyVersion": grading["policyVersion"],

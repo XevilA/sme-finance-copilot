@@ -26,14 +26,14 @@ export const FunderPage: React.FC = () => {
   const mode = envelopeMode(state, (rows) => rows.length === 0);
   const capabilityState = useEnvelope<Capabilities>(useCallback(
     () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("โหมดตัวอย่างไม่ประกาศความสามารถของ backend"))
+      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
       : apiClient.getCapabilities()),
     []));
   const canRequestInfo = capabilityState.envelope?.data.funderInfoRequest.available === true;
   const infoBlockedReason = capabilityState.envelope?.data.funderInfoRequest.reason
-    || "backend ยังไม่มี operation สำหรับขอเอกสารเพิ่มเติม";
+    || "The backend does not support additional information requests yet.";
   const amount = (value: number | null | undefined) =>
-    value == null ? "ยังไม่มีข้อมูล" : `฿${value.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+    value == null ? "No data" : `฿${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   const rbacOff = (funderEnvelope?.missing || []).includes("rbac_not_enforced");
 
   const handleToggleSelectProject = (id: string) => {
@@ -49,8 +49,8 @@ export const FunderPage: React.FC = () => {
     // the project owner and no request record is created.
     addToast({
       type: "warning",
-      title: "ยังไม่รองรับการขอเอกสารจริง",
-      message: `ยังไม่มีคำขอใดถูกส่งสำหรับ '${proj.title}' · ${infoBlockedReason}`,
+      title: "Document requests are not available yet",
+      message: `No request was submitted for '${proj.title}' · ${infoBlockedReason}`,
       duration: 9000,
     });
   };
@@ -73,8 +73,8 @@ export const FunderPage: React.FC = () => {
     return (
       <StateRenderer
         currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
-        errorMessage={error || "อ่านรายการโครงการสำหรับผู้ให้ทุนจาก backend ไม่สำเร็จ"}
-        unavailableReason="ยังไม่มีโครงการที่เปิดให้ผู้ให้ทุนพิจารณา"
+        errorMessage={error || "Could not load funder projects from the backend"}
+        unavailableReason="No projects are available for funder review."
         missingItems={funderEnvelope?.missing || []}
         onRetry={loadData}
         onAddData={() => setCurrentPage("swarm")}
@@ -106,12 +106,12 @@ export const FunderPage: React.FC = () => {
                 <Building className="w-4 h-4" />
               </div>
               <h1 className="text-xl font-display font-bold text-ink">
-                พอร์ทัลสำหรับผู้ให้ทุน (Funder & Investor Workspace)
+                Funder & Investor Workspace
               </h1>
               <DataKindBadge kind="forecast" size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              ดูโครงการที่บันทึกไว้พร้อมระดับหลักฐาน · การเลือกและยอดรวมเป็นการพิจารณาในเครื่อง ไม่ใช่การจัดสรรจริง
+              Review saved projects and evidence levels · Selections and totals are local review aids, not actual funding allocations.
             </p>
           </div>
 
@@ -121,7 +121,7 @@ export const FunderPage: React.FC = () => {
               onClick={() => setCurrentPage("swarm")}
               className="px-3.5 py-1.5 bg-brand text-white rounded-btn text-xs font-semibold hover:bg-brand-dark flex items-center gap-1 transition-all shadow-sm"
             >
-              <span>ดูห้องประกอบทีม SWARM 300 กล่อง</span>
+              <span>View the 300-box SWARM workspace</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -132,19 +132,19 @@ export const FunderPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="text-[10px] font-bold text-brand uppercase tracking-wider block">
-                รายการที่เลือกไว้ในเครื่องนี้ · ยังไม่บันทึกและยังไม่จัดสรรเงินทุน
+                Selected in this browser · Not saved and no funds allocated
               </span>
               <h3 className="text-sm font-display font-bold text-ink">
-                ยอดเป้าหมายรวมของโครงการในรายการ: {amount(allocatedBudget)}
+                Total target funding for listed projects: {amount(allocatedBudget)}
               </h3>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono">
               <div>
-                <span className="text-[10px] text-ink-muted block">ยอดเป้าหมายรวมของที่เลือก:</span>
+                <span className="text-[10px] text-ink-muted block">Selected target total:</span>
                 <span className="font-bold text-brand">{amount(usedBudget)}</span>
               </div>
               <div className="border-l border-slate-200 pl-4">
-                <span className="text-[10px] text-ink-muted block">ยอดของโครงการที่ยังไม่เลือก:</span>
+                <span className="text-[10px] text-ink-muted block">Unselected project total:</span>
                 <span className={`font-bold ${remainingBudget < 0 ? "text-danger" : "text-emerald-700"}`}>
                   {amount(remainingBudget)}
                 </span>
@@ -166,11 +166,11 @@ export const FunderPage: React.FC = () => {
 
           <div className="flex items-center justify-between text-[11px] text-ink-muted">
             <span>
-              เลือกแล้ว {selectedProjectIds.length} โครงการ · การเลือกอยู่ในเครื่องนี้เท่านั้น ไม่ผูกพันเงินทุน
-              {rbacOff ? " · ยังไม่เปิดการบังคับสิทธิ์ สิทธิ์ที่แสดงจึงไม่ใช่การยืนยันตัวตน" : ""}
+              {selectedProjectIds.length} projects selected · This selection stays in this browser and does not commit funding.
+              {rbacOff ? " · Access enforcement is off; displayed roles do not verify identity." : ""}
             </span>
             <span className="font-mono">
-              {Math.round((usedBudget / allocatedBudget) * 100)}% ของยอดเป้าหมายในรายการ
+              {Math.round((usedBudget / allocatedBudget) * 100)}% of listed target funding
             </span>
           </div>
         </div>
@@ -179,7 +179,7 @@ export const FunderPage: React.FC = () => {
         <div className="space-y-4">
           <h3 className="text-sm font-display font-bold text-ink flex items-center gap-2">
             <FileCheck2 className="w-4 h-4 text-brand" />
-            <span>โครงการที่ผ่านเกณฑ์คัดกรองเบื้องต้น</span>
+            <span>Projects passing initial screening</span>
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -219,15 +219,15 @@ export const FunderPage: React.FC = () => {
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-2 p-2.5 bg-slate-50 rounded-xl text-xs mb-3">
                       <div>
-                        <span className="text-[10px] text-ink-muted block">ทุนที่ต้องการ:</span>
+                        <span className="text-[10px] text-ink-muted block">Funding requested:</span>
                         <span className="font-bold font-mono text-ink">
                           ฿{proj.targetFunding.toLocaleString()}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-ink-muted block">ผลตอบแทนคาดการณ์:</span>
+                        <span className="text-[10px] text-ink-muted block">Estimated return:</span>
                         <span className="font-bold font-mono text-emerald-700">
-                          {proj.roiEstimatePercent}% ต่อปี
+                          {proj.roiEstimatePercent}% per year
                         </span>
                       </div>
                     </div>
@@ -248,10 +248,10 @@ export const FunderPage: React.FC = () => {
                         {proj.recommendationDecision === "insufficient_data" && <HelpCircle className="w-3.5 h-3.5 text-slate-500" />}
                         <span>
                           {proj.recommendationDecision === "recommend"
-                            ? "แนะนำให้ปล่อยกู้เต็มจำนวน"
+                            ? "Recommend full funding"
                             : proj.recommendationDecision === "reduced_amount_possible"
-                            ? "ใช้ทุนน้อยลงได้ (ลดความเสี่ยง)"
-                            : "ข้อมูลยังไม่พอ / ยังไม่ควรลง"}
+                            ? "Consider a smaller amount to reduce risk"
+                            : "Insufficient information / Do not invest yet"}
                         </span>
                       </div>
                       <p className="text-[10px] leading-tight">{proj.recommendationNote}</p>
@@ -259,7 +259,7 @@ export const FunderPage: React.FC = () => {
 
                     {/* Documents verified status */}
                     <div className="space-y-1 text-[11px] text-ink-muted">
-                      <span className="font-semibold block text-[10px] text-ink">เอกสารประกอบ:</span>
+                      <span className="font-semibold block text-[10px] text-ink">Supporting documents:</span>
                       {proj.evidenceDocuments.map((doc, idx) => (
                         <div key={idx} className="flex items-center gap-1.5">
                           {doc.verified ? (
@@ -285,7 +285,7 @@ export const FunderPage: React.FC = () => {
                             : "bg-brand text-white hover:bg-brand-dark"
                         }`}
                       >
-                        {isSelected ? "✓ เลือกไว้ในรายการ (ยังไม่จัดสรร)" : "+ เพิ่มเข้ารายการที่สนใจ"}
+                        {isSelected ? "✓ Selected for review (not allocated)" : "+ Add to watchlist"}
                       </button>
                     ) : (
                       <button
@@ -296,7 +296,7 @@ export const FunderPage: React.FC = () => {
                         className="w-full py-2 rounded-btn text-xs font-medium bg-slate-100 text-ink hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"
                       >
                         <Lock className="w-3.5 h-3.5" />
-                        <span>{canRequestInfo ? "ขอสิทธิ์ดูเอกสารสัญญา" : "ยังไม่รองรับการขอเอกสาร"}</span>
+                        <span>{canRequestInfo ? "Request access to contract documents" : "Document requests are not available yet"}</span>
                       </button>
                     )}
                   </div>

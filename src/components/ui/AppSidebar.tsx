@@ -26,111 +26,111 @@ type NavItem = {
   icon: React.ReactNode;
   badge?: string;
   badgeColor?: string;
-  group: "วิเคราะห์ธุรกิจ" | "ประกอบโอกาส & ทีม" | "แซนด์บ็อกซ์ & รายงาน";
+  group: "Business Analysis" | "Build Opportunities & Teams" | "Sandbox & Reports";
 };
 
 const navItems: NavItem[] = [
   // Group 1: Business Diagnostics
   {
     id: "overview",
-    label: "1. ภาพรวมธุรกิจ",
+    label: "1. Business Overview",
     icon: <LayoutDashboard className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "import",
-    label: "2. ข้อมูลธุรกิจ & นำเข้าไฟล์",
+    label: "2. Business Data & Import",
     icon: <UploadCloud className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "cashflow",
-    label: "3. เงินสดและกระแสเงินสด",
+    label: "3. Cash & Cash Flow",
     icon: <TrendingUp className="w-4 h-4" />,
     badge: "Time Travel",
     badgeColor: "bg-brand/10 text-brand",
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "health",
-    label: "4. สุขภาพการเงิน",
+    label: "4. Financial Health",
     icon: <HeartPulse className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "cost",
-    label: "5. ต้นทุนและความคุ้มค่า",
+    label: "5. Costs & Profitability",
     icon: <PieChart className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
   {
     id: "sales",
-    label: "6. ยอดขายและสินค้า",
+    label: "6. Sales & Products",
     icon: <ShoppingBag className="w-4 h-4" />,
-    group: "วิเคราะห์ธุรกิจ",
+    group: "Business Analysis",
   },
 
   // Group 2: Opportunity & Swarm Assembly
   {
     id: "funding",
-    label: "7. จับคู่แหล่งเงินทุน",
+    label: "7. Funding Match",
     icon: <Coins className="w-4 h-4" />,
     badgeColor: "bg-red-50 text-danger border border-red-200",
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "swarm",
-    label: "8. SME SWARM รวมทีม",
+    label: "8. SME SWARM Team Assembly",
     icon: <Network className="w-4 h-4" />,
-    badge: "★ เด่นสุด",
+    badge: "★ Featured",
     badgeColor: "bg-brand text-white shadow-xs",
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "shop-finance",
-    label: "9. แผนเงินรายร้านในทีม",
+    label: "9. Per-SME Cash Plan",
     icon: <Users className="w-4 h-4" />,
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "unlock",
-    label: "10. SME UNLOCK ทรัพยากร",
+    label: "10. SME UNLOCK Resources",
     icon: <Wrench className="w-4 h-4" />,
-    badge: "ถอดชิ้นส่วน",
+    badge: "Disassemble",
     badgeColor: "bg-resource-light text-resource-dark",
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
   {
     id: "funder",
-    label: "11. ฝั่งผู้ให้ทุน (Funder)",
+    label: "11. Funder Portal",
     icon: <Building className="w-4 h-4" />,
-    group: "ประกอบโอกาส & ทีม",
+    group: "Build Opportunities & Teams",
   },
 
   // Group 3: Simulation & Reports
   {
     id: "simulator",
-    label: "12. ห้องจำลอง & ซ้อมแผนพัง",
+    label: "12. Simulation & Chaos Rehearsal",
     icon: <Sliders className="w-4 h-4" />,
     badge: "Chaos",
     badgeColor: "bg-amber-100 text-amber-800",
-    group: "แซนด์บ็อกซ์ & รายงาน",
+    group: "Sandbox & Reports",
   },
   {
     id: "projects",
-    label: "13. โครงการ & รายงาน",
+    label: "13. Projects & Reports",
     icon: <FileCheck2 className="w-4 h-4" />,
-    group: "แซนด์บ็อกซ์ & รายงาน",
+    group: "Sandbox & Reports",
   },
 ];
 
 export const AppSidebar: React.FC = () => {
   const { currentPage, setCurrentPage } = useAppStore();
 
-  const groups: ("วิเคราะห์ธุรกิจ" | "ประกอบโอกาส & ทีม" | "แซนด์บ็อกซ์ & รายงาน")[] = [
-    "วิเคราะห์ธุรกิจ",
-    "ประกอบโอกาส & ทีม",
-    "แซนด์บ็อกซ์ & รายงาน",
+  const groups: ("Business Analysis" | "Build Opportunities & Teams" | "Sandbox & Reports")[] = [
+    "Business Analysis",
+    "Build Opportunities & Teams",
+    "Sandbox & Reports",
   ];
 
   // Footer and the funding badge describe the stored order, shops and proposal.
@@ -142,7 +142,7 @@ export const AppSidebar: React.FC = () => {
   const proposal = proposalState.envelope?.data || null;
   const shortfallShops = proposal ? proposal.shops.filter((shop) => shop.fundingGap > 0).length : 0;
   const fundingBadge = proposal && proposal.totalFundingGap > 0
-    ? `ขาด ฿${proposal.totalFundingGap.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`
+    ? `Shortfall ฿${proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
     : null;
 
   return (
@@ -199,16 +199,16 @@ export const AppSidebar: React.FC = () => {
         <div className="flex items-center gap-1.5 font-semibold text-ink">
           <Sparkles className="w-3.5 h-3.5 text-brand" />
           <span>
-            {order ? `โครงการ: ${order.id}` : "ยังไม่ได้เลือกโครงการ"}
+            {order ? `Project: ${order.id}` : "No project selected"}
           </span>
         </div>
         <p className="text-[10px] mt-0.5 leading-snug">
           {order
-            ? `ผู้สมัคร ${shops.length} ร้าน · เป้าหมาย ${order.quantityPerDay} ต่อวัน ${order.days} วัน`
-            : "ยังไม่มีออเดอร์ที่บันทึกไว้"}
+            ? `${shops.length} applicants · Target ${order.quantityPerDay} per day for ${order.days} days`
+            : "No saved order"}
           {proposal
-            ? ` · ข้อเสนอที่บันทึก: รับงาน ${proposal.shops.length} ร้าน, ขาดทุนหมุนเวียน ${shortfallShops} ร้าน (฿${proposal.totalFundingGap.toLocaleString("th-TH", { maximumFractionDigits: 0 })})`
-            : " · ยังไม่มีข้อเสนอที่บันทึกไว้"}
+            ? ` · Saved proposal: ${proposal.shops.length} shops assigned, ${shortfallShops} with a working-capital shortfall (฿${proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 })})`
+            : " · No saved proposal"}
         </p>
       </div>
     </aside>

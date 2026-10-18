@@ -47,8 +47,8 @@ export const AppHeader: React.FC = () => {
           type="button"
           onClick={() => setMobileMenuOpen(true)}
           className="lg:hidden p-2 text-ink hover:text-brand hover:bg-slate-100 rounded-xl transition-colors shrink-0 cursor-pointer"
-          aria-label="เปิดเมนูนำทาง 15 หน้าจอ"
-          title="เมนูนำทาง"
+          aria-label="Open navigation menu with 15 screens"
+          title="Navigation menu"
         >
           <Menu className="w-5 h-5 text-ink" />
         </button>
@@ -60,14 +60,11 @@ export const AppHeader: React.FC = () => {
           <div className="min-w-0">
             <div className="text-xs font-bold text-ink leading-none flex items-center gap-1.5">
               <span className="truncate">SME Finance Copilot</span>
-              <span className="hidden sm:inline-block text-[10px] font-normal text-brand-dark bg-brand-light px-1.5 py-0.5 rounded-chip border border-brand/20 whitespace-nowrap">
-                ห้องประกอบโอกาสธุรกิจ
-              </span>
             </div>
             <div className="text-[11px] text-ink-muted leading-tight mt-0.5 truncate hidden sm:block">
               {order
-                ? <>โครงการ: <strong>{order.title}</strong> ({order.buyerName})</>
-                : <>โครงการ: <strong>ยังไม่ได้เลือกโครงการ</strong></>}
+                ? <>Project: <strong>{order.title}</strong> ({order.buyerName})</>
+                : <>Project: <strong>No project selected</strong></>}
             </div>
           </div>
         </div>
@@ -89,7 +86,7 @@ export const AppHeader: React.FC = () => {
         >
           <div className="flex items-center gap-2">
             <Search className="w-3.5 h-3.5 text-slate-400" />
-            <span>ค้นหาร้านค้า, ครัวว่าง, แหล่งทุน, โครงการ...</span>
+            <span>Search shops, available kitchens, funders, projects...</span>
           </div>
           <kbd className="font-mono text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded text-slate-500 shadow-2xs">
             ⌘K
@@ -104,8 +101,8 @@ export const AppHeader: React.FC = () => {
           type="button"
           onClick={() => setCommandPaletteOpen(true)}
           className="md:hidden p-2 text-ink-muted hover:text-brand hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
-          aria-label="ค้นหา"
-          title="ค้นหา (⌘K)"
+          aria-label="Search"
+          title="Search (⌘K)"
         >
           <Search className="w-4 h-4 text-ink-muted" />
         </button>
@@ -115,10 +112,10 @@ export const AppHeader: React.FC = () => {
           type="button"
           onClick={() => setStoryModeOpen(true)}
           className="px-3 py-1.5 bg-gradient-to-r from-navy-deep to-brand hover:opacity-95 text-white rounded-btn text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-          title="เริ่มโหมดนำเสนอสำหรับกรรมการ (Spacebar / ลูกศร)"
+          title="Start the committee presentation (Spacebar / arrow keys)"
         >
           <PlayCircle className="w-4 h-4 text-brand-glow animate-pulse" />
-          <span className="hidden sm:inline">โหมดเล่าโครงการ</span>
+          <span className="hidden sm:inline">Story Mode</span>
         </button>
 
         {/* AI Assistant Button */}
@@ -130,22 +127,22 @@ export const AppHeader: React.FC = () => {
               ? "bg-brand text-white border-brand shadow-glow-primary"
               : "bg-white text-ink border-borderLine hover:border-brand/40"
           }`}
-          title="ให้ AI อธิบายหน้านี้และส่องแสงข้อมูล"
+          title="Ask AI to explain this page and highlight key data"
         >
           <Sparkles className={`w-3.5 h-3.5 ${isAIPanelOpen ? "text-white" : "text-brand"}`} />
-          <span className="hidden lg:inline">AI อธิบายหน้านี้</span>
+          <span className="hidden lg:inline">Explain This Page</span>
         </button>
 
         {/* Role Switcher */}
         <div className="relative group">
           <button
             type="button"
-            title="เลือกมุมมองที่จะแสดง ไม่ใช่การเข้าสู่ระบบ สิทธิ์จริงมาจาก token และฐานข้อมูล"
+            title="Choose a display role. This is not a login; actual permissions come from your token and database."
             className="h-8 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-btn text-xs font-medium text-ink flex items-center gap-1.5 transition-colors"
           >
             <User className="w-3.5 h-3.5 text-brand" />
             <span className="hidden sm:inline">
-              {userRole === "owner" ? "เจ้าของร้าน" : userRole === "buyer" ? "ผู้ว่าจ้าง" : "ผู้ให้ทุน"}
+              {userRole === "owner" ? "Shop Owner" : userRole === "buyer" ? "Buyer" : "Funder"}
             </span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
@@ -157,7 +154,7 @@ export const AppHeader: React.FC = () => {
                 userRole === "owner" ? "bg-brand/10 text-brand font-semibold" : "hover:bg-slate-50 text-ink"
               }`}
             >
-              <span>เจ้าของธุรกิจ (Owner)</span>
+              <span>Business Owner</span>
             </button>
             <button
               type="button"
@@ -166,7 +163,7 @@ export const AppHeader: React.FC = () => {
                 userRole === "buyer" ? "bg-brand/10 text-brand font-semibold" : "hover:bg-slate-50 text-ink"
               }`}
             >
-              <span>ผู้ซื้อ/ผู้ว่าจ้าง (Buyer)</span>
+              <span>Buyer / Client</span>
             </button>
             <button
               type="button"
@@ -175,7 +172,7 @@ export const AppHeader: React.FC = () => {
                 userRole === "funder" ? "bg-brand/10 text-brand font-semibold" : "hover:bg-slate-50 text-ink"
               }`}
             >
-              <span>ผู้ให้ทุน (Funder)</span>
+              <span>Funder</span>
             </button>
           </div>
         </div>
@@ -185,27 +182,27 @@ export const AppHeader: React.FC = () => {
           <button
             type="button"
             className="h-8 px-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-btn text-xs text-ink-muted flex items-center gap-1"
-            title="ทดสอบสถานะ 9 แบบของระบบ (Part H)"
+            title="Test the 9 system states (Part H)"
           >
             <Layers className="w-3.5 h-3.5 text-attention" />
-            <span className="hidden xl:inline text-[11px]">สถานะ: {pageStateMode}</span>
+            <span className="hidden xl:inline text-[11px]">Status: {pageStateMode}</span>
           </button>
           <div className="absolute right-0 top-full mt-1 hidden group-hover:block bg-white border border-borderLine rounded-xl shadow-soft-lg p-2 min-w-[190px] z-50 text-xs space-y-1">
             <span className="text-[10px] font-bold text-ink-muted uppercase block px-1">
-              ทดสอบ 9 สถานะ (Part H):
+              Test 9 States (Part H):
             </span>
             {(
               [
-                ["normal", "ปกติ (Normal)"],
-                ["empty", "1. ยังไม่มีข้อมูล (Empty)"],
-                ["loading", "2. กำลังโหลด (Skeleton)"],
-                ["insufficient_data", "3. ข้อมูลไม่พอ (Rule #3)"],
-                ["error", "4. เกิดข้อผิดพลาด (Error)"],
-                ["not_found", "5. ค้นหาไม่พบ (Not Found)"],
-                ["no_permission", "6. ไม่มีสิทธิ์ (No Perm)"],
-                ["stale", "7. ผลล้าสมัย (Stale)"],
-                ["success", "8. บันทึกสำเร็จ (Success)"],
-                ["unsaved", "9. มีการแก้ค้าง (Unsaved)"],
+                ["normal", "Normal"],
+                ["empty", "1. Empty"],
+                ["loading", "2. Loading (Skeleton)"],
+                ["insufficient_data", "3. Insufficient Data (Rule #3)"],
+                ["error", "4. Error"],
+                ["not_found", "5. Not Found"],
+                ["no_permission", "6. No Permission"],
+                ["stale", "7. Stale Data"],
+                ["success", "8. Saved Successfully"],
+                ["unsaved", "9. Unsaved Changes"],
               ] as [PageStateMode, string][]
             ).map(([mode, label]) => (
               <button
@@ -233,7 +230,7 @@ export const AppHeader: React.FC = () => {
               ? "bg-amber-50 text-attention border-amber-300"
               : "bg-white text-ink-muted border-borderLine hover:text-ink"
           }`}
-          title={isReducedMotion ? "ปิดโหมดลดภาพเคลื่อนไหว" : "เปิดโหมดลดภาพเคลื่อนไหว (Reduced Motion)"}
+          title={isReducedMotion ? "Disable reduced motion" : "Enable reduced motion"}
         >
           <Sliders className="w-3.5 h-3.5" />
         </button>

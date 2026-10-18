@@ -15,19 +15,19 @@ export const DataKindBadge: React.FC<DataKindBadgeProps> = ({
   const configs = {
     actual: {
       symbol: "●",
-      label: "จริง",
+      label: "Actual",
       bg: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
       dotColor: "text-emerald-500",
     },
     forecast: {
       symbol: "◐",
-      label: "คาดการณ์",
+      label: "Forecast",
       bg: "bg-brand-light text-brand-dark border-brand/20",
       dotColor: "text-brand",
     },
     simulated: {
       symbol: "◇",
-      label: "จำลอง",
+      label: "Simulated",
       bg: "bg-attention-light text-amber-800 border-attention/30 border-dashed",
       dotColor: "text-attention",
     },
@@ -40,7 +40,7 @@ export const DataKindBadge: React.FC<DataKindBadgeProps> = ({
       className={`inline-flex items-center gap-1 font-medium rounded-chip border select-none transition-colors ${
         size === "sm" ? "text-[11px] px-2 py-0.5" : "text-xs px-2.5 py-1"
       } ${config.bg} ${className}`}
-      title={`ประเภทข้อมูล: ${config.label} (${kind})`}
+      title={`Data type: ${config.label} (${kind})`}
     >
       <span className={`font-mono text-[10px] ${config.dotColor}`}>{config.symbol}</span>
       <span>{config.label}</span>
