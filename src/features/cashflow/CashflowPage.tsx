@@ -57,19 +57,54 @@ export const CashflowPage: React.FC = () => {
   const missing = timelineEnvelope?.missing || [];
 
   if (!timelineEnvelope || mode === "error" || mode === "unavailable" || mode === "insufficient_data") {
-    return (
+    const unavailableState = (
       <StateRenderer
         currentMode={mode === "error" ? "error" : mode === "unavailable" ? "unavailable" : "insufficient_data"}
         errorMessage={error || "Could not load the cash flow schedule from the backend"}
         unavailableReason={accepted
-          ? "The imported statement contains period totals but no dated cash transactions · The system will not substitute a sample business schedule or spread totals across days."
+          ? "The imported statement contains period totals but no dated cash transactions. Add confirmed receipt and payment dates to see the timeline; importing the same summary again will not create dates."
           : "No dated cash transactions are available for this business."}
         missingItems={missing}
         onRetry={loadData}
-        onAddData={() => setCurrentPage("import")}
+        onAddData={accepted ? undefined : () => setCurrentPage("import")}
       >
         {null}
       </StateRenderer>
+    );
+    if (!accepted) return unavailableState;
+
+    const reportedLines = [
+      { field: "cash_balance", label: "Cash balance at period end" },
+      { field: "operating_cash_flow", label: "Operating cash flow" },
+      { field: "investing_cash_flow", label: "Investing cash flow" },
+      { field: "financing_cash_flow", label: "Financing cash flow" },
+    ].map((line) => ({ ...line, value: statementLine(line.field) }))
+      .filter((line) => line.value !== null);
+
+    return (
+      <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-5 text-ink animate-fade-in">
+        <div className="border-b border-borderLine pb-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-display font-bold text-ink">Cash & Cash Flow (Cash Flow Forecast)</h1>
+            <DataKindBadge kind={accepted.input.kind} size="md" />
+          </div>
+          <p className="text-xs text-ink-muted mt-1">
+            Statement period: {accepted.input.period_start} – {accepted.input.period_end}. These are reported totals, not a dated cash forecast.
+          </p>
+        </div>
+        {reportedLines.length > 0 && (
+          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Reported cash flow totals">
+            {reportedLines.map((line) => (
+              <div key={line.field} className="p-4 rounded-card bg-white border border-borderLine">
+                <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">{line.label}</span>
+                <div className="mt-2 text-lg font-bold font-mono tabular-nums">{money(line.value)}</div>
+                <span className="text-[10px] text-ink-muted">Reported in the imported statement</span>
+              </div>
+            ))}
+          </section>
+        )}
+        {unavailableState}
+      </div>
     );
   }
 

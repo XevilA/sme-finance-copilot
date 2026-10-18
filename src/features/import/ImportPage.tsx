@@ -5,6 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import { StatementRecord, validateImportedPeriod } from "@/api/statementImport";
+import { missingDataLabel } from "@/api/dataAvailability";
 import { StatementPreview } from "./StatementPreview";
 import {
   UploadCloud,
@@ -158,12 +159,14 @@ export const ImportPage: React.FC = () => {
       // shop_name is free text for display. It never becomes an SME identity,
       // so imported results stay unattached until a real identity is supplied.
       const result = await apiClient.analyze(input, file ? file.name : draft.shop_name, context);
-      const gap = (result.missing || []).length;
+      const missingFields = result.missing || [];
+      const gap = missingFields.length;
+      const missingSummary = missingFields.slice(0, 3).map(missingDataLabel).join(", ");
       addToast({
         type: gap ? "warning" : "success",
         title: gap ? "Analysis complete, but data is incomplete" : "Analysis complete",
         message: gap
-          ? `Grade ${result.data.grading?.grade || "Unknown"} · ${gap} missing data items; missing values are never assumed to be zero.`
+          ? `Grade ${result.data.grading?.grade || "Unknown"} · Missing: ${missingSummary || `${gap} data items`}${gap > 3 ? `, and ${gap - 3} more` : ""}. Missing values are never assumed to be zero.`
           : `Grade ${result.data.grading?.grade || "Unknown"} · This analyzed data set is now used across all pages.`,
         duration: gap ? 9000 : undefined,
       });

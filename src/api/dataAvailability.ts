@@ -13,6 +13,21 @@ const labels: Record<string, string> = {
   no_sales_products: "Product-level sales records",
   no_sales_channels: "Channel-level sales records",
   rbac_not_enforced: "User access control is not enabled",
+  cash_balance: "Closing cash balance",
+  operating_cash_flow: "Operating cash flow",
+  investing_cash_flow: "Investing cash flow",
+  financing_cash_flow: "Financing cash flow",
+  revenue: "Revenue",
+  cost_of_goods_sold: "Cost of goods sold",
+  total_expenses: "Total expenses",
+  net_income: "Net income",
+  units_sold: "Units sold",
+  current_assets: "Current assets",
+  current_liabilities: "Current liabilities",
+  opening_assets: "Opening assets",
+  opening_equity: "Opening equity",
 };
 
-export function missingDataLabel(code: string): string { return labels[code] || code; }
+export function missingDataLabel(code: string): string {
+  return labels[code] || code.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}

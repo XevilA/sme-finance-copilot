@@ -40,6 +40,18 @@ export const SalesPage: React.FC = () => {
 
   const products = productsEnvelope?.data || [];
   const channels = channelsEnvelope?.data || [];
+  const reportedTotals = [
+    { field: "revenue", label: "Revenue for period", unit: "THB" },
+    { field: "cost_of_goods_sold", label: "Cost of goods sold", unit: "THB" },
+    { field: "total_expenses", label: "Total expenses", unit: "THB" },
+    { field: "net_income", label: "Net income", unit: "THB" },
+    { field: "units_sold", label: "Units sold", unit: "units" },
+  ].flatMap((item) => {
+    const raw = accepted?.input?.[item.field];
+    if (raw == null || raw === "") return [];
+    const value = Number(raw);
+    return Number.isFinite(value) ? [{ ...item, value }] : [];
+  });
 
   // A product or channel breakdown needs catalogue rows. An imported statement
   // only carries period totals, so neither split is reconstructed from them.
@@ -47,19 +59,48 @@ export const SalesPage: React.FC = () => {
     || (productMode === "unavailable" && channelMode === "unavailable")
     || (products.length === 0 && channels.length === 0)) {
     const unavailable = productMode === "unavailable" || channelMode === "unavailable";
-    return (
+    const unavailableState = (
       <StateRenderer
         currentMode={error ? "error" : unavailable ? "unavailable" : "insufficient_data"}
         errorMessage={error || "Could not load product and channel sales from the backend"}
         unavailableReason={accepted
-          ? "The imported statement contains period totals only, with no product or channel breakdown · The system will not estimate a mix or substitute sample data."
+          ? "This statement has period totals only. Product and channel records are needed for a breakdown; importing the same summary again will not create those details."
           : "No products or sales channels have been recorded."}
         missingItems={[...(productsEnvelope?.missing || []), ...(channelsEnvelope?.missing || [])]}
         onRetry={loadData}
-        onAddData={() => setCurrentPage("import")}
+        onAddData={accepted ? undefined : () => setCurrentPage("import")}
       >
         {null}
       </StateRenderer>
+    );
+    if (!accepted) return unavailableState;
+
+    return (
+      <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-5 text-ink animate-fade-in">
+        <div className="border-b border-borderLine pb-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-display font-bold text-ink">Sales & Products (Sales & Channel Profitability)</h1>
+            <DataKindBadge kind={accepted.input.kind} size="md" />
+          </div>
+          <p className="text-xs text-ink-muted mt-1">
+            Statement period: {accepted.input.period_start} – {accepted.input.period_end}. Totals below are reported values; no product or channel split is inferred.
+          </p>
+        </div>
+        {reportedTotals.length > 0 && (
+          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3" aria-label="Reported sales totals">
+            {reportedTotals.map((item) => (
+              <div key={item.field} className="p-4 rounded-card bg-white border border-borderLine">
+                <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">{item.label}</span>
+                <div className="mt-2 text-lg font-bold font-mono tabular-nums">
+                  {item.unit === "THB" ? "฿" : ""}{item.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{item.unit === "units" ? " units" : ""}
+                </div>
+                <span className="text-[10px] text-ink-muted">Reported in the imported statement</span>
+              </div>
+            ))}
+          </section>
+        )}
+        {unavailableState}
+      </div>
     );
   }
 
