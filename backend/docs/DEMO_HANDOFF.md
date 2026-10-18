@@ -2,18 +2,20 @@
 
 This guide summarizes what the current prototype can demonstrate and where the UI must show an unavailable or incomplete state. `GET /api/v1/capabilities` is authoritative for runtime operations. The current production instance uses PostgreSQL with synthetic seed records; authentication enforcement is off, so it is suitable for a public demo with synthetic data only.
 
+**Concurrent-test status:** the automated suite verifies function and database correctness, not load capacity. No concurrent-user load test has been run, so the prototype is suitable for supervised testing with synthetic data, but must not be represented as capacity-tested for a large simultaneous audience. Database-backed endpoints share the demo catalogue and depend on the hosted PostgreSQL connection limit. Check `/health` before the event and keep a demo operator available to handle retries or temporary unavailable states.
+
 ## Eight feature areas
 
-| # | Feature | Prototype status | Frontend behavior |
-| --- | --- | --- | --- |
-| 1 | Statement validation and Excel import | Available for supported `.xlsx` formats; multi-statement extraction keeps statements separate and flags inconsistent periods/currencies | Show validation errors and source periods; never imply that mixed statements form one verified SME record |
-| 2 | Financial calculations and grading | Available for metrics supported by supplied fields; absent inputs remain unavailable | Render each metric status and missing fields; do not fill unknown values with zero |
-| 3 | AI business explanation | Available in deterministic rules mode with evidence; forecast claims require dated events and confirmed coverage | Label `aiMode: rules`; show evidence and limitations; do not present it as generated advice |
-| 4 | Funding matcher | Matching/evaluation endpoints are implemented; live results depend on an accepted statement and catalogue coverage | Show no-match/insufficient-data states honestly; applying for funding is unavailable |
-| 5 | SWARM order allocation | Allocation preview is available; output depends on order requirements, shop capacity, and resource data | Label as preview; show unmet requirements/deficit; resource reservation is unavailable |
-| 6 | What-if simulator | Supported order scenario recomputation is available; saved replay requires database | Identify scenario inputs and assumptions; only expose saved replay when capability says available |
-| 7 | Industry trends | Endpoint exists, but live signals depend on configured provider and successful fetch | Show unavailable/empty/stale states; headline signals are not verified financial forecasts |
-| 8 | Database, API, and authentication | PostgreSQL persistence and API are available; login routes exist but demo auth enforcement is off | Do not expose real customer data; do not claim user isolation or secure production access |
+| # | Feature | Prototype status | Group-test status | Frontend behavior |
+| --- | --- | --- | --- | --- |
+| 1 | Statement validation and Excel import | Available for supported `.xlsx` formats; multi-statement extraction keeps statements separate and flags inconsistent periods/currencies | Suitable for supervised synthetic-data trials; upload throughput under concurrency is untested | Show validation errors and source periods; never imply that mixed statements form one verified SME record |
+| 2 | Financial calculations and grading | Available for metrics supported by supplied fields; absent inputs remain unavailable | Stateless analysis is suitable for a supervised pilot; capacity is untested | Render each metric status and missing fields; do not fill unknown values with zero |
+| 3 | AI business explanation | Available in deterministic rules mode with evidence; forecast claims require dated events and confirmed coverage | Default rules flow avoids external model calls; capacity is untested | Label `aiMode: rules`; show evidence and limitations; do not present it as generated advice |
+| 4 | Funding matcher | Matching/evaluation endpoints are implemented; live results depend on an accepted statement and catalogue coverage | Conditional on database health; concurrent catalogue load is untested | Show no-match/insufficient-data states honestly; applying for funding is unavailable |
+| 5 | SWARM order allocation | Allocation preview is available; output depends on order requirements, shop capacity, and resource data | Preview uses shared catalogue data; concurrent database load is untested | Label as preview; show unmet requirements/deficit; resource reservation is unavailable |
+| 6 | What-if simulator | Supported order scenario recomputation is available; saved replay requires database | Preview can be tried; concurrent saved writes/replay have not been load-tested | Identify scenario inputs and assumptions; only expose saved replay when capability says available |
+| 7 | Industry trends | Endpoint exists, but live signals depend on configured provider and successful fetch | Limited by shared cache/provider rate limits; stale or unavailable results may appear | Show unavailable/empty/stale states; headline signals are not verified financial forecasts |
+| 8 | Database, API, and authentication | PostgreSQL persistence and API are available; login routes exist but demo auth enforcement is off | Not ready for real customer data or a capacity claim; no user isolation, and connection limits are unverified | Do not expose real customer data; do not claim user isolation or secure production access |
 
 ## Connect the frontend
 
