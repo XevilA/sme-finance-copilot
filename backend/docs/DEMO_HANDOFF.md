@@ -1,6 +1,6 @@
 # Demo readiness and frontend handoff
 
-This guide summarizes what the current prototype can demonstrate and where the UI must show an unavailable or incomplete state. `GET /api/v1/capabilities` is authoritative for runtime operations. The current production instance uses PostgreSQL with synthetic seed records; authentication enforcement is off, so it is suitable for a public demo with synthetic data only.
+This guide summarizes what the prototype can demonstrate and where the UI must show an unavailable or incomplete state. `GET /api/v1/capabilities` is authoritative for runtime operations. The live smoke check below was run against `https://sme-finance-copilot-prototype.vercel.app/`. The separate `https://sme-finance-copilot.vercel.app/` domain shown in tester screenshots may be a different Vercel deployment; confirm the exact test URL and build with the organizer before testing. The checked deployment used PostgreSQL with synthetic seed records and had authentication enforcement off, so use synthetic data only.
 
 **Concurrent-test status:** the automated suite verifies function and database correctness, not load capacity. No concurrent-user load test has been run, so the prototype is suitable for supervised testing with synthetic data, but must not be represented as capacity-tested for a large simultaneous audience. Database-backed endpoints share the demo catalogue and depend on the hosted PostgreSQL connection limit. Check `/health` before the event and keep a demo operator available to handle retries or temporary unavailable states.
 
@@ -20,6 +20,29 @@ This guide summarizes what the current prototype can demonstrate and where the U
 | 8 | Database, API, and authentication | **API and PostgreSQL work; demo is unauthenticated** | Live `/health` reported `persistence=true`; funding query read a stored catalogue row | `auth.enforced=false` and `auth.secretConfigured=false`. No tester isolation or real-customer-data protection is provided. Do not use real financial data. |
 
 **Audience and capacity:** The backend suite passed **555 tests, with 1 intentional skip** for the database-disabled case. This verifies functional behavior, not Vercel/PostgreSQL throughput. No concurrent-user load test has been run. Present the app as a supervised synthetic-data prototype; do not promise reliable service for a large group testing simultaneously.
+
+The latest frontend update (`0c9cd21`) passed `pnpm build` and all 10 frontend invariants. It displays available imported statement totals on Cash Flow and Sales pages, while retaining the missing-detail notice. These checks do not verify that the latest commit has finished deploying to every Vercel domain; confirm the deployed build before the test session.
+
+### Workbook-only pages: expected behavior
+
+Cash Flow and Sales are not broken when they show a missing-detail state. A statement total cannot establish dated cash movements, and period revenue cannot establish product or channel shares. On an accepted imported statement, the UI displays the reported aggregate values it actually received, labels the statement period, and keeps the missing-detail explanation. The cash timeline still needs confirmed dated receipts/payments; the product/channel breakdown still needs itemized product and channel records. Uploading the same summary workbook again cannot supply those details.
+
+## WeBank tester run sheet
+
+Use the organizer-confirmed test URL and a synthetic workbook only. Record the URL, test time, browser/device, page, visible status, and a sanitized screenshot or request ID for any unexpected result. Never include API tokens, credentials, or real customer financial data in a bug report.
+
+| Step | Test | Expected result |
+| --- | --- | --- |
+| 1 | Open `/health`; then read `/api/v1/capabilities` | Health reports current persistence/auth settings. Use capabilities to determine enabled actions; do not infer availability from a page title. |
+| 2 | Preview and analyze a supported synthetic `.xlsx` | Validation identifies the selected statement and its period/currency. Multiple statements remain separate. An incomplete analysis can return a grade, but must list missing evidence. |
+| 3 | Open Cash & Cash Flow after importing a totals-only workbook | Reported cash/flow totals appear when present. The dated timeline remains unavailable without confirmed dated cash events and a matching business identity. No totals are spread across days. |
+| 4 | Open Sales & Products after importing a totals-only workbook | Reported revenue/expense totals appear when present. Product and channel breakdowns remain unavailable unless itemized records exist; no mix is estimated. |
+| 5 | Open Funding Match with the database healthy | Funding options may be ranked against the synthetic stored catalogue. A result is not an application or approval. If persistence is off/unhealthy, record the unavailable response. |
+| 6 | Run a SWARM or What-if preview with explicit synthetic order inputs | Preview returns a proposal/comparison or an explicit missing-data state. Do not claim resources are reserved. `persist=false` must not write a saved simulation. |
+| 7 | Open Industry Trends | A successful feed requires a successful provider fetch or usable cache. If it shows timeout/unavailable/empty, record that state; do not report it as a successful live signal. |
+| 8 | Several testers perform low-volume functional checks | The demo is unauthenticated and has no tester isolation. Use synthetic data only. No load-test capacity is certified; record slow responses/errors and stop if failures repeat. |
+
+When reporting a defect, include the page and step, expected vs actual status, sanitized response fields (`status`, `source`, `missing`), and whether `/health` showed persistence enabled. Do not attach a real financial workbook.
 
 ## Connect the frontend
 

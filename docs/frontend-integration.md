@@ -117,7 +117,22 @@ At page startup, read `apiClient.getCapabilities()` and use each `available` fla
 
 Production currently uses synthetic seed records and does not enforce authentication. Authentication routes and token helpers do not establish an authorization boundary while `RBAC_ENFORCED=false`. Never enter or upload customer/production financial data in the public demo. Keep real credentials server-side in host environment variables such as `DATABASE_URL`, `AUTH_SECRET`, and optional `OPENAI_API_KEY`.
 
-## 6. Error handling and checks
+## 6. Frontend developer handoff checklist
+
+The current frontend already connects to the backend through the shared API client. Start by confirming the target Vercel project/domain and that its deployment includes commit `0c9cd21`; the public prototype and the previously used app domain may not point to the same Vercel project.
+
+| Priority | Frontend work | Acceptance check |
+| --- | --- | --- |
+| 1 | Keep all requests in `src/api/client.ts`; use shared contracts and `useEnvelope` / `useAnalysisContext`. | No page-specific raw `fetch`, duplicate financial formulas, or `any` added to hide nullable fields. |
+| 2 | Verify imported-analysis state on pages 1–6 and preserve the accepted input/revision. | Overview, Health, Cost, Cash Flow, and Sales do not silently switch to another SME's seeded data after import. |
+| 3 | Check Cash Flow and Sales on a totals-only workbook. | Display only the imported period totals and the statement period. Keep the missing dated-event or product/channel detail notice; do not fabricate a timeline or sales split. |
+| 4 | Make incomplete results actionable and legible on tablet/mobile. | Show human-readable missing fields, loading/error/retry states, `kind` badges, and source/status. Verify Safari/iPad widths as well as desktop. |
+| 5 | Gate actions using `/api/v1/capabilities`. | Unavailable actions cannot look completed; order/simulation results are labelled previews. |
+| 6 | Run the handoff checks below and report any mismatch with sanitized evidence. | `pnpm build`, `pnpm test:invariants`, statement-import/data-availability checks, and PostgreSQL backend suite pass. |
+
+The cash timeline and detailed Sales views need records the current summary workbook does not contain. The backend currently has read routes for the cash timeline and product/channel sales, but no user-facing create/update contract for entering those detailed records. If the UI adds entry forms, agree on a versioned backend request/response and authorization model first; do not persist these records through an unrelated endpoint or browser-only mock and call it a completed feature.
+
+## 7. Error handling and checks
 
 `apiClient` converts common transport failures to `ApiError` with an HTTP `status` and readable message. Keep retry controls for transient failures and avoid success notifications until the operation has actually succeeded.
 
