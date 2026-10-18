@@ -217,10 +217,11 @@ BusinessOverview ยังเป็น number สำหรับ scalar/diff แ
 
 ## 2. Read contracts 16 เส้นทางที่ client มีจริง
 
-| View | GET path หลัง base URL | Payload / บริบทจริง |
+| View | Path หลัง base URL | Payload / บริบทจริง |
 | --- | --- | --- |
 | Overview | `/overview` | BusinessOverview; scalar/diff nullable, netProfitMargin; kind ตาม input |
 | Cashflow | `/cashflow/timeline` | CashflowDay[] จาก dated events; รับ sme_id, ไม่แผ่ยอดรวมเป็นรายวัน |
+| Cashflow preview | `POST /cashflow/preview` | `{as_of, opening_cash, reserve, events[]}`; แต่ละรายการต้องมีวันที่ในช่วง 1–90 วันหลัง as_of, ประเภท, คำอธิบาย, จำนวนเงิน และสถานะรับ/จ่าย; คืน CashflowDay[] ชนิด simulated พร้อม `persisted=false`; ไม่เขียนฐานข้อมูล |
 | Shops | `/shops` | Shop[] พร้อม UUID จริง; ไม่กำหนดจำนวนร้านตายตัว |
 | Order | `/order` | SwarmOrder หรือ null; active stored order ตาม ACTIVE_PROJECT_ORDER |
 | Stored proposal | `/swarm/proposal` | SwarmProposal ที่บันทึก; ไม่ใช่ POST preview ล่าสุด |
@@ -232,6 +233,7 @@ BusinessOverview ยังเป็น number สำหรับ scalar/diff แ
 | Cost | `/cost/breakdown` | CostBreakdown; ไม่มี dated investment schedule ไม่สร้าง NPV/IRR |
 | Products | `/sales/products` | ProductSales[] จาก catalogue; ไม่ได้คำนวณ product breakdown จากงบที่ import |
 | Channels | `/sales/channels` | ChannelSales[] จาก catalogue; ไม่มีแถวไม่แต่ง channel split |
+| Sales preview | `POST /sales/preview` | รับ `{products[], channels[]}`; สินค้าต้องมี name/category/unitsSold/revenue/cost/turnoverDays; ช่องทางต้องมี channel/grossSales/commissionFee/adCost/deliveryCost; คืนกำไรและ margin จากรายการที่กรอก, `kind=simulated`, `persisted=false`; ไม่เขียนฐานข้อมูล |
 | Funder | `/funder/projects` | FunderProject[]; route ใช้ resolve_principal, อย่าเปิด enforcement โดยยังไม่ต่อ token |
 | Projects | `/projects` | ProjectRecord[] ที่บันทึก; ไม่สร้างไฟล์ report/export |
 | AI panel | `/ai/explain?page={id}` | AIResponse จาก rules; รับ sme_id/coverage; GET นี้ไม่เรียก LLM |

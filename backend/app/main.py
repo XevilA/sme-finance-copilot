@@ -32,6 +32,7 @@ from .routers import swarm as swarm_router
 from .routers import upload as upload_router
 from .routers import contextual as contextual_router
 from .routers import simulations as simulations_router
+from .routers import previews as previews_router
 from .schemas import FinancialInput
 
 
@@ -68,7 +69,8 @@ for router in (frontend_router.router, catalog_router.router,
                calculate_router.router, swarm_router.router,
                analyze_router.router, upload_router.router, simulate_router.router,
                match_funding_router.router, insights_router.router,
-               auth_router.router, contextual_router.router, simulations_router.router):
+               auth_router.router, contextual_router.router, simulations_router.router,
+               previews_router.router):
     app.include_router(router, prefix="/api")
     app.include_router(router, prefix="/api/v1", include_in_schema=False)
 

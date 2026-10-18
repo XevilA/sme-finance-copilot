@@ -66,7 +66,10 @@ is the single loader every page uses.
   is imported, Cashflow, Sales products and Sales channels return an explicit
   unavailable envelope (`source: "none"`) naming what is missing, because the
   statement has no dated cash events and no product or channel split, and the
-  stored default SME belongs to a different statement.
+  stored default SME belongs to a different statement. Each page now provides
+  a stateless manual-entry preview: enter dated receipt/payment rows on Cashflow,
+  and product plus channel cost rows on Sales. Preview responses are labelled
+  `simulated`, return `persisted: false`, and do not alter shared demo records.
 
 ## 3. API contracts consumed
 
@@ -77,6 +80,8 @@ is the single loader every page uses.
 | POST `/analyze` | Import → Overview/Health/Cost/AI | Accepted into the tab context with its revision |
 | POST `/funding/evaluate` | Funding | Grades the imported statement, not a stored seed SME |
 | POST `/forecast/preview` | Funding (cash-needed date) | Null plus `cash_forecast` in missing without an SME |
+| POST `/cashflow/preview` | Cashflow | Stateless 90-day dated cash-event preview; event dates must be 1–90 days after as-of |
+| POST `/sales/preview` | Sales | Stateless product profit and channel net-margin preview; requires every item and cost field |
 | GET `/capabilities` | Funding, ShopFinance, Funder, Projects, Unlock, Simulator | Drives every unavailable state |
 | GET `/simulator/context` | SWARM, Simulator, Unlock | Supplies `projectId`, `constraints`, `missing` |
 | GET `/projects/{id}/constraints` | SWARM | Stored snapshot; unknown ≠ explicit empty |
@@ -326,3 +331,23 @@ Two ways to give a tester the real flow:
    Vercel project and redeploy. `CORS_ORIGINS` in `backend/.env.example`
    already lists `https://sme-finance-copilot.vercel.app`. Untested: no host
    exists yet.
+
+## Cash flow and sales input acceptance checks
+
+The imported workbook supplies reporting-period totals, not dated transactions
+or row-level sales. Testers can enter those details on pages 3 and 6 to calculate
+an explicit preview. Both endpoints are stateless and return `kind=simulated`,
+`source=supplied_input`, and `persisted=false`.
+
+* **Cashflow:** provide opening cash, minimum reserve, and at least one event
+  dated 1–90 days after the statement period end. Each event needs a date,
+  direction, description, and amount. Check that the closing balance equals
+  opening cash plus receipts minus payments and that a reserve breach is flagged.
+* **Sales & Products:** add at least one product with category, units sold,
+  revenue, cost, and turnover days; add at least one sales channel with gross
+  sales, commission, advertising, and delivery costs. Check product profit is
+  revenue minus product cost and channel net profit subtracts the listed channel
+  costs. Channel profit does not allocate product cost of goods.
+* Blank required fields, negative values, cash events outside the 90-day window,
+  and incomplete sales rows should be rejected with a recoverable validation
+  message. Refreshing the page clears these previews because they are not saved.

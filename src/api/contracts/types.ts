@@ -165,6 +165,23 @@ export type CashflowDay = {
   events: FinancialEvent[];
 };
 
+export type CashflowPreviewInput = {
+  as_of: string;
+  opening_cash: string;
+  reserve: string;
+  events: { date: string; type: FinancialEventType; title: string; amount: string;
+    isInflow: boolean; partner?: string; impactReason?: string }[];
+};
+
+export type SalesPreviewInput = {
+  products: { name: string; category: string; unitsSold: number; revenue: string;
+    cost: string; turnoverDays: number }[];
+  channels: { channel: string; grossSales: string; commissionFee: string;
+    adCost: string; deliveryCost: string }[];
+};
+
+export type SalesPreviewResult = { products: ProductSales[]; channels: ChannelSales[] };
+
 export type ShopFinance = {
   shopId: string;
   name: string;

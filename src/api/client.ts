@@ -5,6 +5,7 @@ import {
   BusinessOverview,
   Capabilities,
   CashflowDay,
+  CashflowPreviewInput,
   Shop,
   SwarmOrder,
   SwarmProposal,
@@ -22,6 +23,8 @@ import {
   CostBreakdown,
   ProductSales,
   ChannelSales,
+  SalesPreviewInput,
+  SalesPreviewResult,
   FunderProject,
   ProjectRecord,
   AIResponse,
@@ -464,6 +467,10 @@ export const apiClient = {
     return requestJson(`/cashflow/timeline`);
   },
 
+  async previewCashflow(input: CashflowPreviewInput): Promise<Envelope<CashflowDay[]>> {
+    return postJson(`/cashflow/preview`, input);
+  },
+
   async getShops(): Promise<Envelope<Shop[]>> {
     if (USE_MOCK) {
       await simulateLatency();
@@ -568,6 +575,10 @@ export const apiClient = {
       return wrapEnvelope(mockChannelSales, "actual", "ok");
     }
     return requestJson(`/sales/channels`);
+  },
+
+  async previewSales(input: SalesPreviewInput): Promise<Envelope<SalesPreviewResult>> {
+    return postJson(`/sales/preview`, input);
   },
 
   async getFunderProjects(): Promise<Envelope<FunderProject[]>> {

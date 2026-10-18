@@ -58,6 +58,8 @@ All paths below are relative to the configured `/api/v1` base URL. The client cu
 | Analyze submitted financial input | `apiClient.analyze(input, shopName?, context?)` | `POST /analyze` | Stateless analysis; returns metrics/views/evidence and accepts the analysis for this tab. |
 | Evaluate funding for the same input | `apiClient.evaluateFunding(input, options)` | `POST /funding/evaluate` | Stateless evaluation; needs the funding catalogue database. |
 | Preview a dated forecast | `apiClient.previewForecast(input, context?)` | `POST /forecast/preview` | Preview only; dated SME/project cash-flow evidence is required. |
+| Preview entered cash events | `apiClient.previewCashflow(input)` | `POST /cashflow/preview` | Requires opening cash, reserve, as-of date, and dated receipts/payments 1–90 days ahead; simulated and never persisted. |
+| Preview product/channel margins | `apiClient.previewSales(input)` | `POST /sales/preview` | Requires complete product cost/revenue/units/turnover and channel gross sales/fees; simulated and never persisted. |
 | Check supported operations | `apiClient.getCapabilities()` | `GET /capabilities` | Drive unavailable/disabled UI actions from this response. |
 | Download workbook template | `apiClient.downloadTemplate()` | `GET /analysis/template.xlsx` | Uses authenticated client transport when a token exists. |
 

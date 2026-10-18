@@ -1,7 +1,7 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { ProductSales, ChannelSales, Envelope } from "@/api/contracts/types";
+import { ProductSales, ChannelSales, Envelope, SalesPreviewInput, SalesPreviewResult } from "@/api/contracts/types";
 import { envelopeMode, useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -16,9 +16,20 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+type ProductDraft = { name: string; category: string; unitsSold: string; revenue: string; cost: string; turnoverDays: string };
+
 export const SalesPage: React.FC = () => {
   const { setCurrentPage } = useAppStore();
   const { accepted, stale } = useAnalysisContext();
+  const [productRows, setProductRows] = useState<ProductDraft[]>([
+    { name: "", category: "", unitsSold: "", revenue: "", cost: "", turnoverDays: "" },
+  ]);
+  const [channelRows, setChannelRows] = useState<SalesPreviewInput["channels"]>([
+    { channel: "", grossSales: "", commissionFee: "", adCost: "", deliveryCost: "" },
+  ]);
+  const [salesPreview, setSalesPreview] = useState<SalesPreviewResult | null>(null);
+  const [salesPreviewError, setSalesPreviewError] = useState("");
+  const [salesPreviewLoading, setSalesPreviewLoading] = useState(false);
   const productState = useEnvelope<ProductSales[]>(useCallback(() => apiClient.getProductSales(), []));
   const channelState = useEnvelope<ChannelSales[]>(useCallback(() => apiClient.getChannelSales(), []));
   const productsEnvelope = productState.envelope;
@@ -99,6 +110,52 @@ export const SalesPage: React.FC = () => {
             ))}
           </section>
         )}
+        <section className="p-4 lg:p-6 rounded-card bg-white border border-borderLine space-y-4">
+          <div>
+            <h2 className="font-display font-bold text-sm text-ink">Enter product and channel details</h2>
+            <p className="text-xs text-ink-muted mt-1">The statement has period totals only. Add item-level sales and channel costs for a backend-calculated preview. This preview is not saved.</p>
+          </div>
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wide">Products</h3>
+            {productRows.map((row, index) => <div key={index} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 p-3 rounded-xl bg-slate-50">
+              <label className="text-[11px] font-semibold">Product<input required maxLength={120} value={row.name} onChange={(e) => setProductRows((rows) => rows.map((item, i) => i === index ? { ...item, name: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Category<input required maxLength={80} value={row.category} onChange={(e) => setProductRows((rows) => rows.map((item, i) => i === index ? { ...item, category: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Units sold<input required min="0" type="number" value={row.unitsSold} onChange={(e) => setProductRows((rows) => rows.map((item, i) => i === index ? { ...item, unitsSold: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Revenue (THB)<input required min="0" type="number" step="0.01" value={row.revenue} onChange={(e) => setProductRows((rows) => rows.map((item, i) => i === index ? { ...item, revenue: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Product cost (THB)<input required min="0" type="number" step="0.01" value={row.cost} onChange={(e) => setProductRows((rows) => rows.map((item, i) => i === index ? { ...item, cost: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <div className="flex items-end gap-2"><label className="text-[11px] font-semibold flex-1">Turnover (days)<input required min="0" type="number" value={row.turnoverDays} onChange={(e) => setProductRows((rows) => rows.map((item, i) => i === index ? { ...item, turnoverDays: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label><button type="button" disabled={productRows.length < 2} onClick={() => setProductRows((rows) => rows.filter((_, i) => i !== index))} className="rounded border border-borderLine px-2 py-2 text-[11px] disabled:opacity-40">Remove</button></div>
+            </div>)}
+            <button type="button" onClick={() => setProductRows((rows) => [...rows, { name: "", category: "", unitsSold: "", revenue: "", cost: "", turnoverDays: "" }])} className="rounded-btn border border-brand/30 px-3 py-2 text-xs font-semibold text-brand">+ Add product</button>
+          </div>
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wide">Sales channels</h3>
+            {channelRows.map((row, index) => <div key={index} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-50">
+              <label className="text-[11px] font-semibold">Channel<input required maxLength={120} value={row.channel} onChange={(e) => setChannelRows((rows) => rows.map((item, i) => i === index ? { ...item, channel: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Gross sales (THB)<input required min="0" type="number" step="0.01" value={row.grossSales} onChange={(e) => setChannelRows((rows) => rows.map((item, i) => i === index ? { ...item, grossSales: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Commission (THB)<input required min="0" type="number" step="0.01" value={row.commissionFee} onChange={(e) => setChannelRows((rows) => rows.map((item, i) => i === index ? { ...item, commissionFee: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <label className="text-[11px] font-semibold">Advertising (THB)<input required min="0" type="number" step="0.01" value={row.adCost} onChange={(e) => setChannelRows((rows) => rows.map((item, i) => i === index ? { ...item, adCost: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label>
+              <div className="flex items-end gap-2"><label className="text-[11px] font-semibold flex-1">Delivery (THB)<input required min="0" type="number" step="0.01" value={row.deliveryCost} onChange={(e) => setChannelRows((rows) => rows.map((item, i) => i === index ? { ...item, deliveryCost: e.target.value } : item))} className="mt-1 w-full rounded border border-borderLine p-2 font-normal" /></label><button type="button" disabled={channelRows.length < 2} onClick={() => setChannelRows((rows) => rows.filter((_, i) => i !== index))} className="rounded border border-borderLine px-2 py-2 text-[11px] disabled:opacity-40">Remove</button></div>
+            </div>)}
+            <button type="button" onClick={() => setChannelRows((rows) => [...rows, { channel: "", grossSales: "", commissionFee: "", adCost: "", deliveryCost: "" }])} className="rounded-btn border border-brand/30 px-3 py-2 text-xs font-semibold text-brand">+ Add sales channel</button>
+          </div>
+          <button type="button" disabled={salesPreviewLoading} onClick={async () => {
+            setSalesPreviewLoading(true); setSalesPreviewError("");
+            try {
+              const incompleteProduct = productRows.some((row) => !row.name.trim() || !row.category.trim() || row.unitsSold === "" || row.revenue === "" || row.cost === "" || row.turnoverDays === "");
+              const incompleteChannel = channelRows.some((row) => !row.channel.trim() || row.grossSales === "" || row.commissionFee === "" || row.adCost === "" || row.deliveryCost === "");
+              if (incompleteProduct || incompleteChannel) throw new Error("Complete every product and channel field before calculating. Blank values are not treated as zero.");
+              const input: SalesPreviewInput = {
+                products: productRows.map((row) => ({ ...row, unitsSold: Number(row.unitsSold), turnoverDays: Number(row.turnoverDays) })),
+                channels: channelRows,
+              };
+              const result = await apiClient.previewSales(input); setSalesPreview(result.data);
+            }
+            catch (error) { setSalesPreviewError(error instanceof Error ? error.message : "Could not calculate preview"); }
+            finally { setSalesPreviewLoading(false); }
+          }} className="rounded-btn bg-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{salesPreviewLoading ? "Calculating…" : "Calculate sales preview"}</button>
+          {salesPreviewError && <p role="alert" className="text-xs text-danger">{salesPreviewError}</p>}
+          {salesPreview && <div className="space-y-3"><p className="text-xs font-semibold text-brand">Simulated preview · not saved</p><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th className="p-2">Product</th><th className="p-2">Units</th><th className="p-2">Profit</th><th className="p-2">Margin</th><th className="p-2">Velocity</th></tr></thead><tbody>{salesPreview.products.map((product) => <tr key={product.id} className="border-b border-slate-100"><td className="p-2">{product.name}</td><td className="p-2">{product.unitsSold}</td><td className="p-2">฿{product.profit.toLocaleString()}</td><td className="p-2">{product.profitMarginPercent}%</td><td className="p-2">{product.velocity}</td></tr>)}</tbody></table></div><div className="grid grid-cols-1 md:grid-cols-3 gap-2">{salesPreview.channels.map((channel) => <div key={channel.channel} className="rounded-lg border border-borderLine p-3 text-xs"><b>{channel.channel}</b><div className="mt-1">Net profit: ฿{channel.netProfit.toLocaleString()} ({channel.netMarginPercent}%)</div></div>)}</div></div>}
+        </section>
         {unavailableState}
       </div>
     );
