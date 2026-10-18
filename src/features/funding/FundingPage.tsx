@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { Capabilities, FundingEvaluation, FundingOption, Envelope } from "@/api/contracts/types";
+import { FundingEvaluation, FundingOption, Envelope } from "@/api/contracts/types";
 import { useAnalysisContext, useEnvelope } from "@/hooks/useEnvelope";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { FundingChip } from "@/components/signature/FundingChip";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -43,14 +44,9 @@ export const FundingPage: React.FC = () => {
   const { envelope: fundingEnvelope, loading, error, reload: loadData } = state;
   const evaluation = (fundingEnvelope as (Envelope<FundingOption[]> & { evaluation?: FundingEvaluation }) | null)?.evaluation;
 
-  const capabilityState = useEnvelope<Capabilities>(useCallback(
-    () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("The demo mode does not declare backend capabilities"))
-      : apiClient.getCapabilities()),
-    []));
-  const canApply = capabilityState.envelope?.data.fundingApplication.available === true;
-  const applyBlockedReason = capabilityState.envelope?.data.fundingApplication.reason
-    || "The backend does not support loan applications yet.";
+  const capabilityState = useCapabilities();
+  const canApply = capabilityState.isAvailable("fundingApplication");
+  const applyBlockedReason = capabilityState.reasonFor("fundingApplication", "The backend does not support loan applications yet.");
 
   const amount = (value: string | number | null | undefined) =>
     value == null || value === "" ? "No data" : `฿${Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
@@ -125,7 +121,7 @@ export const FundingPage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 Project-Specific Smart Funding Matcher
               </h1>
-              <DataKindBadge kind="forecast" size="md" />
+              <DataKindBadge kind={fundingEnvelope?.kind ?? "forecast"} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               Cover only the shortfall needed to start work. Compare interest rates and disbursement speed.
@@ -317,7 +313,7 @@ export const FundingPage: React.FC = () => {
                 {activeFunding.name}
               </h3>
             </div>
-            <DataKindBadge kind="actual" size="sm" />
+            <DataKindBadge kind={fundingEnvelope?.kind ?? "actual"} size="sm" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">

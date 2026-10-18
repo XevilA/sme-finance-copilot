@@ -26,16 +26,33 @@ const StoryModeModal = React.lazy(() => import("@/features/reports/StoryModeModa
 import {
   LayoutDashboard,
   TrendingUp,
-  Network,
-  Wrench,
-  FileCheck2,
+  UploadCloud,
+  ShoppingBag,
+  Menu,
   AlertCircle,
   CheckCircle2,
   X,
 } from "lucide-react";
+import type { NavPage } from "@/store/useAppStore";
+import { TranslationKey, useT } from "@/i18n";
+
+const mobileTabs: { id: NavPage; label: TranslationKey; icon: React.ReactNode }[] = [
+  { id: "overview", label: "tab.overview", icon: <LayoutDashboard className="w-5 h-5 mb-0.5" /> },
+  { id: "import", label: "tab.import", icon: <UploadCloud className="w-5 h-5 mb-0.5" /> },
+  { id: "cashflow", label: "tab.cash", icon: <TrendingUp className="w-5 h-5 mb-0.5" /> },
+  { id: "sales", label: "tab.sales", icon: <ShoppingBag className="w-5 h-5 mb-0.5" /> },
+];
 
 export const App: React.FC = () => {
-  const { currentPage, setCurrentPage, isReducedMotion, toasts, removeToast, isAIPanelOpen, isStoryModeOpen } = useAppStore();
+  const { currentPage, setCurrentPage, setMobileMenuOpen, isReducedMotion, toasts, removeToast, isAIPanelOpen, isStoryModeOpen } = useAppStore();
+
+  const t = useT();
+  const language = useAppStore((st) => st.language);
+  // ให้ <html lang> ตรงกับภาษาที่เลือก (screen reader / ฟอนต์ไทย-จีน จะได้ถูก)
+  React.useEffect(() => { document.documentElement.lang = language; }, [language]);
+
+  const tabIndex = mobileTabs.findIndex((tab) => tab.id === currentPage);
+  const activeTabIndex = tabIndex === -1 ? mobileTabs.length : tabIndex;
 
   const renderCurrentPage = () => {
     switch (currentPage) {
@@ -86,72 +103,53 @@ export const App: React.FC = () => {
         {/* Dynamic Screen Viewport */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-8">
           <React.Suspense fallback={(
-            <div role="status" className="m-6 rounded-card border border-borderLine bg-white p-6 text-sm text-ink-muted">
-              Loading page…
+            <div role="status" className="m-4 lg:m-6 rounded-card border border-borderLine bg-white p-6 text-sm text-ink-muted">
+              {t("common.loadingPage")}
             </div>
           )}>
-            {renderCurrentPage()}
+            {/* key ตามหน้า เพื่อให้ animation เข้าหน้าเล่นใหม่ทุกครั้งที่เปลี่ยนเมนู */}
+            <div key={currentPage} className="animate-page-in">
+              {renderCurrentPage()}
+            </div>
           </React.Suspense>
         </main>
       </div>
 
       {/* Mobile Bottom Navigation Bar (Part F) */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-borderLine z-30 px-2 py-1.5 flex items-center justify-around shadow-soft-lg">
+      {/* มือถือ/แท็บเล็ต: 4 หน้าหลัก + ปุ่ม More เปิดเมนูครบทั้ง 13 หน้า */}
+      <nav aria-label={t("tab.navLabel")} className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-borderLine z-30 px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-5 items-center shadow-soft-lg">
+        {/* แถบเล็ก ๆ ที่เลื่อนตามแท็บที่เลือก (ช่องที่ 5 = More) */}
+        <span
+          aria-hidden="true"
+          className="absolute top-0 left-2 h-[3px] rounded-b-full bg-brand transition-transform duration-300 ease-out"
+          style={{ width: "calc((100% - 1rem) / 5)", transform: `translateX(${activeTabIndex * 100}%)` }}
+        />
+        {mobileTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setCurrentPage(tab.id)}
+            aria-current={currentPage === tab.id ? "page" : undefined}
+            className={`press flex flex-col items-center py-1 px-2 rounded-lg text-[10px] transition-colors ${
+              currentPage === tab.id ? "text-brand font-bold" : "text-ink-muted"
+            }`}
+          >
+            <span className={`transition-transform duration-300 ${currentPage === tab.id ? "-translate-y-0.5 scale-110" : ""}`}>{tab.icon}</span>
+            <span>{t(tab.label)}</span>
+          </button>
+        ))}
         <button
           type="button"
-          onClick={() => setCurrentPage("overview")}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] ${
-            currentPage === "overview" ? "text-brand font-bold" : "text-ink-muted"
+          onClick={() => setMobileMenuOpen(true)}
+          aria-label={t("tab.moreLabel")}
+          className={`press flex flex-col items-center py-1 px-2 rounded-lg text-[10px] transition-colors ${
+            mobileTabs.some((tab) => tab.id === currentPage) ? "text-ink-muted" : "text-brand font-bold"
           }`}
         >
-          <LayoutDashboard className="w-5 h-5 mb-0.5" />
-          <span>Overview</span>
+          <Menu className="w-5 h-5 mb-0.5" />
+          <span>{t("tab.more")}</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setCurrentPage("cashflow")}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] ${
-            currentPage === "cashflow" ? "text-brand font-bold" : "text-ink-muted"
-          }`}
-        >
-          <TrendingUp className="w-5 h-5 mb-0.5" />
-          <span>Cash</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setCurrentPage("swarm")}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] ${
-            currentPage === "swarm" ? "text-brand font-bold" : "text-ink-muted"
-          }`}
-        >
-          <Network className="w-5 h-5 mb-0.5" />
-          <span>SWARM</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setCurrentPage("unlock")}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] ${
-            currentPage === "unlock" ? "text-brand font-bold" : "text-ink-muted"
-          }`}
-        >
-          <Wrench className="w-5 h-5 mb-0.5" />
-          <span>Resources</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setCurrentPage("projects")}
-          className={`flex flex-col items-center py-1 px-2 rounded-lg text-[10px] ${
-            currentPage === "projects" ? "text-brand font-bold" : "text-ink-muted"
-          }`}
-        >
-          <FileCheck2 className="w-5 h-5 mb-0.5" />
-          <span>Projects</span>
-        </button>
-      </div>
+      </nav>
 
       {/* Global Modals & Side Panels */}
       <MobileDrawer />
@@ -160,7 +158,7 @@ export const App: React.FC = () => {
       {isStoryModeOpen && <React.Suspense fallback={null}><StoryModeModal /></React.Suspense>}
 
       {/* Toast Notification Container */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none max-w-sm w-full">
+      <div aria-live="polite" className="fixed bottom-20 lg:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 z-50 space-y-2 pointer-events-none sm:max-w-sm sm:w-full">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -177,7 +175,7 @@ export const App: React.FC = () => {
             {toast.type === "success" ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+              <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${toast.type === "error" ? "text-danger" : toast.type === "warning" ? "text-attention" : "text-brand"}`} />
             )}
             <div className="flex-1">
               <div className="font-bold">{toast.title}</div>
@@ -186,6 +184,7 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => removeToast(toast.id)}
+              aria-label={t("common.dismiss")}
               className="text-slate-400 hover:text-slate-600 p-0.5"
             >
               <X className="w-3.5 h-3.5" />

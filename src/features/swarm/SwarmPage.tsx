@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient, OrderContext } from "@/api/client";
-import { OrderConstraints, SwarmOrder, SwarmProposal, Shop, StuckReasonType } from "@/api/contracts/types";
+import { DataKind, OrderConstraints, SwarmOrder, SwarmProposal, Shop, StuckReasonType } from "@/api/contracts/types";
 import { ShopCard } from "@/components/signature/ShopCard";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
@@ -39,6 +39,8 @@ export const SwarmPage: React.FC = () => {
 
   const [order, setOrder] = useState<SwarmOrder | null>(null);
   const [proposal, setProposal] = useState<SwarmProposal | null>(null);
+  // ป้ายประเภทข้อมูลอ่านจาก response จริง (preview = ตามที่ backend ระบุ)
+  const [proposalKind, setProposalKind] = useState<DataKind>("forecast");
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,7 +72,7 @@ export const SwarmPage: React.FC = () => {
     : `${constraints?.collection_schedule.length} collection installments`;
   const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
   const applyProposal = (result: Awaited<ReturnType<typeof apiClient.assembleSwarm>>, pool: Shop[]) => {
-    setProposal(result.data); setEligibility(result.audit.eligibility);
+    setProposal(result.data); setProposalKind(result.kind); setEligibility(result.audit.eligibility);
     setProposalMissing(result.missing || []);
     setShops(pool.map((shop) => {
       const allocation = result.data.shops.find((item) => item.shopId === shop.id);
@@ -101,7 +103,7 @@ export const SwarmPage: React.FC = () => {
     if (apiClient.isDemoMode()) {
       Promise.all([apiClient.getOrder(), apiClient.getShops(), apiClient.getSwarmProposal()])
         .then(([orderRes, shopsRes, proposalRes]) => {
-          setOrder(orderRes.data); setShops(shopsRes.data); setCatalogue(shopsRes.data); setProposal(proposalRes.data);
+          setOrder(orderRes.data); setShops(shopsRes.data); setCatalogue(shopsRes.data); setProposal(proposalRes.data); setProposalKind(proposalRes.kind);
         }).catch((err) => setError(err.message)).finally(() => setLoading(false));
       return;
     }
@@ -208,7 +210,7 @@ export const SwarmPage: React.FC = () => {
               <h1 className="text-xl md:text-2xl font-display font-bold text-white tracking-tight">
                 SME SWARM Team Assembly for Large Orders
               </h1>
-              <DataKindBadge kind="forecast" size="md" />
+              <DataKindBadge kind={proposalKind} size="md" />
             </div>
             <p className="text-xs text-slate-400">
               Large-order allocation workspace · Reviewing {shops.length} applicants · {typeRequirementText} · {distanceText}

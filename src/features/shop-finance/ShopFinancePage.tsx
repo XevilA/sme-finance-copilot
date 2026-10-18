@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
-import { Capabilities, Shop, ShopFinance } from "@/api/contracts/types";
+import { Shop, ShopFinance } from "@/api/contracts/types";
 import { envelopeMode, useEnvelope } from "@/hooks/useEnvelope";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { DataKindBadge } from "@/components/signature/DataKindBadge";
 import { StateRenderer } from "@/components/ui/StateRenderer";
 import {
@@ -34,14 +35,9 @@ export const ShopFinancePage: React.FC = () => {
   const financeState = useEnvelope<ShopFinance | null>(useCallback(
     () => (activeShopId ? apiClient.getShopFinance(activeShopId) : Promise.reject(new Error("No shop has been selected."))),
     [activeShopId]), [activeShopId]);
-  const capabilityState = useEnvelope<Capabilities>(useCallback(
-    () => (apiClient.isDemoMode()
-      ? Promise.reject(new Error("Backend capabilities are not declared in demo mode."))
-      : apiClient.getCapabilities()),
-    []));
-  const canSign = capabilityState.envelope?.data.agreementSignature.available === true;
-  const signBlockedReason = capabilityState.envelope?.data.agreementSignature.reason
-    || "The backend does not support agreement signing.";
+  const capabilityState = useCapabilities();
+  const canSign = capabilityState.isAvailable("agreementSignature");
+  const signBlockedReason = capabilityState.reasonFor("agreementSignature", "The backend does not support agreement signing.");
   const finance = financeState.envelope?.data || null;
   const loading = shopsState.loading || financeState.loading;
   const error = shopsState.error || financeState.error;
@@ -101,7 +97,7 @@ export const ShopFinancePage: React.FC = () => {
               <h1 className="text-xl font-display font-bold text-ink">
                 Team Shop Financial Plan
               </h1>
-              <DataKindBadge kind="forecast" size="md" />
+              <DataKindBadge kind={financeState.envelope?.kind ?? "forecast"} size="md" />
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
               Review cash flow and shortfall dates, and track four-party agreement acceptance.
@@ -134,7 +130,7 @@ export const ShopFinancePage: React.FC = () => {
               <Coins className="w-4 h-4 text-brand" />
               <span>Will taking this order leave more cash? (Profit vs. cash)</span>
             </h2>
-            <DataKindBadge kind="forecast" size="sm" />
+            <DataKindBadge kind={financeState.envelope?.kind ?? "forecast"} size="sm" />
           </div>
           <p className="text-xs text-ink-muted leading-relaxed">
             For <strong>{finance.name}</strong>, at a capacity of {finance.boxesPerDay} {finance.totalBoxes ? `per day (${finance.totalBoxes} total)` : "per day"}:
@@ -238,7 +234,7 @@ export const ShopFinancePage: React.FC = () => {
         <div className="bg-white rounded-card border border-borderLine p-4 space-y-3">
           <h3 className="text-xs font-display font-bold text-ink uppercase tracking-wider flex items-center justify-between">
             <span>Shop cash timeline (Purchase → Production → Delivery → Payment)</span>
-            <DataKindBadge kind="forecast" size="sm" />
+            <DataKindBadge kind={financeState.envelope?.kind ?? "forecast"} size="sm" />
           </h3>
 
           <div className="space-y-2">
@@ -285,7 +281,7 @@ export const ShopFinancePage: React.FC = () => {
                 Confirm pricing, allocation, standards, delivery dates, and payment terms.
               </p>
             </div>
-            <DataKindBadge kind="actual" size="sm" />
+            <DataKindBadge kind={financeState.envelope?.kind ?? "actual"} size="sm" />
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">

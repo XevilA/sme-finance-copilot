@@ -3,6 +3,8 @@ import { useAppStore, NavPage } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { Shop, SwarmOrder, SwarmProposal } from "@/api/contracts/types";
 import { useEnvelope } from "@/hooks/useEnvelope";
+import { TranslationKey, useT } from "@/i18n";
+import { storedProposal } from "@/api/dataAvailability";
 import {
   LayoutDashboard,
   UploadCloud,
@@ -124,8 +126,22 @@ const navItems: NavItem[] = [
   },
 ];
 
+const groupKey: Record<NavItem["group"], TranslationKey> = {
+  "Business Analysis": "navGroup.analysis",
+  "Build Opportunities & Teams": "navGroup.opportunities",
+  "Sandbox & Reports": "navGroup.sandbox",
+};
+// badge ที่เป็นข้อความตายตัว แปลตาม key
+const badgeKey: Partial<Record<NavPage, TranslationKey>> = {
+  cashflow: "navBadge.timeTravel",
+  swarm: "navBadge.featured",
+  unlock: "navBadge.disassemble",
+  simulator: "navBadge.chaos",
+};
+
 export const AppSidebar: React.FC = () => {
   const { currentPage, setCurrentPage } = useAppStore();
+  const t = useT();
 
   const groups: ("Business Analysis" | "Build Opportunities & Teams" | "Sandbox & Reports")[] = [
     "Business Analysis",
@@ -139,10 +155,11 @@ export const AppSidebar: React.FC = () => {
   const proposalState = useEnvelope<SwarmProposal>(useCallback(() => apiClient.getSwarmProposal(), []));
   const order = orderState.envelope?.data || null;
   const shops = shopState.envelope?.data || [];
-  const proposal = proposalState.envelope?.data || null;
+  // ไม่มี database -> backend ส่ง proposal เปล่า (ค่า 0 ทั้งหมด) มา ถือว่าไม่มีข้อมูล
+  const proposal = storedProposal(proposalState.envelope);
   const shortfallShops = proposal ? proposal.shops.filter((shop) => shop.fundingGap > 0).length : 0;
   const fundingBadge = proposal && proposal.totalFundingGap > 0
-    ? `Shortfall ฿${proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+    ? t("navBadge.shortfall", { amount: proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 }) })
     : null;
 
   return (
@@ -153,12 +170,13 @@ export const AppSidebar: React.FC = () => {
           return (
             <div key={group}>
               <div className="px-2.5 mb-1.5 text-[10px] font-bold text-ink-muted uppercase tracking-wider">
-                {group}
+                {t(groupKey[group])}
               </div>
               <div className="space-y-0.5">
                 {items.map((item) => {
                   const isActive = currentPage === item.id;
-                  const badge = item.id === "funding" ? fundingBadge : item.badge;
+                  const fixedBadge = badgeKey[item.id];
+                  const badge = item.id === "funding" ? fundingBadge : fixedBadge ? t(fixedBadge) : item.badge;
                   return (
                     <button
                       key={item.id}
@@ -174,7 +192,7 @@ export const AppSidebar: React.FC = () => {
                         <span className={isActive ? "text-white" : "text-ink-muted group-hover:text-brand"}>
                           {item.icon}
                         </span>
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{t(`nav.${item.id}` as TranslationKey)}</span>
                       </div>
                       {badge && (
                         <span
@@ -199,16 +217,16 @@ export const AppSidebar: React.FC = () => {
         <div className="flex items-center gap-1.5 font-semibold text-ink">
           <Sparkles className="w-3.5 h-3.5 text-brand" />
           <span>
-            {order ? `Project: ${order.id}` : "No project selected"}
+            {order ? t("sidebar.project", { id: order.id }) : t("sidebar.noProject")}
           </span>
         </div>
         <p className="text-[10px] mt-0.5 leading-snug">
           {order
-            ? `${shops.length} applicants · Target ${order.quantityPerDay} per day for ${order.days} days`
-            : "No saved order"}
+            ? t("sidebar.orderSummary", { shops: shops.length, perDay: order.quantityPerDay, days: order.days })
+            : t("sidebar.noOrder")}
           {proposal
-            ? ` · Saved proposal: ${proposal.shops.length} shops assigned, ${shortfallShops} with a working-capital shortfall (฿${proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 })})`
-            : " · No saved proposal"}
+            ? ` · ${t("sidebar.proposalSummary", { shops: proposal.shops.length, short: shortfallShops, amount: proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 }) })}`
+            : ` · ${t("sidebar.noProposal")}`}
         </p>
       </div>
     </aside>

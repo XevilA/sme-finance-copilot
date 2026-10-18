@@ -3,6 +3,7 @@ import { useAppStore, NavPage } from "@/store/useAppStore";
 import { apiClient } from "@/api/client";
 import { FundingOption, Shop, UnlockResource } from "@/api/contracts/types";
 import { useEnvelope } from "@/hooks/useEnvelope";
+import { TranslationKey, useT } from "@/i18n";
 import {
   Search,
   Store,
@@ -46,6 +47,7 @@ const searchableMenu: SearchResultItem[] = [
 
 export const CommandPalette: React.FC = () => {
   const { isCommandPaletteOpen, setCommandPaletteOpen, setCurrentPage } = useAppStore();
+  const t = useT();
   const shopState = useEnvelope<Shop[]>(useCallback(() => apiClient.getShops(), []));
   const resourceState = useEnvelope<UnlockResource[]>(useCallback(() => apiClient.getUnlockResources(), []));
   const fundingState = useEnvelope<FundingOption[]>(useCallback(() => apiClient.getFundingOptions(), []));
@@ -82,13 +84,18 @@ export const CommandPalette: React.FC = () => {
   // returned. Each record carries its own UUID and its own figures.
   const money = (value: number) => `฿${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   const catalogue: SearchResultItem[] = [
-    ...searchableMenu,
+    // ชื่อเมนูแปลตามภาษา (ค้นหาได้ทั้งภาษาที่เลือก)
+    ...searchableMenu.map((item) => ({
+      ...item,
+      title: t(`cmd.${item.id}.title` as TranslationKey),
+      subtitle: t(`cmd.${item.id}.sub` as TranslationKey),
+    })),
     ...(shopState.envelope?.data || []).map((shop) => ({
       id: `shop-${shop.id}`,
       category: "Shops" as const,
       title: shop.name,
-      subtitle: `Available capacity: ${shop.capacityAvailable} ${shop.unit}`
-        + (shop.fundingGap > 0 ? ` · Working-capital shortfall: ${money(shop.fundingGap)}` : " · No funding gap recorded")
+      subtitle: t("cmd.shopCapacity", { n: shop.capacityAvailable, unit: shop.unit })
+        + (shop.fundingGap > 0 ? ` · ${t("cmd.shopShortfall", { amount: money(shop.fundingGap) })}` : ` · ${t("cmd.noGap")}`)
         + ` · ${shop.location}`,
       targetPage: "shop-finance" as NavPage,
       targetShopId: shop.id,
@@ -98,15 +105,15 @@ export const CommandPalette: React.FC = () => {
       category: "Resources" as const,
       title: resource.title,
       subtitle: `${resource.capacityText} · ${resource.priceText} · `
-        + (resource.status === "confirmed" ? "Confirmed" : "Proposed"),
+        + (resource.status === "confirmed" ? t("cmd.confirmed") : t("cmd.proposed")),
       targetPage: "unlock" as NavPage,
     })),
     ...(fundingState.envelope?.data || []).map((option) => ({
       id: `funding-${option.id}`,
       category: "Funders" as const,
       title: option.name,
-      subtitle: `${option.typeLabel} · ${option.provider} · ${option.interestRateAnnual}% annual interest`
-        + ` · Disbursed in ${option.disbursementDays} days`,
+      subtitle: `${option.typeLabel} · ${option.provider} · ${t("cmd.interest", { n: option.interestRateAnnual })}`
+        + ` · ${t("cmd.disbursed", { n: option.disbursementDays })}`,
       targetPage: "funding" as NavPage,
     })),
   ];
@@ -160,12 +167,13 @@ export const CommandPalette: React.FC = () => {
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            placeholder="Search shops, menus, available kitchens, funders, projects... (press Esc to close)"
+            placeholder={t("cmd.placeholder")}
             className="w-full bg-transparent text-sm text-ink placeholder:text-ink-muted outline-none font-sans"
           />
           <button
             type="button"
             onClick={() => setCommandPaletteOpen(false)}
+            aria-label={t("common.close")}
             className="p-1 text-ink-muted hover:text-ink rounded-lg"
           >
             <X className="w-4 h-4" />
@@ -176,7 +184,7 @@ export const CommandPalette: React.FC = () => {
         <div className="max-h-96 overflow-y-auto p-2 space-y-1">
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-xs text-ink-muted">
-              No results found for "{query}"
+              {t("cmd.noResults", { q: query })}
             </div>
           ) : (
             filtered.map((item, idx) => (
@@ -195,7 +203,7 @@ export const CommandPalette: React.FC = () => {
                     <div className="font-semibold flex items-center gap-1.5">
                       <span>{item.title}</span>
                       <span className="text-[10px] text-ink-muted font-normal bg-slate-100 px-1.5 py-0.5 rounded">
-                        {item.category}
+                        {t(`cmdCat.${item.category}` as TranslationKey)}
                       </span>
                     </div>
                     <div className="text-[11px] text-ink-muted line-clamp-1">{item.subtitle}</div>
@@ -209,8 +217,8 @@ export const CommandPalette: React.FC = () => {
 
         {/* Footer shortcuts */}
         <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-ink-muted">
-          <span>Press <strong>Enter</strong> to select</span>
-          <span className="font-mono">Press ⌘K to open anytime</span>
+          <span>{t("cmd.enterHint")}</span>
+          <span className="font-mono">{t("cmd.openHint")}</span>
         </div>
       </div>
     </div>

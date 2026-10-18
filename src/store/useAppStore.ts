@@ -20,6 +20,18 @@ export type UserRole = "owner" | "buyer" | "funder";
 
 export type MotionIntensity = "full" | "reduced" | "off";
 
+export type Language = "en" | "th";
+const LANGUAGE_KEY = "sme-copilot-language";
+
+// จำภาษาที่เลือกไว้ในเครื่อง (ถ้า storage ใช้ไม่ได้ก็ใช้ภาษาอังกฤษไป)
+function readLanguage(): Language {
+  try {
+    const saved = localStorage.getItem(LANGUAGE_KEY);
+    if (saved === "en" || saved === "th") return saved;
+  } catch { /* private mode / blocked storage */ }
+  return "en";
+}
+
 export type PageStateMode =
   | "normal"
   | "empty"
@@ -55,6 +67,10 @@ interface AppState {
   setSelectedShopId: (shopId: string) => void;
   setSelectedOrderId: (orderId: string) => void;
   setContextPill: (pill: string | null) => void;
+
+  // Language
+  language: Language;
+  setLanguage: (language: Language) => void;
 
   // Motion Settings
   motionIntensity: MotionIntensity;
@@ -129,6 +145,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedShopId: (shopId) => set({ selectedShopId: shopId }),
   setSelectedOrderId: (orderId) => set({ selectedOrderId: orderId }),
   setContextPill: (pill) => set({ contextPill: pill }),
+
+  // Language
+  language: readLanguage(),
+  setLanguage: (language) => {
+    try { localStorage.setItem(LANGUAGE_KEY, language); } catch { /* ignore */ }
+    set({ language });
+  },
 
   // Motion Settings
   motionIntensity: "full",

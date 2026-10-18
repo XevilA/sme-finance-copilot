@@ -61,7 +61,7 @@ export const StoryModeModal: React.FC = () => {
             <span className="text-xs text-brand-glow font-semibold tracking-wider uppercase">
               A Common Challenge for SMEs
             </span>
-            <DataKindBadge kind="actual" size="sm" />
+            <DataKindBadge kind="simulated" size="sm" />
           </div>
           <p className="text-sm text-slate-200 leading-relaxed">
             A small restaurant may not be able to fulfill a large order of 300 boxes per day on its own because production capacity and kitchen space are limited (typically 50–70 boxes per day). Declining the order could mean missing a major revenue opportunity.
@@ -209,9 +209,9 @@ export const StoryModeModal: React.FC = () => {
   const current = scenes[storyCurrentScene - 1];
 
   return (
-    <div className="fixed inset-0 z-50 bg-navy-deep text-white flex flex-col justify-between p-6 overflow-hidden animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-navy-deep text-white flex flex-col justify-between p-4 sm:p-6 overflow-y-auto animate-fade-in">
       {/* Top Stepper Bar */}
-      <div className="max-w-5xl w-full mx-auto flex items-center justify-between border-b border-navy-border pb-4">
+      <div className="max-w-5xl w-full mx-auto flex flex-wrap items-center justify-between gap-3 border-b border-navy-border pb-4">
         <div className="flex items-center gap-3">
           <span className="px-2.5 py-1 rounded-chip bg-brand/20 border border-brand text-brand-glow text-xs font-bold font-mono">
             STORY MODE

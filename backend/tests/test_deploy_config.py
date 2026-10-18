@@ -63,6 +63,18 @@ def test_unrelated_query_parameters_survive():
     assert args == {"ssl": True}
 
 
+def test_neon_connection_string_keeps_tls_and_drops_channel_binding():
+    """Neon hands out sslmode=require&channel_binding=require; asyncpg rejects the second."""
+    url, args = normalise_database_url(
+        "postgresql://owner:p@ep-x-pooler.ap-southeast-1.aws.neon.tech/neondb"
+        "?sslmode=require&channel_binding=require"
+    )
+    assert url.startswith("postgresql+asyncpg://")
+    assert "channel_binding" not in url
+    assert "sslmode" not in url
+    assert args == {"ssl": True}
+
+
 def test_an_empty_url_stays_empty_so_demo_mode_still_works():
     assert normalise_database_url("") == ("", {})
     assert normalise_database_url("   ") == ("", {})

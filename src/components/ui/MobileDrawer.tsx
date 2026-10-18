@@ -2,6 +2,9 @@ import React, { useCallback } from "react";
 import { apiClient } from "@/api/client";
 import { SwarmProposal } from "@/api/contracts/types";
 import { useEnvelope } from "@/hooks/useEnvelope";
+import { TranslationKey, useT } from "@/i18n";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { storedProposal } from "@/api/dataAvailability";
 import { useAppStore, NavPage, UserRole } from "@/store/useAppStore";
 import {
   LayoutDashboard,
@@ -129,6 +132,19 @@ const navItems: NavItem[] = [
   },
 ];
 
+const groupKey: Record<NavItem["group"], TranslationKey> = {
+  "Business Analysis": "navGroup.analysis",
+  "Build Opportunities & Teams": "navGroup.opportunities",
+  "Sandbox & Reports": "navGroup.sandbox",
+};
+// badge ที่เป็นข้อความตายตัว แปลตาม key
+const badgeKey: Partial<Record<NavPage, TranslationKey>> = {
+  cashflow: "navBadge.timeTravel",
+  swarm: "navBadge.featured",
+  unlock: "navBadge.disassemble",
+  simulator: "navBadge.chaos",
+};
+
 export const MobileDrawer: React.FC = () => {
   const {
     currentPage,
@@ -142,12 +158,14 @@ export const MobileDrawer: React.FC = () => {
     isReducedMotion,
     toggleReducedMotion,
   } = useAppStore();
+  const t = useT();
 
   // The funding badge reports the stored proposal's own gap, not a fixed figure.
   const proposalState = useEnvelope<SwarmProposal>(useCallback(() => apiClient.getSwarmProposal(), []));
-  const proposal = proposalState.envelope?.data || null;
+  // ไม่มี database -> backend ส่ง proposal เปล่า (ค่า 0 ทั้งหมด) มา ถือว่าไม่มีข้อมูล
+  const proposal = storedProposal(proposalState.envelope);
   const fundingBadge = proposal && proposal.totalFundingGap > 0
-    ? `Shortfall ฿${proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+    ? t("navBadge.shortfall", { amount: proposal.totalFundingGap.toLocaleString("en-US", { maximumFractionDigits: 0 }) })
     : null;
 
   if (!isMobileMenuOpen) return null;
@@ -175,14 +193,14 @@ export const MobileDrawer: React.FC = () => {
               SME
             </div>
             <div>
-              <div className="text-xs font-bold text-ink leading-tight">SME Finance Copilot</div>
+              <div className="text-xs font-bold text-ink leading-tight">{t("app.name")}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setMobileMenuOpen(false)}
             className="p-1.5 text-slate-400 hover:text-ink hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
-            aria-label="Close menu"
+            aria-label={t("drawer.close")}
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,7 +210,7 @@ export const MobileDrawer: React.FC = () => {
         <div className="p-3 bg-slate-100/70 border-b border-borderLine">
           <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
             <Shield className="w-3 h-3 text-brand" />
-            <span>View as (Role)</span>
+            <span>{t("drawer.viewAs")}</span>
           </div>
           <div className="grid grid-cols-3 gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
             {(["owner", "buyer", "funder"] as UserRole[]).map((r) => (
@@ -206,10 +224,16 @@ export const MobileDrawer: React.FC = () => {
                     : "text-ink-muted hover:text-ink"
                 }`}
               >
-                {r === "owner" ? "Owner" : r === "buyer" ? "Buyer" : "Funder"}
+                {t(r === "owner" ? "role.owner" : r === "buyer" ? "role.buyer" : "role.funder")}
               </button>
             ))}
           </div>
+        </div>
+
+        {/* เลือกภาษา */}
+        <div className="px-3 pt-3">
+          <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1.5">{t("lang.label")}</div>
+          <LanguageSwitcher />
         </div>
 
         {/* Scrollable Navigation List */}
@@ -219,7 +243,7 @@ export const MobileDrawer: React.FC = () => {
             return (
               <div key={grp} className="space-y-1">
                 <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider block px-2 mb-1">
-                  {grp}
+                  {t(groupKey[grp])}
                 </span>
                 <div className="space-y-0.5">
                   {itemsInGroup.map((item) => {
@@ -239,9 +263,9 @@ export const MobileDrawer: React.FC = () => {
                           <span className={isActive ? "text-white" : "text-brand"}>
                             {item.icon}
                           </span>
-                          <span className="truncate">{item.label}</span>
+                          <span className="truncate">{t(`nav.${item.id}` as TranslationKey)}</span>
                         </div>
-                        {(item.id === "funding" ? fundingBadge : item.badge) && (
+                        {(item.id === "funding" ? fundingBadge : badgeKey[item.id] ? t(badgeKey[item.id]!) : item.badge) && (
                           <span
                             className={`text-[9px] px-1.5 py-0.5 rounded-chip font-bold shrink-0 ${
                               isActive
@@ -249,7 +273,7 @@ export const MobileDrawer: React.FC = () => {
                                 : item.badgeColor || "bg-slate-100 text-ink-muted"
                             }`}
                           >
-                            {item.id === "funding" ? fundingBadge : item.badge}
+                            {item.id === "funding" ? fundingBadge : badgeKey[item.id] ? t(badgeKey[item.id]!) : item.badge}
                           </span>
                         )}
                       </button>
@@ -272,11 +296,11 @@ export const MobileDrawer: React.FC = () => {
             className="w-full py-2 bg-gradient-to-r from-navy-deep to-brand text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm"
           >
             <PlayCircle className="w-4 h-4 text-brand-glow" />
-            <span>Story Mode</span>
+            <span>{t("header.storyMode")}</span>
           </button>
 
           <div className="flex items-center justify-between pt-1 text-[11px] text-ink-muted">
-            <span>Reduce motion</span>
+            <span>{t("drawer.reduceMotion")}</span>
             <button
               type="button"
               onClick={toggleReducedMotion}
@@ -286,7 +310,7 @@ export const MobileDrawer: React.FC = () => {
                   : "bg-white text-slate-600 border-slate-200"
               }`}
             >
-              {isReducedMotion ? "ON" : "OFF"}
+              {isReducedMotion ? t("common.on") : t("common.off")}
             </button>
           </div>
         </div>
