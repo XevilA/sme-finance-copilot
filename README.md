@@ -61,10 +61,10 @@ backend/.venv/Scripts/python.exe -m pytest -c backend/pytest.ini -q
 
 Database-dependent backend tests are skipped when `DATABASE_URL` is unset. Run the persistence and end-to-end database checks against a dedicated test database, not the public demo database. A stateless test run does not certify database integration.
 
-## Integration and API references
+## Frontend developer: read only these two docs
 
-- [Frontend Integration: API and AI](docs/frontend-integration.md) — local setup, upload-to-analysis flow, AI rendering, typed client usage, runtime capabilities, and error handling.
-- [API Contract Matrix](docs/API_CONTRACT_MATRIX.md) — route details, request context, persistence and replay behavior.
-- [Backend API and Math](backend/docs/API_AND_MATH.md) — input contract, financial formulas, rounding and AI provenance.
-- [Demo Handoff](backend/docs/DEMO_HANDOFF.md) — feature readiness and safe demo boundaries.
+1. [Frontend Integration: API and AI](docs/frontend-integration.md) — start here for setup, the upload-to-analysis flow, AI behavior, and how to connect screens through `apiClient`.
+2. [API Contract Matrix](docs/API_CONTRACT_MATRIX.md) — use as a lookup when you need the exact endpoint, request fields, response context, persistence behavior, or error codes.
+
+These two files are the complete frontend handoff. Backend math/deployment notes and project/proposal documents are supporting references and are not required to start frontend integration.
 
